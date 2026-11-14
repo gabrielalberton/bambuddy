@@ -71,7 +71,7 @@ export function Switch({ checked, onChange, label, id }: { checked: boolean; onC
       }`}
     >
       <span className={`relative inline-block h-6 w-10 shrink-0 rounded-full transition-colors ${checked ? 'bg-bambu-green' : 'bg-bambu-dark-tertiary'}`} aria-hidden="true">
-        <span className={`absolute top-1 h-4 w-4 rounded-full bg-white transition-transform ${checked ? 'translate-x-5' : 'translate-x-1'}`} />
+        <span className={`absolute left-0 top-1 h-4 w-4 rounded-full bg-white transition-transform ${checked ? 'translate-x-5' : 'translate-x-1'}`} />
       </span>
       {label}
     </button>

@@ -192,9 +192,11 @@ export function ModelDetail({ source, id, printer, onBack }: { source: CatalogSo
             </section>
           </div>
 
+          {/* Celular: a barra Salvar/Fatiar fica fixa no rodapé (o <main> do
+              Layout não é o elemento que rola, então sticky não funciona). */}
           {canSave && data.files.length > 0 && (
             <div
-              className="sticky bottom-0 z-10 -mx-4 border-t border-bambu-dark-tertiary bg-bambu-dark/95 px-4 pt-3 backdrop-blur md:static md:mx-0 md:rounded-xl md:border md:px-4"
+              className="fixed inset-x-0 bottom-0 z-30 border-t border-bambu-dark-tertiary bg-bambu-dark/95 px-4 pt-3 backdrop-blur md:static md:rounded-xl md:border"
               style={{ paddingBottom: 'calc(0.75rem + env(safe-area-inset-bottom))' }}
             >
               <div className="grid grid-cols-2 gap-2 md:flex md:flex-wrap">
@@ -224,6 +226,7 @@ export function ModelDetail({ source, id, printer, onBack }: { source: CatalogSo
           </section>
         </>
       ) : null}
+      {canSave && (data?.files.length ?? 0) > 0 && <div className="h-36 md:hidden" aria-hidden="true" />}
       {sliceFile && (
         <SliceModal source={{ kind: 'libraryFile', id: sliceFile.library_file_id, filename: sliceFile.filename }} onClose={() => setSliceFile(null)} />
       )}

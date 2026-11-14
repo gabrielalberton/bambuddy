@@ -13,6 +13,7 @@ filtro padrão; existe como opção explícita (``author_printer``).
 
 from __future__ import annotations
 
+import re
 from pathlib import PurePosixPath
 from typing import Any
 
@@ -44,13 +45,25 @@ DETAIL_FIELDS = (
 ORDERING = {"trending": "popular", "popular": "popular", "newest": "latest", "relevance": "best_match"}
 
 
-def image_url(image: dict | None) -> str | None:
+_IMAGE_PATH = re.compile(r"^(?P<dir>media/prints/\d+/images/[^/]+)/(?P<stem>[^/]+)\.(?P<ext>[A-Za-z0-9]{2,5})$")
+
+
+def image_url(image: dict | None, size: str | None = None) -> str | None:
+    """URL da imagem; com ``size`` usa a miniatura webp que o CDN do Printables gera.
+
+    ``size`` = "cover/640x480" (cards) ou "inside/1280x960" (galeria). O
+    original passa de 1-7 MB; a miniatura tem dezenas de KB (celular).
+    """
     path = (image or {}).get("filePath")
     if not isinstance(path, str) or not path:
         return None
     if path.startswith("https://"):
         return path
-    return "https://media.printables.com/" + path.lstrip("/")
+    path = path.lstrip("/")
+    match = _IMAGE_PATH.match(path)
+    if size and match:
+        return f"https://media.printables.com/{match['dir']}/thumbs/{size}/{match['ext'].lower()}/{match['stem']}.webp"
+    return "https://media.printables.com/" + path
 
 
 def card(model: dict) -> dict:
@@ -60,7 +73,7 @@ def card(model: dict) -> dict:
         "title": model.get("name") or "Untitled model",
         "url": f"https://www.printables.com/model/{model['id']}",
         "creator": (model.get("user") or {}).get("publicUsername") or "Unknown creator",
-        "thumbnail": image_url(model.get("image")),
+        "thumbnail": image_url(model.get("image"), "cover/640x480"),
         "downloads": model.get("downloadCount"),
         "likes": model.get("likesCount"),
     }
@@ -193,7 +206,8 @@ class PrintablesSource(CatalogSource):
         return {
             **card(model),
             "description_html": model.get("description") or "",
-            "images": [u for img in (model.get("images") or [])[:40] if (u := image_url(img))],
+            "thumbnail": image_url(model.get("image"), "inside/1280x960"),
+            "images": [u for img in (model.get("images") or [])[:40] if (u := image_url(img, "inside/1280x960"))],
             "license": (model.get("license") or {}).get("name"),
             "files": ordered,
             "preselect_file_id": preselect,

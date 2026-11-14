@@ -13,7 +13,7 @@ pelo ``/makerworld/import`` com a credencial Bambu Cloud já salva).
 from __future__ import annotations
 
 from typing import Any
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlsplit
 
 import httpx
 
@@ -33,6 +33,18 @@ from .transport import HEADERS
 SEARCH_BASE = "https://api.bambulab.com/v1/search-service"
 
 
+def sized(url: str | None, width: int) -> str | None:
+    """Versão redimensionada pelo próprio CDN (o mesmo parâmetro OSS que o site usa).
+
+    Capa original chega a 2-7 MB; em webp com 400 px fica com poucos KB (celular).
+    """
+    if not isinstance(url, str) or not url or "?" in url:
+        return url or None
+    if urlsplit(url).hostname not in MAKERWORLD_CDN_HOSTS:
+        return url
+    return f"{url}?x-oss-process=image/resize,w_{width}/format,webp"
+
+
 def card(design: dict[str, Any]) -> dict[str, Any]:
     return {
         "provider": "makerworld",
@@ -40,7 +52,7 @@ def card(design: dict[str, Any]) -> dict[str, Any]:
         "title": design.get("title") or "Untitled model",
         "url": f"https://makerworld.com/en/models/{design['id']}",
         "creator": (design.get("designCreator") or {}).get("name") or "Unknown creator",
-        "thumbnail": design.get("coverUrl") or design.get("cover") or None,
+        "thumbnail": sized(design.get("coverUrl") or design.get("cover") or None, 400),
         "downloads": design.get("downloadCount"),
         "likes": design.get("likeCount"),
     }
@@ -202,8 +214,9 @@ class MakerWorldSource(CatalogSource):
         license_value = design.get("license")
         return {
             **card(design),
+            "thumbnail": sized(design.get("coverUrl") or design.get("cover") or None, 1200),
             "description_html": design.get("summary") or "",
-            "images": images[:40],
+            "images": [sized(u, 1200) for u in images[:40]],
             "license": license_value if isinstance(license_value, str) else None,
             "files": ordered,
             "preselect_file_id": preselect,

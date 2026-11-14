@@ -354,3 +354,21 @@ async def test_thingiverse_search_detail_and_download(monkeypatch):
     assert got.data == valid_stl() and got.canonical_url == "https://www.thingiverse.com/thing:9#file-1"
     cdn = [r for r in seen if r.url.host == "cdn.thingiverse.com"][0]
     assert "authorization" not in cdn.headers
+
+
+def test_thumbnails_use_cdn_resized_versions():
+    from backend.app.custom.models_catalog.makerworld import card as mw_card, sized
+    from backend.app.custom.models_catalog.printables import image_url
+
+    assert (
+        mw_card({"id": 1, "cover": "https://makerworld.bblmw.com/a/b.jpg"})["thumbnail"]
+        == "https://makerworld.bblmw.com/a/b.jpg?x-oss-process=image/resize,w_400/format,webp"
+    )
+    assert sized("https://evil.example/a.jpg", 400) == "https://evil.example/a.jpg"
+    assert sized("https://makerworld.bblmw.com/a.jpg?x=1", 400) == "https://makerworld.bblmw.com/a.jpg?x=1"
+    path = {"filePath": "media/prints/3161/images/20206_ab/benchy.JPEG"}
+    assert (
+        image_url(path, "cover/640x480")
+        == "https://media.printables.com/media/prints/3161/images/20206_ab/thumbs/cover/640x480/jpeg/benchy.webp"
+    )
+    assert image_url(path) == "https://media.printables.com/media/prints/3161/images/20206_ab/benchy.JPEG"
