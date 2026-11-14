@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
+import { MultiPrinterOnly } from '../custom/MultiPrinterOnly';
 import { X, Loader2, QrCode, Cpu, MapPin, ArrowLeft } from 'lucide-react';
 import { api, ApiError, type AMSTray } from '../api/client';
 import { Button } from './Button';
@@ -409,6 +410,7 @@ export function QrAssignTargetModal({ isOpen, onClose, spoolmanMode = false }: Q
 
               {tab === 'ams' ? (
                 <div className="space-y-3">
+                  <MultiPrinterOnly>
                   <div>
                     <label htmlFor="qr-printer-select" className="block text-xs font-medium text-bambu-gray uppercase tracking-wide mb-1">
                       {t('inventory.qrAssign.printer')}
@@ -430,6 +432,7 @@ export function QrAssignTargetModal({ isOpen, onClose, spoolmanMode = false }: Q
                       ))}
                     </select>
                   </div>
+                  </MultiPrinterOnly>
 
                   <div>
                     <span className="block text-xs font-medium text-bambu-gray uppercase tracking-wide mb-1">

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
+import { MultiPrinterOnly } from '../custom/MultiPrinterOnly';
 import {
   Gauge,
   Loader2,
@@ -1334,6 +1335,7 @@ export function KProfilesView() {
 
       {/* Printer & Nozzle Selector */}
       <div className="flex flex-wrap gap-4 mb-6">
+        <MultiPrinterOnly>
         <div className="flex-1 min-w-48">
           <label className="block text-sm text-bambu-gray mb-1">{t('kProfiles.printer')}</label>
           <select
@@ -1348,6 +1350,7 @@ export function KProfilesView() {
             ))}
           </select>
         </div>
+        </MultiPrinterOnly>
 
         <div className="w-32">
           <label className="block text-sm text-bambu-gray mb-1">{t('kProfiles.nozzle')}</label>
