@@ -4,6 +4,9 @@ import { render } from '../../__tests__/utils';
 import { PrintersPage } from '../../pages/PrintersPage';
 import { PrinterSelector } from '../../components/PrintModal/PrinterSelector';
 import { CameraLauncher } from '../../components/CameraLauncher';
+import { PrintModal } from '../../components/PrintModal';
+import { http, HttpResponse } from 'msw';
+import { server } from '../../__tests__/mocks/server';
 import type { Printer } from '../../api/client';
 import { setSinglePrinterModeOverride } from '../flags';
 import { LAST_PRINTER_COUNT_KEY } from '../useSinglePrinter';
@@ -131,5 +134,34 @@ describe('CameraLauncher no modo impressora única', () => {
     fireEvent.click(button);
     await waitFor(() => expect(localStorage.getItem('openEmbeddedCameras')).toBeNull());
     expect(screen.queryByRole('region', { name: 'Cameras' })).toBeNull();
+  });
+});
+
+describe('PrintModal no modo impressora única', () => {
+  it('autoseleciona a única impressora, esconde a lista e envia com printer_id', async () => {
+    setSinglePrinterModeOverride('auto');
+    mockPrinterList([printerA1]);
+    const bodies: Array<Record<string, unknown>> = [];
+    server.use(
+      http.get('/api/v1/archives/:id/plates', () => HttpResponse.json({ is_multi_plate: false, plates: [] })),
+      http.get('/api/v1/archives/:id/filament-requirements', () => HttpResponse.json({ filaments: [] })),
+      http.post('/api/v1/queue/', async ({ request }) => {
+        bodies.push((await request.json()) as Record<string, unknown>);
+        return HttpResponse.json({ id: 1, status: 'pending' });
+      }),
+    );
+    render(<PrintModal mode="create" archiveId={1} archiveName="Benchy.3mf" onClose={vi.fn()} onSuccess={vi.fn()} />);
+
+    // Sem lista de impressoras e sem aviso "Select at least one printer": a seleção automática aconteceu.
+    await waitFor(() => expect(localStorage.getItem(LAST_PRINTER_COUNT_KEY)).toBe('1'));
+    await waitFor(() => expect(screen.queryByText('Select at least one printer')).toBeNull());
+    expect(screen.queryByText('A1 do Gabriel')).toBeNull();
+    expect(screen.queryByText('Specific Printer')).toBeNull();
+
+    const submit = document.querySelector('button[type="submit"]') as HTMLButtonElement;
+    await waitFor(() => expect(submit.disabled).toBe(false));
+    fireEvent.click(submit);
+    await waitFor(() => expect(bodies).toHaveLength(1));
+    expect(bodies[0].printer_id).toBe(7);
   });
 });
