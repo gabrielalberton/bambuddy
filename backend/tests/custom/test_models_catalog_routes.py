@@ -128,3 +128,32 @@ async def test_permission_boundaries(async_client):
         f"{BASE}/makerworld/42/save", headers={"Authorization": f"Bearer {mw_viewer}"}, json={"file_id": "6"}
     )
     assert r.status_code == 403
+
+
+async def test_save_sends_web_push_once_and_on_failure(async_client):
+    """Salvar do catálogo avisa no PWA (Web Push) quando baixa um arquivo novo e quando o download falha."""
+    import asyncio
+
+    from backend.app.services.model_providers.base import ProviderError
+
+    sent = AsyncMock()
+    download = AsyncMock(return_value=_download())
+    with (
+        patch("backend.app.custom.webpush.provider.notify", sent),
+        patch.object(catalog.SOURCES["printables"], "download", download),
+        patch("backend.app.api.routes.library._render_stl_thumbnail", AsyncMock(return_value=None)),
+    ):
+        ok = await async_client.post(f"{BASE}/printables/43/save", json={"file_id": "stl:5"})
+        again = await async_client.post(f"{BASE}/printables/43/save", json={"file_id": "stl:5"})
+        await asyncio.sleep(0)
+        assert ok.status_code == 200 and again.json()["was_existing"] is True
+        assert sent.await_count == 1
+        title, url = sent.await_args.args[1], sent.await_args.args[3]
+        assert title == "Modelo salvo na biblioteca" and url == "/files"
+
+        download.side_effect = ProviderError("upstream down")
+        failed = await async_client.post(f"{BASE}/printables/44/save", json={"file_id": "stl:6"})
+        await asyncio.sleep(0)
+        assert failed.status_code >= 500
+        assert sent.await_count == 2
+        assert sent.await_args.args[1].startswith("Catálogo") and sent.await_args.args[3] == "/model-sources"

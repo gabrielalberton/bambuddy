@@ -172,6 +172,10 @@ Cartão da impressora: não tem vídeo (só a miniatura do job), então não rec
 Notificações nativas no PWA (inclusive com o app fechado) como provedor de notificação `webpush`
 ("Web Push (PWA)"). Como funciona, passo a passo no celular e problemas comuns: `custom/docs/notificacoes-pwa.md`.
 
+Notificações das personalizações: o "Salvar" do catálogo chama `notify()` ao baixar um arquivo novo
+("Modelo salvo na biblioteca", abre `/files`) e quando o download falha (abre `/model-sources`). O gêmeo digital não gera
+alertas próprios (é só visualização; os eventos da impressão já vêm do `notification_service` do upstream).
+
 ### Interruptor
 
 - Backend: `BAMBUDDY_CUSTOM_WEBPUSH=0` desliga rotas e provedor (a tabela continua existindo).

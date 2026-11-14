@@ -262,6 +262,42 @@ async def save(
     api_key_cloud_owner: User | None = Depends(resolve_api_key_cloud_owner),
     actor: User | ApiKeyActor | None = RequestActor,
 ):
+    # Download pode demorar e o PWA pode estar em segundo plano: avisa por Web Push quando termina ou falha.
+    try:
+        saved = await _save(source_id, model_id, body, db, credentials, x_api_key, api_key_cloud_owner, actor)
+    except HTTPException as exc:
+        if exc.status_code not in (400, 401, 403, 404, 422):
+            _push_save_result(actor, source_id, None, f"Falha ao baixar o modelo ({exc.status_code}): {exc.detail}")
+        raise
+    except Exception:
+        _push_save_result(actor, source_id, None, "Falha ao baixar o modelo (erro interno).")
+        raise
+    if not saved.was_existing:
+        _push_save_result(actor, source_id, saved, None)
+    return saved
+
+
+_push_tasks: set[asyncio.Task] = set()
+
+
+def _push_save_result(actor, source_id: str, saved: SavedFile | None, error: str | None) -> None:
+    """Dispara a notificação sem atrasar a resposta; nunca derruba o salvamento."""
+    try:
+        from backend.app.custom.webpush.provider import notify
+
+        user_ids = [actor.id] if isinstance(actor, User) else None
+        if saved is not None:
+            title, body, url, tag = "Modelo salvo na biblioteca", saved.filename, "/files", f"catalog-save-{saved.library_file_id}"
+        else:
+            title, body, url, tag = f"Catálogo ({source_id})", error or "", "/model-sources", "catalog-save-error"
+        task = asyncio.get_running_loop().create_task(notify(user_ids, title, body, url, tag))
+        _push_tasks.add(task)
+        task.add_done_callback(_push_tasks.discard)
+    except Exception:  # noqa: BLE001 - notificação é acessória
+        logger.debug("Web Push do catálogo falhou", exc_info=True)
+
+
+async def _save(source_id, model_id, body, db, credentials, x_api_key, api_key_cloud_owner, actor) -> SavedFile:
     source = get_source(source_id)
     check_id(model_id)
 
