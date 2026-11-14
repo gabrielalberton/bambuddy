@@ -1,6 +1,7 @@
 import { useQuery, useQueries, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Loader2, Plus, Plug, AlertTriangle, RotateCcw, Bell, Download, RefreshCw, ExternalLink, Globe, Droplets, Thermometer, FileText, Edit2, Pencil, Send, CheckCircle, XCircle, History, Trash2, Zap, TrendingUp, Calendar, DollarSign, Power, PowerOff, Key, Copy, Database, X, Shield, Printer, Cylinder, Wifi, Home, Video, Users, Lock, Unlock, ChevronDown, Save, Mail, Flame, Layers, ListOrdered, Code, Search, Scale, Settings as SettingsIcon, ScanEye, Cog, QrCode, Heart, Briefcase, Workflow, UploadCloud, MonitorPlay, Info, Lightbulb } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { MultiPrinterOnly } from '../custom/MultiPrinterOnly';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../api/client';
 import { useAuth } from '../contexts/AuthContext';
@@ -1938,6 +1939,7 @@ export function SettingsPage() {
                   </div>
                 </div>
               </div>
+              <MultiPrinterOnly>
               <div>
                 <label className="block text-sm text-bambu-gray mb-1">
                   {t('settings.defaultPrinter')}
@@ -1961,6 +1963,7 @@ export function SettingsPage() {
                   {t('settings.defaultPrinterDescription')}
                 </p>
               </div>
+              </MultiPrinterOnly>
             </CardContent>
           </Card>
 
@@ -6391,6 +6394,7 @@ export function SettingsPage() {
             </Card>
 
             {/* Per-Printer Mapping Default */}
+            <MultiPrinterOnly>
             <Card id="card-printmodal">
               <CardHeader>
                 <h2 className="text-lg font-semibold text-white">{t('settings.printModal')}</h2>
@@ -6415,6 +6419,7 @@ export function SettingsPage() {
                 </div>
               </CardContent>
             </Card>
+            </MultiPrinterOnly>
 
             <Card id="card-amsthresholds">
               <CardHeader>
