@@ -167,6 +167,49 @@ Chave **"Câmera | 3D"** onde o Bambuddy mostra a câmera da A1: em "3D", o quad
 
 Cartão da impressora: não tem vídeo (só a miniatura do job), então não recebeu a chave. Total do twin no upstream: 2 arquivos, +12/−4 (com single-printer + catálogo, `git diff --stat v1.3.1..custom-twin` fora de `custom/`: 26 arquivos, +133/−25).
 
+## 4. Web Push no PWA (`custom(webpush)`)
+
+Notificações nativas no PWA (inclusive com o app fechado) como provedor de notificação `webpush`
+("Web Push (PWA)"). Como funciona, passo a passo no celular e problemas comuns: `custom/docs/notificacoes-pwa.md`.
+
+### Interruptor
+
+- Backend: `BAMBUDDY_CUSTOM_WEBPUSH=0` desliga rotas e provedor (a tabela continua existindo).
+- Frontend: `localStorage.setItem('custom.webPush', 'off')`; nos testes (vitest) a UI fica desligada e o tipo
+  `webpush` some da lista do modal (a suíte do upstream confere a lista exata); testes nossos ligam com
+  `setWebPushOverride(true)` / `vi.stubEnv('MODE', 'production')`.
+
+### Código nosso
+
+| Arquivo | O que é |
+|---|---|
+| `backend/app/custom/webpush/crypto.py` | RFC 8291 (`aes128gcm`) e VAPID RFC 8292 (JWT ES256) só com `cryptography` + `PyJWT` (já na imagem; nenhuma dependência nova) |
+| `backend/app/custom/webpush/keys.py` | par VAPID em `<DATA_DIR>/custom/webpush/vapid.json` (600), gerado uma vez |
+| `backend/app/custom/webpush/models.py` | tabela `custom_webpush_subscriptions` (criada pelo `create_all` do upstream; o modelo é importado pelo `install()`) |
+| `backend/app/custom/webpush/sender.py` | payload, envio httpx, limpeza 404/410, allowlist de serviços de push |
+| `backend/app/custom/webpush/provider.py` | `send_for_provider`/`send_test` (ganchos do notification_service), links por evento, `notify()` para outras personalizações |
+| `backend/app/custom/webpush/routes.py` | `/api/v1/custom/webpush/*` e o mount `/custom` (static/custom, `no-cache`) |
+| `backend/app/custom/api.py` | `install()` do fork: +3 linhas chamando `webpush.register` |
+| `frontend/public/custom/sw-push.js`, `webpush-badge.png` | handlers `push`/`notificationclick` do SW e badge monocromático |
+| `frontend/src/custom/webpush/` | `useWebPush`, cartão "Notificações neste aparelho", banner de convite, preset de eventos, flags, API |
+| `frontend/src/custom/i18n/` | textos do fork (en, pt-BR) mesclados no i18n (evento `loaded`, sem editar locales do upstream) |
+| `backend/tests/custom/test_webpush.py`, `frontend/src/custom/__tests__/webpush.test.tsx` | testes |
+
+### Pontos de contato no upstream
+
+| Arquivo | Âncora | +/− | O que / por quê |
+|---|---|---|---|
+| `backend/app/schemas/notification.py` | `NOTIFY = "notify"` (enum `ProviderType`) | +1 | aceita o tipo `webpush` |
+| `backend/app/services/notification_service.py` | `_send_test_notification`: após `image_data = await asyncio.to_thread(_load_sample_notification_image) ...`; `_send_to_provider`: após `if not provider.attach_photo: image_data = None` | +4, +6 | desvia `webpush` para `backend.app.custom.webpush` antes do `try` com a cadeia de `elif` (horário silencioso e attach_photo já aplicados). 6 linhas porque o formatter quebra a chamada. |
+| `frontend/public/sw.js` | 1ª linha `// Bambuddy Service Worker` | +1 | `try { importScripts('/custom/sw-push.js'); } catch (e) {...}`. Sem trocar nomes de cache: o importScripts não passa pelo fetch handler e `/custom/*` vai com `no-cache`. Mudar o `sw.js` faz os aparelhos atualizarem o SW na próxima abertura. |
+| `frontend/src/main.tsx` | `import { i18nReady } from './i18n'` | +1 | `import './custom/i18n'` |
+| `frontend/src/api/client.ts` | `export type ProviderType =` | +1/−1 | `\| 'webpush'` |
+| `frontend/src/components/AddNotificationModal.tsx` | import de `MultiPrinterOnly`; `const PROVIDER_VALUES` | +2/−1 | `...webPushProviderValues()` no fim da lista (sem campos de configuração) |
+| `frontend/src/pages/SettingsPage.tsx` | import de `MultiPrinterOnly`; `{/* Left Column: Providers */}` + `<div>` | +2 | `<WebPushDeviceCard />` no topo da coluna de provedores |
+| `frontend/src/components/Layout.tsx` | `import { useTranslation }`; `{/* Pages load on first open (#3175)...` | +2 | `<WebPushPromptBanner />` (convite único, dispensável; também roteia o clique da notificação quando o SW não consegue navegar) |
+
+Total do Web Push no upstream (`git diff --stat gabriel..custom-webpush` sem os diretórios nossos): 8 arquivos, +20/−2.
+
 ## Build e imagem
 
 - `custom/build.sh [--no-docker]`: lê `custom/BASE_VERSION`, confere que o `CMD` do `Dockerfile` do upstream é o mesmo do
