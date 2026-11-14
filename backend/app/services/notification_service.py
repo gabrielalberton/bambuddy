@@ -391,6 +391,10 @@ class NotificationService:
         if provider_type == "notify" and not notify_supports_photos(config.get("device_id")):
             attach_photo = False
         image_data = await asyncio.to_thread(_load_sample_notification_image) if attach_photo else None
+        if provider_type == "webpush":  # custom(webpush): backend/app/custom/webpush
+            from backend.app.custom.webpush import send_test as custom_webpush_test
+
+            return await custom_webpush_test(config, title, message, db, image_data)
 
         try:
             if provider_type == "callmebot":
@@ -1420,6 +1424,12 @@ class NotificationService:
         # provider in the same send left in photo_cache.
         if not provider.attach_photo:
             image_data = None
+        if provider.provider_type == "webpush":  # custom(webpush): backend/app/custom/webpush
+            from backend.app.custom.webpush import send_for_provider as webpush
+
+            return await webpush(
+                provider, title, message, db, image_data, event_type, variables, printer_id, photo_cache
+            )
 
         try:
             if provider.provider_type == "callmebot":

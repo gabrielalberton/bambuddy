@@ -23,6 +23,7 @@ class ProviderType(StrEnum):
     BARK = "bark"
     GOTIFY = "gotify"
     NOTIFY = "notify"
+    WEBPUSH = "webpush"  # custom(webpush): backend/app/custom/webpush
 
 
 class NotificationProviderBase(BaseModel):
