@@ -2,6 +2,8 @@ import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
+import { useSinglePrinter } from '../custom/useSinglePrinter';
+import { MultiPrinterOnly } from '../custom/MultiPrinterOnly';
 import {
   Download,
   Trash2,
@@ -1217,7 +1219,7 @@ function ArchiveCard({
           </Button>
         </div>
         <div className="flex items-center gap-2 mb-3 flex-wrap">
-          <p className="text-xs text-bambu-gray">{printerName}</p>
+          <MultiPrinterOnly always={!archive.printer_id}><p className="text-xs text-bambu-gray">{printerName}</p></MultiPrinterOnly>
           {(() => {
             const bed = getBedTypeInfo(archive.bed_type);
             return bed ? (
@@ -1909,6 +1911,7 @@ function ArchiveListRow({
   const queryClient = useQueryClient();
   const { showToast } = useToast();
   const { hasPermission, canModify } = useAuth();
+  const { single } = useSinglePrinter();
   const [showEdit, setShowEdit] = useState(false);
   const [showPrintLog, setShowPrintLog] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -2462,7 +2465,7 @@ function ArchiveListRow({
             </div>
           )}
         </div>
-        <div className="col-span-4">
+        <div className={single ? 'col-span-6' : 'col-span-4'}>
           <div className="flex items-center gap-2">
             <p className="text-white text-sm truncate">
               {selectionMode ? (
@@ -2586,9 +2589,9 @@ function ArchiveListRow({
             </div>
           )}
         </div>
-        <div className="col-span-2 text-sm text-bambu-gray truncate">
+        {!single && <div className="col-span-2 text-sm text-bambu-gray truncate">
           {printerName}
-        </div>
+        </div>}
         <div className="col-span-2 text-sm text-bambu-gray">
           <div>{formatDateOnly(archive.created_at)}</div>
           {archive.created_by_username && (
@@ -3048,6 +3051,8 @@ export function ArchivesPage() {
     const saved = localStorage.getItem('archiveFilterPrinter');
     return saved ? Number(saved) : null;
   });
+  const { single } = useSinglePrinter();
+  useEffect(() => { if (single) setFilterPrinter(null); }, [single]);
   const [filterMaterial, setFilterMaterial] = useState<string | null>(() => {
     // A saved joined value ("PLA Basic,PLA") was once offered as a material of
     // its own (#3262); it matches nothing now, and would hide every archive.
@@ -3233,8 +3238,8 @@ export function ArchivesPage() {
   const [showLogColumnModal, setShowLogColumnModal] = useState(false);
   const [logSort, setLogSort] = useState<LogSortState>(loadLogSort);
   const visibleLogColumns = useMemo(
-    () => logColumns.filter((c) => c.visible).map((c) => c.id),
-    [logColumns],
+    () => logColumns.filter((c) => c.visible && !(single && c.id === 'printer')).map((c) => c.id),
+    [logColumns, single],
   );
 
   const handleNavigateToArchive = useCallback((archiveId: number) => {
@@ -4344,6 +4349,7 @@ export function ArchivesPage() {
             </div>
             {/* Filters - horizontal scroll on mobile */}
             <div className="flex gap-2 md:gap-4 overflow-x-auto pb-1 md:pb-0 -mx-4 px-4 md:mx-0 md:px-0 md:flex-wrap scrollbar-hide">
+            {!single && (
             <div className="flex items-center gap-2 flex-shrink-0">
               <Filter className="w-4 h-4 text-bambu-gray hidden md:block" />
               <select
@@ -4361,6 +4367,7 @@ export function ArchivesPage() {
                 ))}
               </select>
             </div>
+            )}
             <div className="flex items-center gap-2 flex-shrink-0">
               <Package className="w-4 h-4 text-bambu-gray hidden md:block" />
               <select
@@ -4607,8 +4614,8 @@ export function ArchivesPage() {
               {/* List Header */}
               <div className="grid grid-cols-12 gap-4 px-4 py-3 text-xs text-bambu-gray font-medium">
                 <div className="col-span-1"></div>
-                <div className="col-span-4">Name</div>
-                <div className="col-span-2">Printer</div>
+                <div className={single ? 'col-span-6' : 'col-span-4'}>Name</div>
+                {!single && <div className="col-span-2">Printer</div>}
                 <div className="col-span-2">Date</div>
                 <div className="col-span-1">Size</div>
                 <div className="col-span-2 text-right">Actions</div>
@@ -4660,6 +4667,7 @@ export function ArchivesPage() {
                   />
                 </div>
                 {/* Printer filter */}
+                {!single && (
                 <select
                   className="px-3 py-2 bg-bambu-dark border border-bambu-dark-tertiary rounded-lg text-white focus:border-bambu-green focus:outline-none text-sm"
                   value={filterPrinter || ''}
@@ -4670,6 +4678,7 @@ export function ArchivesPage() {
                     <option key={p.id} value={p.id}>{p.name}</option>
                   ))}
                 </select>
+                )}
                 {/* User filter */}
                 <select
                   className="px-3 py-2 bg-bambu-dark border border-bambu-dark-tertiary rounded-lg text-white focus:border-bambu-green focus:outline-none text-sm"
