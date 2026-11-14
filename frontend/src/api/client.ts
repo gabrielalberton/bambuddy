@@ -3260,7 +3260,7 @@ export interface Filament {
 }
 
 // Notification Provider types
-export type ProviderType = 'callmebot' | 'ntfy' | 'pushover' | 'telegram' | 'email' | 'discord' | 'webhook' | 'homeassistant' | 'bark' | 'gotify' | 'notify';
+export type ProviderType = 'callmebot' | 'ntfy' | 'pushover' | 'telegram' | 'email' | 'discord' | 'webhook' | 'homeassistant' | 'bark' | 'gotify' | 'notify' | 'webpush'; // custom(webpush)
 // How a Telegram provider collects the outcome verdict (#3046)
 export type TelegramVerdictMode = 'buttons' | 'reactions' | 'both';
 

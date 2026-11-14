@@ -2,6 +2,7 @@ import { useQuery, useQueries, useMutation, useQueryClient } from '@tanstack/rea
 import { Loader2, Plus, Plug, AlertTriangle, RotateCcw, Bell, Download, RefreshCw, ExternalLink, Globe, Droplets, Thermometer, FileText, Edit2, Pencil, Send, CheckCircle, XCircle, History, Trash2, Zap, TrendingUp, Calendar, DollarSign, Power, PowerOff, Key, Copy, Database, X, Shield, Printer, Cylinder, Wifi, Home, Video, Users, Lock, Unlock, ChevronDown, Save, Mail, Flame, Layers, ListOrdered, Code, Search, Scale, Settings as SettingsIcon, ScanEye, Cog, QrCode, Heart, Briefcase, Workflow, UploadCloud, MonitorPlay, Info, Lightbulb } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { MultiPrinterOnly } from '../custom/MultiPrinterOnly';
+import { WebPushDeviceCard } from '../custom/webpush/WebPushDeviceCard';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../api/client';
 import { useAuth } from '../contexts/AuthContext';
@@ -4078,6 +4079,7 @@ export function SettingsPage() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {/* Left Column: Providers */}
           <div>
+            <WebPushDeviceCard />
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold text-white flex items-center gap-2" id="card-providers">
                 <Bell className="w-5 h-5 text-bambu-green" />

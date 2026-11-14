@@ -3,6 +3,7 @@ import { PageLoading } from './PageLoading';
 import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { Printer, Archive, ListOrdered, BarChart3, Cloud, Settings, Sun, Moon, Monitor, ChevronLeft, ChevronRight, Keyboard, Github, ArrowUpCircle, Wrench, FolderKanban, FolderOpen, X, Menu, Info, Plug, Bug, LogOut, Key, Loader2, Disc3, ShieldAlert, Globe, Bell, Receipt, Megaphone, type LucideIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { WebPushPromptBanner } from '../custom/webpush/WebPushPromptBanner';
 import { useTheme } from '../contexts/ThemeContext';
 import { KeyboardShortcutsModal } from './KeyboardShortcutsModal';
 import { InstallAppButton } from './InstallAppButton';
@@ -1142,6 +1143,7 @@ export function Layout() {
             </button>
           </div>
         )}
+        <WebPushPromptBanner />
         {/* Pages load on first open (#3175); the sidebar stays meanwhile. */}
         <Suspense fallback={<PageLoading />}>
           <Outlet />
