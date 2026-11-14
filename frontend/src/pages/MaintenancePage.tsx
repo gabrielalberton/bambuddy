@@ -1,5 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { MultiPrinterOnly } from '../custom/MultiPrinterOnly';
+import { useAutoSelectSinglePrinter } from '../custom/useSinglePrinter';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Wrench,
@@ -500,6 +502,7 @@ function SettingsSection({
     if (!overview) return [];
     return overview.map(o => ({ id: o.printer_id, name: o.printer_name }));
   }, [overview]);
+  useAutoSelectSinglePrinter(showAddType && printers.length === 1 && selectedPrinters.size === 0, () => setSelectedPrinters(new Set([printers[0].id])));
 
   // Get which printers have a specific maintenance type assigned
   const getAssignedPrinters = (typeId: number) => {
@@ -717,6 +720,7 @@ function SettingsSection({
                   />
                 </div>
                 {/* Printer selection */}
+                <MultiPrinterOnly always={selectedPrinters.size === 0}>
                 <div className="mt-4">
                   <label className="block text-xs text-bambu-gray mb-1.5">{t('maintenance.assignToPrinters')}</label>
                   <div className="flex flex-wrap gap-2">
@@ -739,6 +743,7 @@ function SettingsSection({
                     <p className="text-xs text-orange-700 dark:text-orange-400 mt-1">{t('maintenance.selectAtLeastOnePrinter')}</p>
                   )}
                 </div>
+                </MultiPrinterOnly>
                 <div className="mt-4 flex justify-end gap-2">
                   <Button type="button" variant="secondary" onClick={() => { setShowAddType(false); setSelectedPrinters(new Set()); }}>
                     {t('common.cancel')}
@@ -978,7 +983,7 @@ function SettingsSection({
             {printerItems.map((printer) => (
               <Card key={printer.printerId}>
                 <CardContent className="py-4">
-                  <h3 className="text-sm font-medium text-white mb-3">{printer.printerName}</h3>
+                  <MultiPrinterOnly><h3 className="text-sm font-medium text-white mb-3">{printer.printerName}</h3></MultiPrinterOnly>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
                     {printer.items.map((item) => {
                       const Icon = getIcon(item.maintenance_type_icon);

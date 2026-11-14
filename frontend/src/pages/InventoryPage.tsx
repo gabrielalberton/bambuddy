@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect, useRef, useCallback, type ReactNode } fro
 import { useSearchParams } from 'react-router-dom';
 import { useQuery, useQueries, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
+import { MultiPrinterOnly } from '../custom/MultiPrinterOnly';
 import {
   Plus, Loader2, Trash2, Archive, RotateCcw, Edit2, Package,
   Search, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight,
@@ -331,7 +332,7 @@ const columnCells: Record<string, (ctx: CellCtx) => ReactNode> = {
     const slotLabel = formatAssignmentSlotLabel(assignment);
     return (
       <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-400">
-        {printerLabel} {slotLabel}{assignment.ams_label ? ` (${assignment.ams_label})` : ''}
+        <MultiPrinterOnly>{printerLabel} </MultiPrinterOnly>{slotLabel}{assignment.ams_label ? ` (${assignment.ams_label})` : ''}
       </span>
     );
   },
