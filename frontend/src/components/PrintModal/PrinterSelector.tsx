@@ -26,6 +26,7 @@ import type { PrinterSelectorProps, AssignmentMode } from './types';
 import type { PrinterMappingResult, PerPrinterConfig } from '../../hooks/useMultiPrinterFilamentMapping';
 import type { FilamentRequirement, LoadedFilament } from '../../hooks/useFilamentMapping';
 import { useUiSettings } from '../../hooks/useUiSettings';
+import { useSinglePrinter } from '../../custom/useSinglePrinter';
 
 interface PrinterSelectorWithMappingProps extends PrinterSelectorProps {
   /** Per-printer mapping results (only used when multiple printers selected) */
@@ -237,6 +238,7 @@ export function PrinterSelector({
 }: PrinterSelectorWithMappingProps) {
   // State for showing all printers vs only matching model
   const [showAllPrinters, setShowAllPrinters] = useState(false);
+  const { single } = useSinglePrinter();
 
   // Filter printers based on showInactive flag
   const activePrinters = showInactive ? printers : printers.filter((p) => p.is_active);
@@ -317,7 +319,7 @@ export function PrinterSelector({
   }, [activePrinters, targetModel]);
 
   // Check if model-based assignment is available (need callbacks and multiple printers of same model)
-  const modelAssignmentAvailable = onAssignmentModeChange && onTargetModelChange && uniqueModels.length > 0;
+  const modelAssignmentAvailable = !(single && assignmentMode === 'printer') && onAssignmentModeChange && onTargetModelChange && uniqueModels.length > 0;
 
   const showMappingOptions = allowMultiple &&
     selectedPrinterIds.length > 1 &&
@@ -562,7 +564,7 @@ export function PrinterSelector({
       )}
 
       {/* Printer list (only in printer mode) */}
-      {assignmentMode === 'printer' && displayPrinters.map((printer) => {
+      {assignmentMode === 'printer' && !(single && selectedCount > 0) && displayPrinters.map((printer) => {
         const selected = isSelected(printer.id);
         const mappingResult = getPrinterMappingResult(printer.id);
         const hasOverride = mappingResult && !mappingResult.config.useDefault;
