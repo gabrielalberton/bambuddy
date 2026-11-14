@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { MultiPrinterOnly } from '../custom/MultiPrinterOnly';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Loader2, ScanEye, Check, X, AlertTriangle, Info } from 'lucide-react';
 import { api, ApiError } from '../api/client';
@@ -353,6 +354,7 @@ export function ObicoSettings() {
           </CardContent>
         </Card>
 
+        <MultiPrinterOnly always={enabledPrinters !== null}>
         <Card id="card-fd-perprinter">
           <CardHeader>
             <h2 className="text-lg font-semibold text-white">{t('failureDetection.perPrinterTitle')}</h2>
@@ -385,6 +387,7 @@ export function ObicoSettings() {
             )}
           </CardContent>
         </Card>
+        </MultiPrinterOnly>
       </div>
 
       <div className="space-y-3 flex-1 lg:max-w-xl">

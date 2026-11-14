@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
+import { MultiPrinterOnly } from '../custom/MultiPrinterOnly';
 import { Bell, Trash2, Settings2, Edit2, Send, Loader2, CheckCircle, XCircle, Moon, Clock, ChevronDown, ChevronUp, Calendar, Camera, CameraOff } from 'lucide-react';
 import { api } from '../api/client';
 import { formatDateOnly, parseUTCDate } from '../utils/date';
@@ -103,6 +104,7 @@ export function NotificationProviderCard({ provider, onEdit }: NotificationProvi
 
           {provider.enabled && (<>
           {/* Linked Printer */}
+          <MultiPrinterOnly>
           {linkedPrinter && (
             <div className="mb-3 px-2 py-1.5 bg-bambu-dark rounded-lg">
               <span className="text-xs text-bambu-gray">{t('notifications.printer')} </span>
@@ -114,6 +116,7 @@ export function NotificationProviderCard({ provider, onEdit }: NotificationProvi
               <span className="text-xs text-bambu-gray">{t('notifications.allPrinters')}</span>
             </div>
           )}
+          </MultiPrinterOnly>
 
           {/* Event summary - show all event tags */}
           <div className="mb-3 flex flex-wrap gap-1">

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CheckCircle2, Circle, Lightbulb, Loader2, Play, RefreshCw, XCircle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { MultiPrinterOnly } from '../custom/MultiPrinterOnly';
 import { api, ApiError } from '../api/client';
 import type { WLEDConfig, WLEDPreset, WLEDPresets } from '../api/client';
 import { Button } from './Button';
@@ -222,6 +223,7 @@ export function WLEDSettings() {
                 <h3 className="font-semibold text-white">{t('wled.connectionSection')}</h3>
               </CardHeader>
               <CardContent className="space-y-4">
+                <MultiPrinterOnly always={printerId == null}>
                 <label className="block">
                   <span className="block text-sm text-bambu-gray mb-1">{t('wled.printer')}</span>
                   <select
@@ -237,6 +239,7 @@ export function WLEDSettings() {
                     {printers.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
                   </select>
                 </label>
+                </MultiPrinterOnly>
 
                 <label className="flex items-center gap-3 text-white">
                   <input

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Gauge, Loader2, Save, Search, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { MultiPrinterOnly } from '../custom/MultiPrinterOnly';
 import { api } from '../api/client';
 import type { HADisplayEntity, Printer, PrinterHASensor } from '../api/client';
 import { Button } from './Button';
@@ -189,6 +190,7 @@ export function HASensorModal({ sensor, printers, onClose }: Props) {
             </div>
           )}
 
+          <MultiPrinterOnly always={printerId === ''}>
           {!isEditing && (
             <div>
               <label className="block text-sm text-bambu-gray mb-1">{t('haSensors.printer')}</label>
@@ -205,6 +207,7 @@ export function HASensorModal({ sensor, printers, onClose }: Props) {
               </select>
             </div>
           )}
+          </MultiPrinterOnly>
 
           {!haConfigured && (
             <div className="p-3 bg-yellow-100 dark:bg-yellow-500/20 border border-yellow-400 dark:border-yellow-500/50 rounded-lg text-sm text-yellow-700 dark:text-yellow-400">

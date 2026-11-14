@@ -12,6 +12,7 @@
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { MultiPrinterOnly } from '../custom/MultiPrinterOnly';
 import { Copy, ExternalLink, Eye, EyeOff } from 'lucide-react';
 import { api, type Printer } from '../api/client';
 import { useToast } from '../contexts/ToastContext';
@@ -375,6 +376,7 @@ export function StreamOverlayBuilder({ onTokenCreated }: { onTokenCreated?: () =
         }} />}
       </div>
       <div className="grid grid-cols-1 gap-4 @min-[28rem]/overlay:grid-cols-2">
+        <MultiPrinterOnly always={printerId === null || !printers.some((printer) => printer.id === printerId)}>
         <div>
           <label
             htmlFor="overlay-builder-printer"
@@ -397,6 +399,7 @@ export function StreamOverlayBuilder({ onTokenCreated }: { onTokenCreated?: () =
             ))}
           </select>
         </div>
+        </MultiPrinterOnly>
 
         <div>
           <label htmlFor="overlay-builder-size" className="block text-sm font-medium text-white mb-1">

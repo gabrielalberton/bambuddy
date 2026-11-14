@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
+import { MultiPrinterOnly } from '../custom/MultiPrinterOnly';
 import { X, Save, Loader2, Send, CheckCircle, XCircle } from 'lucide-react';
 import { api } from '../api/client';
 import type { NotificationProvider, NotificationProviderCreate, NotificationProviderUpdate, ProviderType, TelegramVerdictMode } from '../api/client';
@@ -724,6 +725,7 @@ export function AddNotificationModal({ provider, onClose }: AddNotificationModal
           )}
 
           {/* Link to Printer */}
+          <MultiPrinterOnly always={printerId != null}>
           <div>
             <label className="block text-sm text-bambu-gray mb-1">{t('notifications.printerFilter')}</label>
             <select
@@ -742,6 +744,7 @@ export function AddNotificationModal({ provider, onClose }: AddNotificationModal
               {t('notifications.onlyFromPrinter')}
             </p>
           </div>
+          </MultiPrinterOnly>
 
           {/* Attach Photo */}
           <div className="flex items-center justify-between">

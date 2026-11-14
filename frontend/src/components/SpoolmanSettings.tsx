@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { MultiPrinterOnly } from '../custom/MultiPrinterOnly';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Loader2, Check, X, RefreshCw, Link2, Database, ChevronDown, Info, AlertTriangle, Package, ExternalLink, Tags } from 'lucide-react';
 import { api, ApiError } from '../api/client';
@@ -510,6 +511,7 @@ export function SpoolmanSettings() {
                   </div>
                   <div className="flex items-center gap-2">
                     {/* Printer selector */}
+                    <MultiPrinterOnly always={selectedPrinterId !== 'all'}>
                     <div className="relative flex-1">
                       <select
                         value={selectedPrinterId}
@@ -525,6 +527,7 @@ export function SpoolmanSettings() {
                       </select>
                       <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-bambu-gray pointer-events-none" />
                     </div>
+                    </MultiPrinterOnly>
                     {/* Sync button */}
                     <Button
                       variant="secondary"
