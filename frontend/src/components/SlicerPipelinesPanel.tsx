@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { MultiPrinterOnly } from '../custom/MultiPrinterOnly';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, Check, Edit2, Loader2, Printer as PrinterIcon, Search, Trash2, Workflow, X } from 'lucide-react';
 import {
@@ -201,6 +202,7 @@ export function SlicerPipelinesPanel() {
                 className="w-full pl-7 pr-2 py-1 text-xs bg-bambu-dark border border-bambu-dark-tertiary rounded text-white"
               />
             </div>
+            <MultiPrinterOnly always={targetFilter !== ''}>
             <select
               value={targetFilter}
               onChange={(e) => setTargetFilter(e.target.value)}
@@ -234,6 +236,7 @@ export function SlicerPipelinesPanel() {
                 </option>
               )}
             </select>
+            </MultiPrinterOnly>
             {(searchTerm || targetFilter) && (
               <span className="text-xs text-bambu-gray">
                 {t('settings.pipelines.filter.count', '{{shown}} / {{total}}', {

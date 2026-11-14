@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import { MultiPrinterOnly } from '../custom/MultiPrinterOnly';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Check,
@@ -220,6 +221,7 @@ export function PipelineRunsView() {
         {/* Target filter: built from targets actually in use across saved
             pipelines so the dropdown stays short. Mirrors the SlicerPipelinesPanel
             target picker. */}
+        <MultiPrinterOnly always={targetFilter !== ''}>
         {(targetOptions.printers.length > 0 || targetOptions.classes.length > 0) && (
           <FilterDropdown
             icon={<PrinterIcon className="w-3.5 h-3.5 text-bambu-gray" />}
@@ -244,6 +246,7 @@ export function PipelineRunsView() {
             ]}
           />
         )}
+        </MultiPrinterOnly>
         {hasFilter && (
           <button
             type="button"
