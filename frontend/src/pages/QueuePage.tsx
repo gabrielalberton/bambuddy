@@ -1,6 +1,8 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { bulkUpdateToast } from '../utils/queueBulkUpdate';
 import { useTranslation } from 'react-i18next';
+import { useSinglePrinter } from '../custom/useSinglePrinter';
+import { MultiPrinterOnly } from '../custom/MultiPrinterOnly';
 import { keepPreviousData, useQuery, useQueries, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import {
@@ -409,6 +411,7 @@ function BulkEditModal({
           </p>
 
           {/* Printer Assignment */}
+          <MultiPrinterOnly>
           <div>
             <label className="block text-sm font-medium text-white mb-2">{t('queue.bulkEdit.printer')}</label>
             <select
@@ -428,6 +431,7 @@ function BulkEditModal({
               ))}
             </select>
           </div>
+          </MultiPrinterOnly>
 
           {/* Queue Options */}
           <div>
@@ -854,6 +858,7 @@ function SortableQueueItem({
           </div>
 
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs sm:text-sm text-bambu-gray">
+            <MultiPrinterOnly always={item.printer_id === null}>
             <span className={`flex items-center gap-1 sm:gap-1.5 ${item.printer_id === null && !item.target_model ? 'text-orange-700 dark:text-orange-400' : ''} ${item.target_model && !item.printer_id ? 'text-blue-700 dark:text-blue-400' : ''}`}>
               <Printer className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
               <span className="truncate max-w-[120px] sm:max-w-none">
@@ -869,6 +874,7 @@ function SortableQueueItem({
                   : (item.printer_name || `${t('common.printer')} #${item.printer_id}`)}
               </span>
             </span>
+            </MultiPrinterOnly>
             {item.print_time_seconds && (
               <span className="flex items-center gap-1 sm:gap-1.5">
                 <Timer className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
@@ -1599,7 +1605,7 @@ function HistorySection({
           >
             <option value="date">{t('queue.sort.byDate')}</option>
             <option value="name">{t('queue.sort.byName')}</option>
-            <option value="printer">{t('queue.sort.byPrinter')}</option>
+            <MultiPrinterOnly><option value="printer">{t('queue.sort.byPrinter')}</option></MultiPrinterOnly>
           </select>
           <Button
             variant="ghost"
@@ -1844,6 +1850,9 @@ export function QueuePage() {
   useEffect(() => {
     setHistoryVisibleCount(HISTORY_PAGE_SIZE);
   }, [historySortBy, historySortAsc, filterLocation]);
+
+  const { single } = useSinglePrinter();
+  useEffect(() => { if (single) { setPendingSortBy(s => s === 'printer' ? 'position' : s); setHistorySortBy(s => s === 'printer' ? 'date' : s); } }, [single]);
 
   useEffect(() => {
     localStorage.setItem('queue.pendingSortBy', pendingSortBy);
@@ -2827,6 +2836,7 @@ export function QueuePage() {
           dashboard, so this row is hidden when that tab is active. */}
       {activeTab !== 'pipelines' && activeTab !== 'batches' && (
       <div className="flex flex-wrap items-center gap-2 sm:gap-4 mb-6">
+        {!single && (
         <select
           className="px-2 sm:px-3 py-2 text-sm sm:text-base bg-bambu-dark-secondary border border-bambu-dark-tertiary rounded-lg text-white focus:border-bambu-green focus:outline-none min-w-0 flex-1 sm:flex-none"
           value={filterPrinter === -1 ? 'unassigned' : (filterPrinter || '')}
@@ -2843,6 +2853,7 @@ export function QueuePage() {
             <option key={p.id} value={p.id}>{p.name}</option>
           ))}
         </select>
+        )}
 
         <select
           className="px-2 sm:px-3 py-2 text-sm sm:text-base bg-bambu-dark-secondary border border-bambu-dark-tertiary rounded-lg text-white focus:border-bambu-green focus:outline-none min-w-0 flex-1 sm:flex-none"
@@ -2858,7 +2869,7 @@ export function QueuePage() {
           <option value="cancelled">{t('queue.status.cancelled')}</option>
         </select>
 
-        {uniqueLocations.length > 0 && (
+        {!single && uniqueLocations.length > 0 && (
           <select
             className="px-2 sm:px-3 py-2 text-sm sm:text-base bg-bambu-dark-secondary border border-bambu-dark-tertiary rounded-lg text-white focus:border-bambu-green focus:outline-none min-w-0 flex-1 sm:flex-none"
             value={filterLocation}
@@ -2893,6 +2904,7 @@ export function QueuePage() {
           Hidden on History/Timeline tabs since they don't apply. */}
       {activeTab === 'queue' && (
         <div className="flex flex-wrap items-center gap-3 mb-6">
+          {!single && (
           <div className="inline-flex items-center bg-bambu-dark-secondary border border-bambu-dark-tertiary rounded-lg p-0.5">
             <button
               className={`px-3 py-1.5 text-xs sm:text-sm rounded-md transition-colors flex items-center gap-1.5 ${
@@ -2915,6 +2927,7 @@ export function QueuePage() {
               <span className="hidden sm:inline">{t('queue.layout.byPrinter')}</span>
             </button>
           </div>
+          )}
           <button
             onClick={() => {
               const newValue = !(settings?.queue_shortest_first ?? false);
@@ -3039,7 +3052,7 @@ export function QueuePage() {
                   >
                     <option value="position">{t('queue.sort.byPosition')}</option>
                     <option value="name">{t('queue.sort.byName')}</option>
-                    <option value="printer">{t('queue.sort.byPrinter')}</option>
+                    {!single && <option value="printer">{t('queue.sort.byPrinter')}</option>}
                     <option value="time">{t('queue.sort.bySchedule')}</option>
                   </select>
                   <Button
@@ -3123,7 +3136,7 @@ export function QueuePage() {
                   items={sortableIds}
                   strategy={verticalListSortingStrategy}
                 >
-                  {activeLayout === 'position' ? (
+                  {activeLayout === 'position' || single ? (
                     <div className="space-y-2 sm:space-y-3">
                       {groupedRows.map((row, idx) => (
                         <QueueRowRender
