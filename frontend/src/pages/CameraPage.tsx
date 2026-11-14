@@ -14,6 +14,7 @@ import { useStreamImgRef } from '../hooks/useStreamImgRef';
 import { useCameraViewerId } from '../hooks/useCameraViewerId';
 import { isSideways, useSidewaysBox } from '../hooks/useSidewaysBox';
 import { isStandaloneWebApp, readOpenerTabId, requestCameraPopIn } from '../utils/camera';
+import { CameraOrTwin, TwinSwitch, useTwinActive } from '../custom/twin';
 
 const MAX_RECONNECT_ATTEMPTS = 5;
 // The server's Retry-After for a snapshot while a live view starts.
@@ -63,6 +64,7 @@ function CameraView({ onPoppedIn }: { onPoppedIn: () => void }) {
   const streamTokenValue = streamTokenData?.token ?? getStreamToken();
 
   const [streamMode, setStreamMode] = useState<'stream' | 'snapshot'>('stream');
+  const twinActive = useTwinActive(id);
   const [showSkipObjectsModal, setShowSkipObjectsModal] = useState(false);
   const [showDiagnoseModal, setShowDiagnoseModal] = useState(false);
   const [streamError, setStreamError] = useState(false);
@@ -308,7 +310,7 @@ function CameraView({ onPoppedIn }: { onPoppedIn: () => void }) {
   useEffect(() => {
     // Only skip stall check during initial load, reconnecting, or transitioning
     // Continue checking even during streamError to detect recovery
-    if (streamMode !== 'stream' || streamLoading || isReconnecting || transitioning) {
+    if (streamMode !== 'stream' || streamLoading || isReconnecting || transitioning || twinActive) {
       if (stallCheckIntervalRef.current) {
         clearInterval(stallCheckIntervalRef.current);
         stallCheckIntervalRef.current = null;
@@ -354,7 +356,7 @@ function CameraView({ onPoppedIn }: { onPoppedIn: () => void }) {
         stallCheckIntervalRef.current = null;
       }
     };
-  }, [streamMode, streamLoading, streamError, isReconnecting, transitioning, id, attemptReconnect]);
+  }, [streamMode, streamLoading, streamError, isReconnecting, transitioning, twinActive, id, attemptReconnect]);
 
   const handleStreamError = (e: React.SyntheticEvent<HTMLImageElement>) => {
     // Clearing the src (reconnect, restart, mode switch) fires error with an empty src.
@@ -750,6 +752,7 @@ function CameraView({ onPoppedIn }: { onPoppedIn: () => void }) {
           {printer?.name || `Printer ${id}`}
         </h1>
         <div className="flex items-center gap-2">
+          <TwinSwitch printerId={id} size="sm" />
           {/* Mode toggle */}
           <div className="flex bg-bambu-dark rounded p-0.5">
             <button
@@ -850,6 +853,7 @@ function CameraView({ onPoppedIn }: { onPoppedIn: () => void }) {
         onTouchEnd={handleTouchEnd}
         style={{ touchAction: 'none' }}
       >
+        <CameraOrTwin printerId={id}>
         <div ref={videoAreaRef} className="relative w-full h-full flex items-center justify-center">
           {(streamLoading || transitioning) && !isReconnecting && (
             <div className="absolute inset-0 flex items-center justify-center bg-black/50 z-10">
@@ -950,6 +954,7 @@ function CameraView({ onPoppedIn }: { onPoppedIn: () => void }) {
             </button>
           </div>
         </div>
+        </CameraOrTwin>
       </div>
 
       {/* Skip Objects Modal */}

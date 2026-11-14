@@ -13,6 +13,7 @@ import { useCameraViewerId } from '../hooks/useCameraViewerId';
 import { isSideways, useSidewaysBox } from '../hooks/useSidewaysBox';
 import { isStandaloneWebApp, openCameraWindow } from '../utils/camera';
 import { useIsSidebarCompact } from '../hooks/useIsSidebarCompact';
+import { CameraOrTwin, TwinSwitch, useTwinActive } from '../custom/twin';
 
 export interface EmbeddedCameraViewerProps {
   printerId: number;
@@ -98,6 +99,7 @@ export function EmbeddedCameraViewer({ printerId, printerName, viewerIndex = 0, 
   const [isResizing, setIsResizing] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [isMinimized, setIsMinimized] = useState(false);
+  const twinActive = useTwinActive(printerId);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [zoomLevel, setZoomLevel] = useState(1);
   const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
@@ -254,7 +256,7 @@ export function EmbeddedCameraViewer({ printerId, printerName, viewerIndex = 0, 
 
   // Stall detection
   useEffect(() => {
-    if (streamLoading || isReconnecting || isMinimized) {
+    if (streamLoading || isReconnecting || isMinimized || twinActive) {
       if (stallCheckIntervalRef.current) {
         clearInterval(stallCheckIntervalRef.current);
         stallCheckIntervalRef.current = null;
@@ -284,7 +286,7 @@ export function EmbeddedCameraViewer({ printerId, printerName, viewerIndex = 0, 
         stallCheckIntervalRef.current = null;
       }
     };
-  }, [streamLoading, streamError, isReconnecting, isMinimized, printerId, attemptReconnect]);
+  }, [streamLoading, streamError, isReconnecting, isMinimized, twinActive, printerId, attemptReconnect]);
 
   // Fullscreen change listener
   useEffect(() => {
@@ -611,6 +613,7 @@ export function EmbeddedCameraViewer({ printerId, printerName, viewerIndex = 0, 
           <span className="truncate">{printer?.name || printerName}</span>
         </div>
         <div className="flex items-center gap-1 no-drag">
+          <TwinSwitch printerId={printerId} size="sm" />
           <button
             onClick={() => chamberLightMutation.mutate(!status?.chamber_light)}
             disabled={!status?.connected || chamberLightMutation.isPending || !hasPermission('printers:control')}
@@ -696,6 +699,7 @@ export function EmbeddedCameraViewer({ printerId, printerName, viewerIndex = 0, 
 
       {/* Video area */}
       {!isMinimized && (
+        <CameraOrTwin printerId={printerId} className="relative w-full h-[calc(100%-40px)]">
         <div
           ref={videoAreaRef}
           className={`relative w-full bg-black flex items-center justify-center overflow-hidden ${isFullscreen ? 'h-[calc(100%-40px)]' : 'h-[calc(100%-40px)]'}`}
@@ -810,6 +814,7 @@ export function EmbeddedCameraViewer({ printerId, printerName, viewerIndex = 0, 
             </div>
           )}
         </div>
+        </CameraOrTwin>
       )}
       {/* Skip Objects Modal */}
       <SkipObjectsModal
