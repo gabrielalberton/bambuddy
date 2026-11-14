@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { api, type Printer } from '../api/client';
 import { getSinglePrinterMode } from './flags';
@@ -73,4 +73,18 @@ export function useSinglePrinter(options: { enabled?: boolean } = {}): SinglePri
   // do render), então a ordem dos hooks é estável.
   // eslint-disable-next-line react-hooks/rules-of-hooks
   return getSinglePrinterMode() === 'off' ? OFF : useSinglePrinterActive(options.enabled ?? true);
+}
+
+/**
+ * Resolve sozinho um campo "qual impressora" no modo impressora única: quando
+ * `when` for true (ex.: campo ainda vazio), chama `select` com a impressora.
+ * Evita que o arquivo do upstream precise importar useEffect só para o gancho.
+ */
+export function useAutoSelectSinglePrinter(when: boolean, select: (printer: Printer) => void): void {
+  const { single, printer } = useSinglePrinter();
+  const selectRef = useRef(select);
+  selectRef.current = select;
+  useEffect(() => {
+    if (when && single && printer) selectRef.current(printer);
+  }, [when, single, printer]);
 }

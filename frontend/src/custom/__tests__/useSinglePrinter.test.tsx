@@ -1,8 +1,9 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import type { ReactNode } from 'react';
-import { renderHook, waitFor } from '@testing-library/react';
+import { render, renderHook, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { useSinglePrinter, LAST_PRINTER_COUNT_KEY } from '../useSinglePrinter';
+import { useSinglePrinter, useAutoSelectSinglePrinter, LAST_PRINTER_COUNT_KEY } from '../useSinglePrinter';
+import { MultiPrinterOnly } from '../MultiPrinterOnly';
 import { getSinglePrinterMode, setSinglePrinterModeOverride, SINGLE_PRINTER_MODE_STORAGE_KEY } from '../flags';
 import { printerA1, printerP1S, mockPrinterList, installMemoryStorage } from './fixtures';
 
@@ -78,5 +79,38 @@ describe('useSinglePrinter', () => {
     const { result } = renderHook(() => useSinglePrinter(), { wrapper });
     await waitFor(() => expect(result.current.printer?.id).toBe(7));
     expect(result.current.single).toBe(true);
+  });
+});
+
+describe('useAutoSelectSinglePrinter / MultiPrinterOnly', () => {
+  beforeEach(() => { installMemoryStorage(); });
+  afterEach(() => setSinglePrinterModeOverride(null));
+
+  it('preenche o campo vazio com a única impressora', async () => {
+    setSinglePrinterModeOverride('auto');
+    mockPrinterList([printerA1]);
+    const select = vi.fn();
+    renderHook(() => useAutoSelectSinglePrinter(true, select), { wrapper });
+    await waitFor(() => expect(select).toHaveBeenCalledWith(expect.objectContaining({ id: 7 })));
+  });
+
+  it('não mexe quando `when` é false ou há várias impressoras', async () => {
+    setSinglePrinterModeOverride('auto');
+    mockPrinterList([printerA1, printerP1S]);
+    const select = vi.fn();
+    const { result } = renderHook(() => { useAutoSelectSinglePrinter(true, select); return useSinglePrinter(); }, { wrapper });
+    await waitFor(() => expect(result.current.printers).toHaveLength(2));
+    expect(select).not.toHaveBeenCalled();
+  });
+
+  it('MultiPrinterOnly esconde no modo único, exceto com `always`', async () => {
+    setSinglePrinterModeOverride('on');
+    mockPrinterList([printerA1]);
+    render(<>
+      <MultiPrinterOnly><span>multi</span></MultiPrinterOnly>
+      <MultiPrinterOnly always><span>sempre</span></MultiPrinterOnly>
+    </>, { wrapper });
+    expect(screen.queryByText('multi')).toBeNull();
+    expect(screen.queryByText('sempre')).not.toBeNull();
   });
 });
