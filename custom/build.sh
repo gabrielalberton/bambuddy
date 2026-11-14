@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Compila o frontend do fork e gera a imagem bambuddy-gabriel:<base>-<sha>.
+# Compila o frontend do fork, junta o backend nosso (backend/app/custom) e gera a imagem bambuddy-gabriel:<base>-<sha>.
 # Não faz deploy nem mexe no container em execução.
 #
 # Uso: custom/build.sh [--no-docker]
@@ -13,7 +13,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BASE="$(tr -d '[:space:]' < "$ROOT/custom/BASE_VERSION")"   # ex.: v1.3.1
 BASE_NUM="${BASE#v}"                                          # ex.: 1.3.1
 SHA="$(git -C "$ROOT" rev-parse --short HEAD)"
-if [ -n "$(git -C "$ROOT" status --porcelain -- frontend custom)" ]; then
+if [ -n "$(git -C "$ROOT" status --porcelain -- frontend custom backend/app/custom)" ]; then
   SHA="${SHA}-dirty"
 fi
 OUT="$ROOT/custom/.build"
@@ -26,6 +26,17 @@ NO_DOCKER=0
 avail_kb="$(awk '/MemAvailable/ {print $2}' /proc/meminfo)"
 if [ "$avail_kb" -lt 2000000 ]; then
   echo "Memória disponível baixa ($((avail_kb / 1024)) MiB < ~2 GiB): abortando. Tente mais tarde." >&2
+  exit 1
+fi
+
+# O custom/Dockerfile repete o CMD do upstream trocando só o módulo ASGI. Se o
+# upstream mudar o CMD numa nova base, pare aqui em vez de gerar imagem errada.
+UP_CMD="$(grep '^CMD ' "$ROOT/Dockerfile" | tail -1 | sed 's/backend\.app\.main:app/backend.app.custom.asgi:app/')"
+OUR_CMD="$(grep '^CMD ' "$ROOT/custom/Dockerfile" | tail -1)"
+if [ "$UP_CMD" != "$OUR_CMD" ]; then
+  echo "O CMD do Dockerfile do upstream mudou; atualize o CMD de custom/Dockerfile:" >&2
+  echo "  upstream (com módulo trocado): $UP_CMD" >&2
+  echo "  custom/Dockerfile:             $OUR_CMD" >&2
   exit 1
 fi
 
@@ -42,8 +53,13 @@ mkdir -p "$OUT"
 # Mesmo passo do "npm run build" do upstream (check:baseline), no diretório nosso.
 node scripts/check-browser-baseline.mjs "$OUT/static/assets"
 
+# Backend nosso: só backend/app/custom (sem __pycache__), no contexto do docker build.
+rm -rf "$OUT/backend_custom"
+mkdir -p "$OUT/backend_custom"
+(cd "$ROOT/backend/app/custom" && tar --exclude='__pycache__' --exclude='*.pyc' -cf - .) | tar -xf - -C "$OUT/backend_custom"
+
 if [ "$NO_DOCKER" = 1 ]; then
-  echo "Frontend em $OUT/static (sem docker build)."
+  echo "Frontend em $OUT/static e backend em $OUT/backend_custom (sem docker build)."
   exit 0
 fi
 
