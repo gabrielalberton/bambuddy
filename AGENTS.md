@@ -3,6 +3,19 @@
 Fork de [maziggy/bambuddy](https://github.com/maziggy/bambuddy) (AGPL-3.0) com personalizações para o homelab do Gabriel
 (uma única impressora: Bambu Lab A1 + AMS Lite). Este arquivo vale para qualquer agente (Codex, Claude Code) que mexa aqui.
 
+## Uso principal: PWA no celular
+
+O Gabriel usa o Bambuddy **principalmente como PWA instalado no celular Android** (Chrome), aberto por
+`https://bambu.local.alberton.work` (HTTPS válido; precisa ser HTTPS para service worker e push). Toda personalização:
+
+- é projetada e conferida **primeiro em tela de celular** (~390x844, toque, sem hover, teclado virtual), depois desktop;
+- funciona dentro do PWA (modo standalone, sem barra do navegador; considerar `safe-area`, voltar do Android, app em
+  segundo plano/retomado, rede caindo e voltando);
+- respeita o service worker do upstream (`frontend/public/sw.js`): nada de quebrar cache/atualização; ganchos nele
+  só via um `importScripts` para arquivo nosso;
+- **notificações têm que chegar no PWA** (Web Push, inclusive com o app fechado) — toda funcionalidade nova que
+  gere alerta precisa disparar notificação por esse canal e ser testada nele. Ver `custom/CUSTOMIZATIONS.md`.
+
 ## Premissa número 1: atualizar para uma nova release do upstream tem que ser fácil
 
 Toda personalização existe para sobreviver a `git rebase` sobre a próxima release **com o mínimo possível de conflitos**.
