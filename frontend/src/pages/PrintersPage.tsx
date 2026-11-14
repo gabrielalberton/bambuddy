@@ -87,6 +87,7 @@ function dryingBlockedKey(reasons: Array<number | string> | undefined): string {
 }
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
+import { useSinglePrinter } from '../custom/useSinglePrinter';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import {
@@ -9160,6 +9161,8 @@ export function PrintersPage() {
     queryKey: ['printers'],
     queryFn: api.getPrinters,
   });
+  const { single } = useSinglePrinter();
+  useEffect(() => { if (single) { setPageView('cards'); setHideDisconnected(false); setSearch(''); setStatusFilter('all'); setLocationFilter('all'); setSortBy('name'); } }, [single]);
 
   // Fetch the UI-rendering subset of settings. Uses /ui-preferences (not /settings)
   // so users with printers:read but no settings:read still get the values needed
@@ -9839,6 +9842,7 @@ export function PrintersPage() {
   const renderViewControls = (inMenu = false) => (
     <>
       {/* Sort dropdown */}
+      {!single && (<>
       <div className={`flex items-center gap-1 ${inMenu ? 'w-full' : ''}`}>
         <ToolbarDropdown<SortOption>
           value={sortBy}
@@ -9921,6 +9925,7 @@ export function PrintersPage() {
           {inMenu && <span>{t('printers.pageView.openCamWallPage')}</span>}
         </RouterLink>
       )}
+      </>)}
 
       {/* Card size selector */}
       <div className={`flex h-8 items-center bg-bambu-dark rounded-lg border border-bambu-dark-tertiary ${inMenu ? 'w-full' : ''}`}>
@@ -9962,6 +9967,7 @@ export function PrintersPage() {
   const renderActionControls = (inMenu = false) => (
     <>
       {/* Bulk select toggle */}
+      {!single && (
       <button
         onClick={() => {
           if (selectionMode) clearSelection();
@@ -9978,6 +9984,7 @@ export function PrintersPage() {
         <CheckSquare className="w-4 h-4" />
         {inMenu && <span>{t('printers.bulk.select')}</span>}
       </button>
+      )}
 
       {/* Power dropdown for offline printers with smart plugs */}
       {hideDisconnected && Object.keys(smartPlugByPrinter).length > 0 && (
@@ -10049,11 +10056,11 @@ export function PrintersPage() {
             <PrinterIcon className="w-7 h-7 text-bambu-green" />
             {t('printers.title')}
           </h1>
-          <StatusSummaryBar printers={printers} />
+          {!single && <StatusSummaryBar printers={printers} />}
         </div>
         <div ref={toolbarRef} className="relative flex items-center gap-2">
           {/* Only show search bar when printers exist */}
-          {printers && printers.length > 0 && (
+          {!single && printers && printers.length > 0 && (
             <div className="relative min-w-0 flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-bambu-gray/50" />
               <input
@@ -10086,8 +10093,8 @@ export function PrintersPage() {
             inert={compactToolbar}
             className={`${compactToolbar ? 'absolute -left-[9999px] top-0 flex w-max pointer-events-none opacity-0' : 'flex'} ml-auto items-center justify-end gap-2 flex-nowrap [&>*]:shrink-0`}
           >
-            <div className="h-6 w-px bg-bambu-dark-tertiary" />
-            <div className="flex items-center gap-2">{renderFilterControls()}</div>
+            {!single && <div className="h-6 w-px bg-bambu-dark-tertiary" />}
+            {!single && <div className="flex items-center gap-2">{renderFilterControls()}</div>}
             <div className="h-6 w-px bg-bambu-dark-tertiary" />
             <div className="flex items-center gap-2">{renderViewControls()}</div>
             <div className="h-6 w-px bg-bambu-dark-tertiary" />
@@ -10096,9 +10103,11 @@ export function PrintersPage() {
 
           {compactToolbar && (
             <div className="ml-auto flex items-center justify-end gap-1">
+              {!single && (
               <ToolbarMenu label={t('printers.toolbar.filters', 'Filters')} icon={<Filter className="w-4 h-4" />}>
                 <div className="flex w-48 flex-col gap-2">{renderFilterControls(true)}</div>
               </ToolbarMenu>
+              )}
               <ToolbarMenu label={t('printers.toolbar.view', 'View')} icon={<SlidersHorizontal className="w-4 h-4" />}>
                 <div className="flex w-48 flex-col gap-2">{renderViewControls(true)}</div>
               </ToolbarMenu>
