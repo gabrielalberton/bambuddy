@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { MultiPrinterOnly } from '../custom/MultiPrinterOnly';
+import { useAutoSelectSinglePrinter } from '../custom/useSinglePrinter';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Loader2, ChevronDown, ArrowRightLeft } from 'lucide-react';
 import { api, multiVirtualPrinterApi } from '../api/client';
@@ -33,6 +35,7 @@ export function VirtualPrinterAddDialog({ onClose }: VirtualPrinterAddDialogProp
     queryKey: ['printers'],
     queryFn: api.getPrinters,
   });
+  useAutoSelectSinglePrinter(targetPrinterId === null, (p) => setTargetPrinterId(p.id));
 
   const createMutation = useMutation({
     mutationFn: () =>
@@ -106,6 +109,7 @@ export function VirtualPrinterAddDialog({ onClose }: VirtualPrinterAddDialogProp
 
           {/* Target Printer - only for proxy mode */}
           {mode === 'proxy' && (
+            <MultiPrinterOnly always={targetPrinterId === null}>
             <div>
               <label className="text-sm text-white font-medium block mb-1">{t('virtualPrinter.targetPrinter.title')}</label>
               <div className="relative">
@@ -125,6 +129,7 @@ export function VirtualPrinterAddDialog({ onClose }: VirtualPrinterAddDialogProp
                 <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-bambu-gray pointer-events-none" />
               </div>
             </div>
+            </MultiPrinterOnly>
           )}
 
           <p className="text-xs text-bambu-gray">

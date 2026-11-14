@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { MultiPrinterOnly } from '../custom/MultiPrinterOnly';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import {
   Loader2, Check, AlertTriangle, Eye, EyeOff, Info,
@@ -680,6 +681,7 @@ export function VirtualPrinterCard({ printer, models }: VirtualPrinterCardProps)
             )}
 
             {/* Target Printer */}
+            <MultiPrinterOnly always={!printer.target_printer_id}>
             <div className="pt-2 border-t border-bambu-dark-tertiary">
               <div className="text-white text-sm font-medium mb-2">{t('virtualPrinter.targetPrinter.title')}</div>
               <div className="relative">
@@ -700,6 +702,7 @@ export function VirtualPrinterCard({ printer, models }: VirtualPrinterCardProps)
                 <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-bambu-gray pointer-events-none" />
               </div>
             </div>
+            </MultiPrinterOnly>
 
             {/* Bind Interface */}
             <div className="pt-2 border-t border-bambu-dark-tertiary">
