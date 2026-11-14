@@ -27,7 +27,7 @@ export function createTwin(container, opts) {
   let disposed = false;
 
   const canvas = document.createElement('canvas');
-  canvas.style.cssText = 'display:block;width:100%;height:100%;touch-action:none;outline:none;cursor:default';
+  canvas.style.cssText = 'position:absolute;inset:0;display:block;width:100%;height:100%;touch-action:none;outline:none;cursor:default';
   canvas.setAttribute('aria-hidden', 'true');
   container.appendChild(canvas);
 

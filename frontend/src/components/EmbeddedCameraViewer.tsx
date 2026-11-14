@@ -13,7 +13,7 @@ import { useCameraViewerId } from '../hooks/useCameraViewerId';
 import { isSideways, useSidewaysBox } from '../hooks/useSidewaysBox';
 import { isStandaloneWebApp, openCameraWindow } from '../utils/camera';
 import { useIsSidebarCompact } from '../hooks/useIsSidebarCompact';
-import { CameraOrTwin, TwinSwitch, useTwinActive } from '../custom/twin';
+import { CameraOrTwin, useTwinActive } from '../custom/twin';
 
 export interface EmbeddedCameraViewerProps {
   printerId: number;
@@ -613,7 +613,6 @@ export function EmbeddedCameraViewer({ printerId, printerName, viewerIndex = 0, 
           <span className="truncate">{printer?.name || printerName}</span>
         </div>
         <div className="flex items-center gap-1 no-drag">
-          <TwinSwitch printerId={printerId} size="sm" />
           <button
             onClick={() => chamberLightMutation.mutate(!status?.chamber_light)}
             disabled={!status?.connected || chamberLightMutation.isPending || !hasPermission('printers:control')}

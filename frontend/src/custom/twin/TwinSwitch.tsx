@@ -26,7 +26,7 @@ export function TwinSwitch({ printerId, size = 'md', className = '' }: TwinSwitc
       role="group"
       aria-label={s.group}
       data-testid="twin-switch"
-      className={`no-drag inline-flex items-center rounded-md border border-white/10 bg-black/40 p-0.5 ${className}`}
+      className={`no-drag inline-flex items-center rounded-md border border-white/15 bg-black/60 p-0.5 ${className}`}
       onMouseDown={(e) => e.stopPropagation()}
       onTouchStart={(e) => e.stopPropagation()}
       onKeyDown={(e) => {

@@ -14,7 +14,7 @@ import { useStreamImgRef } from '../hooks/useStreamImgRef';
 import { useCameraViewerId } from '../hooks/useCameraViewerId';
 import { isSideways, useSidewaysBox } from '../hooks/useSidewaysBox';
 import { isStandaloneWebApp, readOpenerTabId, requestCameraPopIn } from '../utils/camera';
-import { CameraOrTwin, TwinSwitch, useTwinActive } from '../custom/twin';
+import { CameraOrTwin, useTwinActive } from '../custom/twin';
 
 const MAX_RECONNECT_ATTEMPTS = 5;
 // The server's Retry-After for a snapshot while a live view starts.
@@ -752,7 +752,6 @@ function CameraView({ onPoppedIn }: { onPoppedIn: () => void }) {
           {printer?.name || `Printer ${id}`}
         </h1>
         <div className="flex items-center gap-2">
-          <TwinSwitch printerId={id} size="sm" />
           {/* Mode toggle */}
           <div className="flex bg-bambu-dark rounded p-0.5">
             <button
@@ -853,7 +852,7 @@ function CameraView({ onPoppedIn }: { onPoppedIn: () => void }) {
         onTouchEnd={handleTouchEnd}
         style={{ touchAction: 'none' }}
       >
-        <CameraOrTwin printerId={id}>
+        <CameraOrTwin printerId={id} className="relative w-full self-stretch" switchPlacement="viewport">
         <div ref={videoAreaRef} className="relative w-full h-full flex items-center justify-center">
           {(streamLoading || transitioning) && !isReconnecting && (
             <div className="absolute inset-0 flex items-center justify-center bg-black/50 z-10">

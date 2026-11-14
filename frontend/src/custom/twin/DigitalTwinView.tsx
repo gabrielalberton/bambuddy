@@ -58,7 +58,7 @@ export default function DigitalTwinView({ printerId, className = '' }: DigitalTw
       onTouchStart={stop}
       onTouchMove={stop}
       onTouchEnd={stop}
-      className={`relative w-full h-full overflow-hidden bg-[#171a21] select-none ${className}`}
+      className={`absolute inset-0 overflow-hidden bg-[#171a21] select-none ${className}`}
     >
       {failed && (
         <div className="absolute inset-0 flex items-center justify-center text-xs text-bambu-gray p-4 text-center">
