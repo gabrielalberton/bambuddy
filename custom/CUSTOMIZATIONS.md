@@ -131,6 +131,42 @@ fallback quando o usuário não enxerga impressora nenhuma.
 Desvio de rota conhecido: em dev local, `uvicorn backend.app.main:app` **não** tem as rotas do catálogo; use
 `uvicorn backend.app.custom.asgi:app`.
 
+## 3. Gêmeo digital da A1 (`custom(twin)`)
+
+Chave **"Câmera | 3D"** onde o Bambuddy mostra a câmera da A1: em "3D", o quadro de vídeo dá lugar ao gêmeo digital
+(porte do `3d-printing/twin`). Somente leitura; sem segunda conexão MQTT. Detalhes, medições e limites:
+`custom/docs/gemeo-digital.md`.
+
+### Interruptores
+
+- Backend: `BAMBUDDY_CUSTOM_TWIN=0` (rotas respondem 404). Gravações: `BAMBUDDY_CUSTOM_TWIN_RECORD=1` (desligado por padrão).
+  Simulação de dev/QA: `BAMBUDDY_CUSTOM_TWIN_SIM=<arquivo.gcode.3mf>` (+ `_SIM_START`, `_SIM_SPEED`).
+- Frontend: `frontend/src/custom/twin/twinFlags.ts` (`TWIN_VIEW`), ou `localStorage['custom.twin'] = 'off'|'on'`. Nos testes
+  do vitest fica desligado (override `setTwinOverride()`). Escolha do usuário: `localStorage['custom.twin.view']`.
+- GLB opcional da A1 em `<data>/custom/twin/a1.glb` (licença desconhecida: **nunca** versionar; sem ele, modelo procedural).
+
+### Código nosso
+
+| Arquivo | O que é |
+|---|---|
+| `backend/app/custom/twin/` | `gcode.py`/`pack.py`/`state.py`/`sim.py`/`recorder.py` (portados), `jobs.py` (3MF do arquivo/biblioteca, parse em processo spawn, cache em `<data>/custom/twin/cache`), `hub.py` (estado via `register_raw_message_handler` do cliente MQTT do Bambuddy, SSE), `router.py` (rotas GET + `include_twin`) |
+| `backend/app/custom/api.py` | `install()` chama `include_twin(app)` (2 linhas, arquivo nosso) |
+| `backend/tests/custom/twin/` | parser vs G-code real, somente leitura/sem publish, lista branca, rotas e autorização |
+| `frontend/src/custom/twin/` | `engine/` (motor JS portado + `engine.d.ts`), `DigitalTwinView.tsx` (lazy), `CameraOrTwin.tsx`, `TwinSwitch.tsx`, `useTwinView.ts`, `twinFlags.ts`, `i18n.ts`, `index.ts` |
+| `frontend/src/custom/__tests__/twin.test.tsx` | chave, troca do quadro nas duas telas, stream fechado, persistência, teclado, sem checagem de travamento no 3D |
+
+### Pontos de contato no upstream
+
+| Arquivo | Âncora | +/− | O que / por quê |
+|---|---|---|---|
+| `frontend/src/components/EmbeddedCameraViewer.tsx` | import após `useIsSidebarCompact`; após `useState` de `isMinimized`; efeito `// Stall detection` (condição e deps); `{!isMinimized && (` do `{/* Video area */}` e o `</div>` antes de `{/* Skip Objects Modal */}` | +6/−2 | `useTwinActive` pausa a checagem de travamento do stream com o 3D ativo (senão ela "reconectaria" uma câmera desmontada); `<CameraOrTwin>` em volta do quadro de vídeo (desenha a chave no rodapé da janela e troca o quadro). |
+| `frontend/src/pages/CameraPage.tsx` | import após `requestCameraPopIn`; após `useState` de `streamMode`; efeito `// Stall detection - periodically check...` (condição e deps); `<div ref={videoAreaRef}` e o `</div>` antes de `{/* Skip Objects Modal */}` | +6/−2 | Idem; a chave fica fixa no rodapé da tela (polegar, `safe-area`). |
+| `backend/app/main.py` | `PUBLIC_API_PREFIXES` | 0 (em tempo de execução) | `include_twin` acrescenta `/api/v1/custom/twin/stream/` à lista do middleware global (como `/camera/stream` está nos padrões públicos): `EventSource` não manda cabeçalho, quem valida o token é a dependência da rota. Se o upstream renomear a lista: 401 (falha fechada). |
+| `backend/app/services/bambu_mqtt.py` | `register_raw_message_handler` / `unregister_raw_message_handler` | 0 | API pública do upstream usada sem alteração (conferir a assinatura ao atualizar a base). |
+| `backend/app/main.py` / `services/printer_manager.py` / `api/routes/library.py` | `running_print_archive`, `resolve_plate_id`, `printer_manager.get_client`, `to_absolute_path` | 0 | Funções do upstream chamadas (só leitura) para achar o 3MF do job. Conferir ao atualizar a base. |
+
+Cartão da impressora: não tem vídeo (só a miniatura do job), então não recebeu a chave. Total do twin no upstream: 2 arquivos, +12/−4 (com single-printer + catálogo, `git diff --stat v1.3.1..custom-twin` fora de `custom/`: 26 arquivos, +133/−25).
+
 ## Build e imagem
 
 - `custom/build.sh [--no-docker]`: lê `custom/BASE_VERSION`, confere que o `CMD` do `Dockerfile` do upstream é o mesmo do
