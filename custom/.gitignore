@@ -1,0 +1,2 @@
+# Saída do custom/build.sh (frontend compilado + contexto do docker build)
+.build/
