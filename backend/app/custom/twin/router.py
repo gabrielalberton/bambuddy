@@ -127,10 +127,10 @@ async def twin_health(printer_id: int, _=RequirePrinterPermissionIfAuthEnabled(P
     return {**get_hub(printer_id).health(), "rss_mb": rss}
 
 
-def include_twin(app, prefix: str | None = None) -> None:
+def include_twin(app, prefix: str | None = None) -> list[str]:
     """Registra as rotas do twin no app do Bambuddy ANTES do catch-all do SPA (`/{full_path:path}`). Idempotente."""
     if getattr(app.state, "custom_twin_included", False):
-        return
+        return []
     if prefix is None:
         from backend.app.core.config import settings
 
@@ -153,3 +153,4 @@ def include_twin(app, prefix: str | None = None) -> None:
     if isinstance(public, list) and stream_prefix not in public:
         public.append(stream_prefix)
     app.state.custom_twin_included = True
+    return [getattr(r, "path", "") for r in added]

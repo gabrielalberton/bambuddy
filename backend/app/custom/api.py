@@ -35,8 +35,12 @@ def install(app: FastAPI) -> list[str]:
         remaining = [r for r in app.router.routes if r not in added]
         catch_all = _spa_catch_all_index(remaining)
         app.router.routes[:] = remaining[:catch_all] + added + remaining[catch_all:]
+    # Gêmeo digital da A1 (custom/docs/gemeo-digital.md): include_twin também insere antes do pega-tudo do SPA.
+    from .twin.router import include_twin
+
+    twin_paths = include_twin(app)
     setattr(app.state, _INSTALLED_FLAG, True)
-    return [getattr(r, "path", "") for r in added]
+    return [getattr(r, "path", "") for r in added] + twin_paths
 
 
 def _spa_catch_all_index(routes: list) -> int:
