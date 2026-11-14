@@ -58,6 +58,18 @@ rm -rf "$OUT/backend_custom"
 mkdir -p "$OUT/backend_custom"
 (cd "$ROOT/backend/app/custom" && tar --exclude='__pycache__' --exclude='*.pyc' -cf - .) | tar -xf - -C "$OUT/backend_custom"
 
+# Arquivos do upstream em backend/app que receberam ganchos do fork (ex.: notification_service.py
+# para o Web Push): copiados inteiros, na versão desta branch, que é a da base + o gancho.
+# A lista sai do git (diferença para a tag base), então não precisa ser mantida à mão.
+rm -rf "$OUT/backend_hooks"
+mkdir -p "$OUT/backend_hooks"
+git -C "$ROOT" diff --name-only --diff-filter=M "$BASE" -- backend/app ':!backend/app/custom' |
+  while read -r f; do
+    mkdir -p "$OUT/backend_hooks/$(dirname "$f")"
+    cp "$ROOT/$f" "$OUT/backend_hooks/$f"
+    echo "gancho no upstream: $f"
+  done
+
 if [ "$NO_DOCKER" = 1 ]; then
   echo "Frontend em $OUT/static e backend em $OUT/backend_custom (sem docker build)."
   exit 0

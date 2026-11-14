@@ -24,6 +24,8 @@ COPY static/ /app/static/
 # Backend nosso (pacote novo; não sobrescreve nada do upstream).
 RUN rm -rf /app/backend/app/custom
 COPY backend_custom/ /app/backend/app/custom/
+# Arquivos do upstream com ganchos do fork (lista gerada por build.sh a partir do git).
+COPY backend_hooks/ /app/
 
 # Mesmo CMD do Dockerfile do upstream (conferir a cada nova base!), só com
 # backend.app.custom.asgi:app no lugar de backend.app.main:app. O ENTRYPOINT
