@@ -2,6 +2,7 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import { i18nReady } from './i18n'
+import './custom/i18n' // custom(fork): textos do fork (custom/CUSTOMIZATIONS.md)
 import App from './App.tsx'
 
 // Only English is bundled (#3175). Wait for the language in use, so the first
