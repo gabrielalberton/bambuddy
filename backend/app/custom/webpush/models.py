@@ -1,7 +1,7 @@
 """Tabela própria do fork (prefixo ``custom_``): inscrições Web Push por aparelho.
 
 Criada pelo ``Base.metadata.create_all`` do upstream (``init_db``), porque este módulo é
-importado quando ``backend.app.custom.register`` roda, antes do lifespan. Nada de migração
+importado pelo ``install()`` de ``backend/app/custom/api.py`` (entrada ``backend.app.custom.asgi``), antes do lifespan. Nada de migração
 nem coluna em tabela do upstream.
 """
 

@@ -30,6 +30,9 @@ def install(app: FastAPI) -> list[str]:
         app.include_router(models_router, prefix=app_settings.api_prefix)
     else:
         logger.info("Catálogo de modelos do fork desligado (BAMBUDDY_CUSTOM_MODELS_CATALOG)")
+    from .webpush import register as register_webpush
+
+    register_webpush(app, app_settings.api_prefix)
     added = [r for r in app.router.routes if r not in before]
     if added:
         remaining = [r for r in app.router.routes if r not in added]
