@@ -6,6 +6,7 @@ import { Camera, Check, Loader2 } from 'lucide-react';
 import { api } from '../api/client';
 import { useAuth } from '../contexts/AuthContext';
 import { useEmbeddedCameras } from '../contexts/EmbeddedCameraContext';
+import { useSinglePrinterCameraToggle } from '../custom/useSinglePrinterCamera';
 
 interface CameraLauncherProps {
   /** Where the printer list opens: beside the Printers row of the sidebar, or down from the compact header. */
@@ -68,6 +69,7 @@ export function CameraLauncher({
   const menuRef = useRef<HTMLDivElement>(null);
   // As the overlays: the printer list takes printers:read.
   const canView = hasPermission('camera:view') && hasPermission('printers:read');
+  useSinglePrinterCameraToggle(open, setOpen, canView);
 
   const { data: printers, isLoading } = useQuery({
     queryKey: ['printers'],
