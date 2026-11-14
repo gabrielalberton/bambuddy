@@ -41,3 +41,37 @@ export function getSinglePrinterMode(): SinglePrinterMode {
   }
   return SINGLE_PRINTER_MODE;
 }
+
+/**
+ * MODEL_CATALOG ("catálogo de modelos" na página Fontes de modelos):
+ *  - 'on':  aba "Catálogo" (MakerWorld/Printables/... com filtro da impressora) ligada;
+ *  - 'off': página do upstream intacta.
+ * Nos testes o efetivo é 'off' (suíte do upstream sem alteração); testes nossos
+ * usam setModelCatalogOverride(). No navegador:
+ *   localStorage.setItem('custom.modelCatalog', 'off')
+ * O backend tem o interruptor próprio BAMBUDDY_CUSTOM_MODELS_CATALOG.
+ */
+export type ModelCatalogMode = 'on' | 'off';
+
+export const MODEL_CATALOG: ModelCatalogMode = 'on';
+
+export const MODEL_CATALOG_STORAGE_KEY = 'custom.modelCatalog';
+
+let catalogOverride: ModelCatalogMode | null = null;
+
+/** Só para testes. */
+export function setModelCatalogOverride(mode: ModelCatalogMode | null): void {
+  catalogOverride = mode;
+}
+
+export function isModelCatalogEnabled(): boolean {
+  if (catalogOverride) return catalogOverride === 'on';
+  if (import.meta.env.MODE === 'test') return false;
+  try {
+    const stored = localStorage.getItem(MODEL_CATALOG_STORAGE_KEY);
+    if (stored === 'on' || stored === 'off') return stored === 'on';
+  } catch {
+    /* localStorage indisponível */
+  }
+  return MODEL_CATALOG === 'on';
+}

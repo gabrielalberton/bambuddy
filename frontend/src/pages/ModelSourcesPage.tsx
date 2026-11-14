@@ -7,8 +7,9 @@ import { api } from '../api/client';
 import { ManyfoldTab } from '../components/ManyfoldTab';
 import { useAuth } from '../contexts/AuthContext';
 import { MakerworldPage } from './MakerworldPage';
+import { CatalogTab, useCatalogTab } from '../custom/models/catalogTab';
 
-type SourceTab = 'makerworld' | 'manyfold';
+type SourceTab = 'makerworld' | 'manyfold' | 'catalog';
 
 /**
  * Model Sources (#1471): the places models come into the library from, one tab
@@ -33,6 +34,7 @@ export function ModelSourcesPage() {
   const tabs: { id: SourceTab; label: string; icon: typeof Globe }[] = [];
   if (hasPermission('makerworld:view')) tabs.push({ id: 'makerworld', label: t('modelSources.tabMakerworld'), icon: Globe });
   if (showManyfold) tabs.push({ id: 'manyfold', label: t('modelSources.tabManyfold'), icon: Library });
+  useCatalogTab(tabs);
 
   const requested = searchParams.get('tab');
   // A Manyfold-only user, before Manyfold is connected, has no tab; show them
@@ -71,6 +73,7 @@ export function ModelSourcesPage() {
         </div>
       )}
 
+      {active === 'catalog' && <CatalogTab />}
       {active === 'makerworld' && <MakerworldPage embedded />}
       {active === 'manyfold' && <ManyfoldTab />}
     </div>

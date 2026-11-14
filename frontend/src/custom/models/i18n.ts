@@ -1,0 +1,166 @@
+import { useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
+
+/**
+ * Textos do catálogo (fork). Não usamos os arquivos de locale do upstream
+ * (regra 6 do AGENTS.md): dicionário próprio, pt-BR + en, fallback en.
+ */
+const en = {
+  tab: 'Catalog',
+  search: 'Search models',
+  searchPlaceholder: 'Search models…',
+  allSources: 'All',
+  sort: 'Sort',
+  trending: 'Trending',
+  popular: 'Popular',
+  newest: 'Newest',
+  recentMakerworld: 'Recent · 24 h',
+  relevance: 'Relevance',
+  category: 'Category',
+  allCategories: 'All categories',
+  printerFilter: 'Only for my {{printer}}',
+  printerFilterOn: 'Showing models for {{printer}}',
+  printerFilterOff: 'Showing all models',
+  filterServer: 'Filtered by MakerWorld: models with a profile for {{printer}}.',
+  filterNotApplied: 'Filter off: all models.',
+  filterNaPrintables:
+    'Printables has no size or printer-profile data: the {{printer}} filter does not apply here.',
+  filterAuthorPrinter: 'Only models the author printed on a {{printer}} (rare)',
+  filterAuthorApplied: 'Only models the author marked as printed on a {{printer}}.',
+  filterNaThingiverse: 'Thingiverse has no printer or size data: the {{printer}} filter does not apply here.',
+  disabled: 'Disabled',
+  results: '{{count}} results',
+  resultsMany: 'many results',
+  empty: 'No models found',
+  emptyHint: 'Try another search, category or turn off the printer filter.',
+  previous: 'Previous',
+  next: 'Next',
+  page: 'Page {{page}}',
+  loading: 'Loading…',
+  noImage: 'No preview',
+  loadError: 'Could not load.',
+  authError: 'Access denied. Check your sign-in or permissions.',
+  retry: 'Retry',
+  back: 'Back',
+  by: 'by {{creator}}',
+  license: 'License: {{license}}',
+  original: 'Open original',
+  files: 'Print profiles and files',
+  filesHint: 'Profiles for your printer come first.',
+  noFiles: 'No downloadable files.',
+  matchNative: 'Made for {{printer}}',
+  matchCompatible: 'Compatible with {{printer}}',
+  matchOther: 'Other printer',
+  matchUnknown: 'No printer info',
+  saveOnly: 'Save only',
+  plates: '{{count}} plate(s)',
+  ams: 'AMS',
+  destination: 'Save to',
+  defaultFolder: 'Default ({{folder}} folder)',
+  save: 'Save to library',
+  saving: 'Saving…',
+  slice: 'Slice in Bambuddy',
+  preparing: 'Preparing…',
+  sliceHint: 'Slicing saves the file to the library, then opens the slicer. It never starts a print.',
+  saved: 'Saved: {{filename}}',
+  alreadySaved: 'Already in the library: {{filename}}',
+  openLibrary: 'Open in library',
+  noImportPermission: 'You can browse, but your account cannot save files to the library.',
+  makerworldSignIn: 'MakerWorld downloads use your Bambu Cloud sign-in (Settings).',
+  description: 'Description',
+  noDescription: 'No description.',
+  gallery: 'Images',
+  sources: 'Sources',
+  sourceDisabledHint: 'Not configured',
+  wrongProfileWarning: 'This profile was not made for {{printer}}; check it in the slicer.',
+};
+
+type Key = keyof typeof en;
+
+const ptBR: Record<Key, string> = {
+  tab: 'Catálogo',
+  search: 'Buscar modelos',
+  searchPlaceholder: 'Buscar modelos…',
+  allSources: 'Todas',
+  sort: 'Ordem',
+  trending: 'Em alta',
+  popular: 'Populares',
+  newest: 'Mais novos',
+  recentMakerworld: 'Recentes · 24 h',
+  relevance: 'Relevância',
+  category: 'Categoria',
+  allCategories: 'Todas as categorias',
+  printerFilter: 'Só para minha {{printer}}',
+  printerFilterOn: 'Mostrando modelos para {{printer}}',
+  printerFilterOff: 'Mostrando todos os modelos',
+  filterServer: 'Filtrado pelo MakerWorld: modelos com perfil para {{printer}}.',
+  filterNotApplied: 'Filtro desligado: todos os modelos.',
+  filterNaPrintables:
+    'O Printables não informa tamanho nem perfis por impressora: o filtro {{printer}} não se aplica aqui.',
+  filterAuthorPrinter: 'Só modelos que o autor imprimiu numa {{printer}} (raro)',
+  filterAuthorApplied: 'Só modelos que o autor marcou como impressos numa {{printer}}.',
+  filterNaThingiverse: 'O Thingiverse não informa impressora nem tamanho: o filtro {{printer}} não se aplica aqui.',
+  disabled: 'Desligada',
+  results: '{{count}} resultados',
+  resultsMany: 'muitos resultados',
+  empty: 'Nenhum modelo encontrado',
+  emptyHint: 'Tente outra busca, categoria ou desligue o filtro da impressora.',
+  previous: 'Anterior',
+  next: 'Próxima',
+  page: 'Página {{page}}',
+  loading: 'Carregando…',
+  noImage: 'Sem imagem',
+  loadError: 'Não foi possível carregar.',
+  authError: 'Acesso negado. Confira o login ou as permissões.',
+  retry: 'Tentar de novo',
+  back: 'Voltar',
+  by: 'por {{creator}}',
+  license: 'Licença: {{license}}',
+  original: 'Abrir original',
+  files: 'Perfis de impressão e arquivos',
+  filesHint: 'Os perfis da sua impressora aparecem primeiro.',
+  noFiles: 'Nenhum arquivo para baixar.',
+  matchNative: 'Feito para {{printer}}',
+  matchCompatible: 'Compatível com {{printer}}',
+  matchOther: 'Outra impressora',
+  matchUnknown: 'Sem info de impressora',
+  saveOnly: 'Só salvar',
+  plates: '{{count}} placa(s)',
+  ams: 'AMS',
+  destination: 'Salvar em',
+  defaultFolder: 'Padrão (pasta {{folder}})',
+  save: 'Salvar na biblioteca',
+  saving: 'Salvando…',
+  slice: 'Fatiar no Bambuddy',
+  preparing: 'Preparando…',
+  sliceHint: 'Fatiar salva o arquivo na biblioteca e abre o fatiador. Nunca inicia impressão.',
+  saved: 'Salvo: {{filename}}',
+  alreadySaved: 'Já estava na biblioteca: {{filename}}',
+  openLibrary: 'Abrir na biblioteca',
+  noImportPermission: 'Você pode navegar, mas sua conta não pode salvar arquivos na biblioteca.',
+  makerworldSignIn: 'Downloads do MakerWorld usam seu login Bambu Cloud (Configurações).',
+  description: 'Descrição',
+  noDescription: 'Sem descrição.',
+  gallery: 'Imagens',
+  sources: 'Fontes',
+  sourceDisabledHint: 'Não configurada',
+  wrongProfileWarning: 'Este perfil não foi feito para {{printer}}; confira no fatiador.',
+};
+
+export type CatalogKey = Key;
+
+export function translate(language: string | undefined, key: Key, vars?: Record<string, string | number>): string {
+  const dict = language?.toLowerCase().startsWith('pt') ? ptBR : en;
+  let text = dict[key] ?? en[key] ?? key;
+  if (vars) for (const [name, value] of Object.entries(vars)) text = text.split(`{{${name}}}`).join(String(value));
+  return text;
+}
+
+export function useCatalogT() {
+  const { i18n } = useTranslation();
+  const language = i18n.language;
+  return useCallback(
+    (key: Key, vars?: Record<string, string | number>) => translate(language, key, vars),
+    [language],
+  );
+}
