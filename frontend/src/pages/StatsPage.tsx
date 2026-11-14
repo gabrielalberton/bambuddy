@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { MultiPrinterOnly } from '../custom/MultiPrinterOnly';
 import {
   Package,
   Clock,
@@ -245,6 +246,7 @@ function SuccessRateWidget({
           </div>
         </div>
         {/* Show per-printer breakdown when expanded */}
+        <MultiPrinterOnly>
         {size >= 2 && stats?.prints_by_printer && Object.keys(stats.prints_by_printer).length > 0 && (
           <div className="mt-4 pt-4 border-t border-bambu-dark-tertiary">
             <p className="text-xs text-bambu-gray font-medium mb-2">{t('stats.printsByPrinter')}</p>
@@ -260,6 +262,7 @@ function SuccessRateWidget({
             </div>
           </div>
         )}
+        </MultiPrinterOnly>
       </div>
     </div>
   );
@@ -348,6 +351,7 @@ function TimeAccuracyWidget({
           <Target className="w-3 h-3 flex-shrink-0" />
           <span>{t('stats.perfectEstimate')}</span>
         </div>
+        <MultiPrinterOnly>
         {printerEntries.length > 0 && (
           <div className={`mt-2 ${size === 4 ? 'grid grid-cols-3 gap-x-6 gap-y-1' : size === 2 ? 'grid grid-cols-2 gap-x-6 gap-y-1' : 'space-y-1'}`} style={{ width: 'fit-content' }}>
             {printerEntries.map(([printerId, acc]) => (
@@ -365,6 +369,7 @@ function TimeAccuracyWidget({
             ))}
           </div>
         )}
+        </MultiPrinterOnly>
       </div>
     </div>
   );
@@ -619,6 +624,7 @@ function PrinterStatsWidget({
   return (
     <div className="space-y-4">
       {/* By Printer */}
+      <MultiPrinterOnly>
       <div className="bg-bambu-dark rounded-lg p-4">
         <div className="flex items-center justify-between mb-3">
           <h4 className="text-sm font-medium text-bambu-gray">{t('stats.printsByPrinter')}</h4>
@@ -644,6 +650,7 @@ function PrinterStatsWidget({
           <p className="text-bambu-gray text-center py-4">{t('stats.noPrinterData')}</p>
         )}
       </div>
+      </MultiPrinterOnly>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Print Duration */}
