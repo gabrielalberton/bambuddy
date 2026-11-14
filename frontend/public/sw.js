@@ -1,4 +1,5 @@
 // Bambuddy Service Worker
+try { importScripts('/custom/sw-push.js'); } catch (e) { console.warn('[SW] custom push add-on unavailable', e); } // custom(webpush)
 const CACHE_NAME = 'bambuddy-v31';
 const STATIC_CACHE = 'bambuddy-static-v29';
 
