@@ -74,13 +74,76 @@ Total no upstream (`git diff --stat v1.3.1..gabriel -- . ':!custom' ':!AGENTS.md
 - **MaintenancePage**: cabeçalho `PrinterSection` (traz os selos de vencidos) e chips atribuir/remover tipo por impressora (função real de ligar/desligar um tipo) mantidos.
 - **Rotas `/camwall` e `/printer-locations`**: continuam existindo; só os links da página de impressoras somem.
 
+## 2. Catálogo de modelos (`custom(models)`)
+
+Aba **Catálogo** (primeira, padrão) em *Fontes de modelos* (`/model-sources?tab=catalog`), no estilo do navegador
+MakerWorld do Bambu Handy: busca, fontes, ordem, categorias, detalhe com perfis, **Salvar na biblioteca** e
+**Fatiar no Bambuddy** (salva e abre o `SliceModal` existente; nunca inicia impressão). Projetada primeiro para o PWA
+no celular (390x844, toque): grade de 2 colunas, chips roláveis, chave grande, barra Salvar/Fatiar fixa no rodapé com
+`safe-area`, estado na URL (o "voltar" do Android fecha o detalhe). Screenshots: `custom/docs/screenshots/catalogo/`.
+
+Baseado no trabalho de 1337faye/bambuddy-model-search (AGPL-3.0, commit `1b3b65b59`), **portado** (não cherry-pick)
+para os diretórios do fork. Ficaram de fora: tudo de X2D, o CSS das setas de select, edições nos locales do upstream,
+reescrita de testes do upstream e o mecanismo de "fonte temporária" de fatiamento (exigia mexer em `library.py` e
+`library_trash.py`; aqui Fatiar = salvar normal + SliceModal).
+
+Detalhes por fonte, evidência do filtro e limites: `custom/docs/fontes-de-modelos.md`.
+
+### Filtro "Só para minha <modelo>"
+
+Ligado por padrão em todas as fontes; desligar fica lembrado por navegador (`localStorage['custom.models.printerFilter']`).
+O modelo vem de `GET /printers/` (modo impressora única: a única; senão todos os modelos distintos); `A1` só como
+fallback quando o usuário não enxerga impressora nenhuma.
+
+| Fonte | Acesso | Busca/detalhe | Salvar/Fatiar | Filtro A1 |
+|---|---|---|---|---|
+| MakerWorld | search-service público + design-service (anônimo) | sim | sim, via `POST /makerworld/import` do upstream (credencial Bambu Cloud salva; permissão `makerworld:import`) | **no servidor**: `devModelNames=N2S` (perfil compatível, `compatibility` ou `otherCompatibility`); no detalhe, perfis A1 primeiro e pré-selecionado |
+| Printables | GraphQL público (anônimo) | sim | sim (STL/3MF; outros só salvar) | **não aplicável** (sem dimensões nem perfis por impressora); opção explícita "impressora do autor = A1" (`printerIds`, rara) |
+| Thingiverse | API oficial, **App Token** | sim (com token) | sim (com token) | não aplicável |
+| Thangs, Cults3D, MyMiniFactory, Crealty Cloud | — | não implementadas (ver docs) | — | — |
+
+### Interruptores
+
+- Frontend: `frontend/src/custom/flags.ts` → `MODEL_CATALOG = 'on'`; no navegador `localStorage.setItem('custom.modelCatalog','off')`.
+  Nos testes (vitest) o efetivo é `'off'` (suíte do upstream intacta); testes nossos usam `setModelCatalogOverride('on')`.
+- Backend: `BAMBUDDY_CUSTOM_MODELS_CATALOG=0` não registra as rotas.
+- Thingiverse: só liga com `BAMBUDDY_CUSTOM_THINGIVERSE_API_KEY` (env do container; nunca no git).
+
+### Código nosso
+
+| Caminho | O que é |
+|---|---|
+| `backend/app/custom/asgi.py` | ponto de entrada da imagem: importa `backend.app.main.app` e chama `install()` |
+| `backend/app/custom/api.py` | `install(app)`: inclui os routers do fork e os move para **antes** da rota pega-tudo do SPA (`GET /{full_path:path}`) |
+| `backend/app/custom/models_catalog/` | `router.py` (`/api/v1/custom/models/{sources, <fonte>/browse, categories, thumbnail, <id>, <id>/save}`), `makerworld.py`, `printables.py`, `thingiverse.py`, `transport.py` (cache, allowlist de CDN, validação STL/3MF), `printer_models.py` (modelo → `devModelName`/id do Printables) |
+| `backend/tests/custom/` | transporte, fontes (transporte simulado), rotas com a biblioteca real e permissões |
+| `custom/scripts/smoke_models_catalog.py` | smoke ao vivo (poucas requisições, sem download) |
+| `frontend/src/custom/models/` | `ModelCatalog.tsx`, `ModelDetail.tsx`, `catalogTab.ts` (gancho), `usePrinterModels.ts`, `api.ts`, `i18n.ts` (pt-BR/en próprio), `shared.tsx`, `constants.ts`, `utils.ts`, `types.ts` |
+| `frontend/src/custom/__tests__/modelCatalog.test.tsx` | aba/flag, filtro padrão e persistência, modelo da impressora, Printables N/A, fonte sem chave, detalhe/salvar/fatiar |
+
+### Pontos de contato no upstream
+
+| Arquivo | Âncora | +/− | O que / por quê |
+|---|---|---|---|
+| `frontend/src/pages/ModelSourcesPage.tsx` | import após `import { MakerworldPage }`; `type SourceTab`; após `if (showManyfold) tabs.push(...)`; antes de `{active === 'makerworld' && <MakerworldPage embedded />}` | +4/−1 | `useCatalogTab(tabs)` põe a aba em primeiro (com a flag desligada não faz nada) e `{active === 'catalog' && <CatalogTab />}`. |
+| `backend/app/main.py` | — | 0 | **Não tocado.** As rotas entram por `backend.app.custom.asgi` (ver Build). |
+
+Desvio de rota conhecido: em dev local, `uvicorn backend.app.main:app` **não** tem as rotas do catálogo; use
+`uvicorn backend.app.custom.asgi:app`.
+
 ## Build e imagem
 
-- `custom/build.sh [--no-docker]`: lê `custom/BASE_VERSION`, roda `npm ci` só se `node_modules` faltar/estiver mais velho
-  que o `package-lock.json`, compila com `vite build` em `custom/.build/static` (não em `../static`, que é versionado pelo
-  upstream) sob `systemd-run ... MemoryMax=3G`, roda o `check-browser-baseline` (o mesmo passo do `npm run build`) e faz
-  `docker build -f custom/Dockerfile custom/.build` com as tags `bambuddy-gabriel:<base>-<sha>` e `bambuddy-gabriel:latest`
-  (`-dirty` no sha se `frontend/` ou `custom/` tiverem mudança não commitada).
-- `custom/Dockerfile`: `FROM ghcr.io/maziggy/bambuddy:<base>`, apaga `/app/static` e copia o frontend compilado.
+- `custom/build.sh [--no-docker]`: lê `custom/BASE_VERSION`, confere que o `CMD` do `Dockerfile` do upstream é o mesmo do
+  `custom/Dockerfile` (com o módulo trocado; se o upstream mudar, o build para), roda `npm ci` só se `node_modules`
+  faltar/estiver mais velho que o `package-lock.json`, compila com `vite build` em `custom/.build/static` (não em
+  `../static`, que é versionado pelo upstream) sob `systemd-run ... MemoryMax=3G`, roda o `check-browser-baseline`, copia
+  `backend/app/custom` (sem `__pycache__`) para `custom/.build/backend_custom` e faz `docker build -f custom/Dockerfile
+  custom/.build` com as tags `bambuddy-gabriel:<base>-<sha>` e `bambuddy-gabriel:latest` (`-dirty` no sha se `frontend/`,
+  `custom/` ou `backend/app/custom` tiverem mudança não commitada).
+- `custom/Dockerfile`: `FROM ghcr.io/maziggy/bambuddy:<base>`, troca `/app/static` pelo frontend compilado, copia só
+  `backend/app/custom/` e repete o `CMD` do upstream com `backend.app.custom.asgi:app` no lugar de
+  `backend.app.main:app` (ENTRYPOINT do upstream mantido). Escolhido em vez de um gancho de 2 linhas em `main.py` porque
+  não exige copiar nenhum arquivo do upstream para a imagem; o custo é o `CMD` duplicado, vigiado pelo `build.sh`.
   O contexto é `custom/.build/` porque o `.dockerignore` do upstream exclui `static/`.
-- Deploy (não automatizado aqui): trocar a imagem no stack `23-bambuddy.yml` em compose-migration.
+- Deploy (não automatizado aqui): trocar a imagem no stack `23-bambuddy.yml` em compose-migration. Se o compose
+  definir `command:` próprio, ele precisa apontar para `backend.app.custom.asgi:app` (hoje não define).
