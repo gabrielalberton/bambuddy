@@ -17,22 +17,53 @@ const REST = { x: 40, y: 170, z: 90 };
  * @param {{ eventsUrl: () => string, jobUrl: (id: string) => string, modelUrl?: (() => string) | null,
  *           tuning?: { lead?: number, lat?: number, tau?: number }, debug?: boolean, procedural?: boolean }} opts
  */
+// O GLB da A1 (~2,8 MB) vem com o token de stream na URL, que muda a cada sessão: o cache HTTP nunca acertava e o modelo
+// era baixado de novo a cada abertura. Guarda o arquivo no Cache Storage (chave sem o token) e na memória da página.
+const MODEL_CACHE = 'custom-twin-model-v1';
+const memModel = new Map();
+function modelCacheKey(url) {
+  const u = new URL(url, location.href);
+  u.searchParams.delete('token');
+  return u.toString();
+}
+async function loadModelBuffer(url, signal) {
+  const key = modelCacheKey(url);
+  if (memModel.has(key)) return memModel.get(key);
+  let store = null;
+  try { store = 'caches' in window ? await caches.open(MODEL_CACHE) : null; } catch { store = null; }
+  try {
+    const hit = store && await store.match(key);
+    if (hit) { const buf = await hit.arrayBuffer(); memModel.set(key, buf); return buf; }
+  } catch { /* cache indisponível: baixa */ }
+  const r = await fetch(url, { signal, credentials: 'same-origin' });
+  if (!r.ok) return null;
+  const buf = await r.arrayBuffer();
+  memModel.set(key, buf);
+  try { await store?.put(key, new Response(buf.slice(0), { headers: { 'Content-Type': 'model/gltf-binary' } })); } catch { /* cota/privado: segue sem cache */ }
+  return buf;
+}
+
 export function createTwin(container, opts) {
   const DEBUG = !!opts.debug;
   const LEAD = Math.max(-5, Math.min(5, Number(opts.tuning?.lead) || 0));
   const TRK_URL = {};
   for (const k of ['lat', 'tau']) if (Number.isFinite(opts.tuning?.[k])) TRK_URL[k] = opts.tuning[k];
   const isMobile = matchMedia('(pointer:coarse)').matches || Math.min(screen.width, screen.height) < 700;
-  const PR_MAX = Math.min(window.devicePixelRatio || 1, isMobile ? 1.5 : 2);
+  // Nitidez: até 2x (telas de celular têm ~3x) e nunca abaixo de 1,25x (abaixo disso fica visivelmente pixelizado).
+  const DPR = window.devicePixelRatio || 1;
+  const PR_MAX = Math.min(DPR, 2);
+  const PR_MIN = Math.min(DPR, 1.25);
   let disposed = false;
+  let lastAdapt = performance.now();
 
   const canvas = document.createElement('canvas');
-  canvas.style.cssText = 'position:absolute;inset:0;display:block;width:100%;height:100%;touch-action:none;outline:none;cursor:default';
+  // Começa invisível e aparece (fade) só quando o modelo definitivo está montado: sem "piscar" o procedural antes do real.
+  canvas.style.cssText = 'position:absolute;inset:0;display:block;width:100%;height:100%;touch-action:none;outline:none;cursor:default;opacity:0;transition:opacity 180ms ease-out';
   canvas.setAttribute('aria-hidden', 'true');
   container.appendChild(canvas);
 
   // ---------- renderer / cena ----------
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias: !isMobile || (window.devicePixelRatio || 1) < 2, powerPreference: 'high-performance', alpha: false });
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance', alpha: false });
   let pr = PR_MAX;
   renderer.setPixelRatio(pr);
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -78,19 +109,30 @@ export function createTwin(container, opts) {
   const model = new A1Model();
   // Modelo real da A1 (GLB opcional no volume de dados do Bambuddy; licença desconhecida, nunca versionado). Sem ele: procedural.
   const abort = new AbortController();
+  let revealed = false;
+  const reveal = () => {
+    if (revealed || disposed) return;
+    revealed = true;
+    lastAdapt = performance.now();   // sem adaptar a resolução pelos primeiros quadros (compilação de shaders)
+    requestAnimationFrame(() => { canvas.style.opacity = '1'; });
+  };
   if (opts.modelUrl && !opts.procedural) {
+    // Sem resposta em 6 s (rede ruim), mostra o procedural; o real ainda entra quando chegar.
+    const fallback = setTimeout(reveal, 6000);
     (async () => {
       try {
-        const r = await fetch(opts.modelUrl(), { signal: abort.signal, credentials: 'same-origin' });
-        if (!r.ok || disposed) return;
-        const buf = await r.arrayBuffer();
+        const buf = await loadModelBuffer(opts.modelUrl(), abort.signal);
+        if (!buf || disposed) return;
         const { GLTFLoader } = await import('three/examples/jsm/loaders/GLTFLoader.js');
         const gltf = await new Promise((ok, err) => new GLTFLoader().parse(buf, '', ok, err));
         if (disposed) { disposeTree(gltf.scene); return; }
         model.attachCAD(gltf.scene);
         stats.model = 'step'; view.fit = 1.2; view.ty = 125;
       } catch (e) { if (DEBUG) console.warn('modelo STEP indisponível; procedural', e); }
+      finally { clearTimeout(fallback); reveal(); }
     })();
+  } else {
+    reveal();
   }
   scene.add(model.root);
   const object = new PrintedObject([]);
@@ -259,7 +301,7 @@ export function createTwin(container, opts) {
   // ---------- loop (pausado em segundo plano / fora da tela) ----------
   let lastT = performance.now();
   const tmp = {};
-  let fpsAcc = 0, fpsN = 0, lastAdapt = 0;
+  let fpsAcc = 0, fpsN = 0;
   function tick() {
     const nowP = performance.now();
     const dt = Math.min((nowP - lastT) / 1000, 0.1);
@@ -289,12 +331,12 @@ export function createTwin(container, opts) {
     object.update(T, dt, showObj && S.prog != null);
     updateCamera(nowS);
     renderer.render(scene, camera);
-    // adaptação de qualidade (celular: começa em no máx. 1,5x e desce até 0,75x se o FPS cair)
+    // adaptação de qualidade: até 2x, desce em passos de 0,25 até PR_MIN (1,25x) só com FPS baixo de verdade
     fpsAcc += dt; fpsN++;
     if (fpsAcc > 2) {
       const fps = fpsN / fpsAcc; stats.fps = fps; fpsAcc = 0; fpsN = 0;
       if (performance.now() - lastAdapt > 3000) {
-        if (fps < 28 && pr > 0.8) { pr = Math.max(0.75, pr - 0.25); renderer.setPixelRatio(pr); W = H = 0; frame(); lastAdapt = performance.now(); }
+        if (fps < 24 && pr > PR_MIN) { pr = Math.max(PR_MIN, pr - 0.25); renderer.setPixelRatio(pr); W = H = 0; frame(); lastAdapt = performance.now(); }
         else if (fps > 56 && pr < PR_MAX) { pr = Math.min(pr + 0.25, PR_MAX); renderer.setPixelRatio(pr); W = H = 0; frame(); lastAdapt = performance.now(); }
       }
     }
