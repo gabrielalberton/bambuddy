@@ -10050,7 +10050,7 @@ export function PrintersPage() {
 
   return (
     <div className="p-4 md:p-8">
-      <div className="space-y-3 mb-6">
+      <div className={single ? 'hidden' : 'space-y-3 mb-6'}>
         <div>
           <h1 className="text-2xl font-bold text-white flex items-center gap-3">
             <PrinterIcon className="w-7 h-7 text-bambu-green" />
