@@ -1,5 +1,6 @@
 import { lazy, Suspense, type ReactNode } from 'react';
 import { CameraPreview } from '../camera/CameraPreview';
+import { FillParentHeight } from '../camera/FillParentHeight';
 import { TwinFrame } from './TwinFrame';
 import { TwinSwitch } from './TwinSwitch';
 import { useTwinActive, useTwinAvailable } from './useTwinView';
@@ -26,7 +27,9 @@ export function CameraOrTwin({ printerId, className = 'relative w-full h-full', 
   const available = useTwinAvailable(printerId);
   const active = useTwinActive(printerId);
   // Prévia instantânea da câmera (custom/docs/camera-previa.md): vale com ou sem o gêmeo digital.
-  if (!available) return <>{children}<CameraPreview printerId={printerId} /></>;
+  // Página da câmera (chave fixa na tela): o quadro de vídeo ganha altura medida (ver FillParentHeight).
+  const camera = switchPlacement === 'viewport' ? <FillParentHeight>{children}</FillParentHeight> : children;
+  if (!available) return <>{camera}<CameraPreview printerId={printerId} /></>;
   const pos = switchPlacement === 'viewport' ? 'fixed' : 'absolute';
   const overlay = (
     <div
@@ -47,7 +50,7 @@ export function CameraOrTwin({ printerId, className = 'relative w-full h-full', 
         </TwinFrame>
       ) : (
         <>
-          {children}
+          {camera}
           <CameraPreview printerId={printerId} />
         </>
       )}
