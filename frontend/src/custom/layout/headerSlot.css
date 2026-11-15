@@ -35,8 +35,8 @@
 }
 /* barra de progresso: linha fina */
 [data-custom-header-status] > div > div > div > div:nth-child(3) {
-  height: 5px !important;
+  height: 11px !important;
 }
-[data-custom-header-status] > div > div > div > div:nth-child(3) > span {
-  display: none !important; /* ---% (a barra já mostra) */
+[data-custom-header-status] > div {
+  padding-left: 2px !important;
 }
