@@ -128,7 +128,7 @@ describe('Filamentos em lista (modo impressora única)', () => {
     for (const h of unitHeaders) expect(getComputedStyle(h).display).toBe('none');
   });
 
-  it('uma linha por slot, AMS 1-4 e depois o externo, com bolinha | material | K | barra', async () => {
+  it('uma linha por slot, AMS 1-4 e depois o externo, com bolinha | material | barra (sem K)', async () => {
     setup();
     const list = await rows();
     const circles = list.map((r) => r.querySelector(':scope > div:first-of-type')!.textContent);
@@ -136,14 +136,14 @@ describe('Filamentos em lista (modo impressora única)', () => {
     expect(list.map((r) => r.querySelector(':scope > div:nth-of-type(2)')!.textContent)).toEqual([
       'PLA', 'PLA', 'PLA', 'PLA', 'Empty',
     ]);
-    expect(list[0].querySelector(':scope > div:nth-of-type(3)')!.textContent).toContain('0.020');
+    expect(getComputedStyle(list[0].querySelector(':scope > div:nth-of-type(3)')!).display).toBe('none');
 
     for (const r of list) {
       // colunas fixas iguais em toda linha => toda barra começa e termina no mesmo x
       expect(getComputedStyle(r).gridTemplateColumns).toBe(FILAMENT_ROW_COLUMNS);
       const bar = r.lastElementChild as HTMLElement;
       expect(bar.className).toContain('overflow-hidden');
-      expect(getComputedStyle(bar).gridColumn).toBe('4');
+      expect(getComputedStyle(bar).gridColumn).toBe('3');
     }
     // nível: largura da barra interna = remain
     const fills = list.map((r) => (r.lastElementChild!.firstElementChild as HTMLElement | null)?.style.width ?? null);

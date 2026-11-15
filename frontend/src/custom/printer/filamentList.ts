@@ -9,7 +9,7 @@
  *  - some o cabeçalho "FILAMENTS" (rótulo, botão de backup, linha, olho) e o
  *    cabeçalho de cada unidade ("AMS-A" + umidade/temperatura, "External");
  *  - unidades e slots ficam empilhados, um slot por linha;
- *  - cada linha é uma grade `bolinha | material | K | barra` com as três
+ *  - cada linha é uma grade `bolinha | material | barra` (o K some) com as duas
  *    primeiras colunas de largura fixa, então toda barra (= 100%) começa e
  *    termina no mesmo x, qualquer que seja o texto.
  *
@@ -26,7 +26,7 @@ export const FILAMENT_LIST_CLASS = 'custom-filament-list';
 export const FILAMENT_LIST_KEEP_HEADER_CLASS = 'custom-filament-list--keep-header';
 
 /** Larguras fixas das colunas antes da barra (iguais em toda linha). */
-export const FILAMENT_ROW_COLUMNS = '1.375rem 3.75rem 3rem minmax(0, 1fr)';
+export const FILAMENT_ROW_COLUMNS = '1.375rem 3.75rem minmax(0, 1fr)';
 
 const S = `.${FILAMENT_LIST_CLASS}`;
 
@@ -83,10 +83,8 @@ ${row(' > div:first-of-type > span')} { font-size: calc(var(--pc-t9, 9px) + 1px)
 ${row(' > div:nth-of-type(2)')} {
   grid-column: 2; font-size: calc(var(--pc-t9, 9px) + 3px); line-height: 1.2;
 }
-${row(' > div:nth-of-type(3):not(:last-child)')} {
-  grid-column: 3; font-size: calc(var(--pc-t8, 8px) + 2px); line-height: 1.2;
-}
-${row(' > div:last-child')} { grid-column: 4; height: 0.5rem; margin: 0; }
+${row(' > div:nth-of-type(3):not(:last-child)')} { display: none !important; }
+${row(' > div:last-child')} { grid-column: 3; height: 0.5rem; margin: 0; }
 `;
 
 const STYLE_ID = 'custom-filament-list-style';

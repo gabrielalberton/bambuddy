@@ -89,6 +89,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { useSinglePrinter } from '../custom/useSinglePrinter';
 import { InlineCamera } from '../custom/camera/InlineCamera';
+import { NozzleSizeBadge, PrintHoursTile } from '../custom/printer/CardExtras';
 import { InHeader } from '../custom/layout/HeaderSlot';
 import { headerStatusEnabled } from '../custom/layout/headerFlags';
 import { useFilamentListClass } from '../custom/printer/filamentList';
@@ -4048,12 +4049,12 @@ function PrinterCard({
                       first entry alone named one hotend and implied it was the
                       whole printer. Deduplicated, so the usual matching pair
                       still reads as a single "0.4mm". */}
-                  {viewMode === 'expanded' && installedNozzleDiameters(status).length > 0 && (
+                  {viewMode === 'expanded' && !single && installedNozzleDiameters(status).length > 0 && (
                     <span className={single ? 'text-bambu-gray' : 'ml-1.5 text-bambu-gray'} title={status?.nozzles?.[0]?.nozzle_type || 'Nozzle'}>
                       {single ? '' : '• '}{installedNozzleDiameters(status).join(' / ')}mm
                     </span>
                   )}
-                  {viewMode === 'expanded' && maintenanceInfo && maintenanceInfo.total_print_hours > 0 && (
+                  {viewMode === 'expanded' && !single && maintenanceInfo && maintenanceInfo.total_print_hours > 0 && (
                     <span className="ml-2 text-bambu-gray">
                       <Clock className="w-[var(--pc-i3,0.75rem)] h-[var(--pc-i3,0.75rem)] inline-block mr-1" />
                       {Math.round(maintenanceInfo.total_print_hours)}h
@@ -4283,6 +4284,7 @@ function PrinterCard({
                   {status.door_open ? <DoorOpen className="w-[var(--pc-i3,0.75rem)] h-[var(--pc-i3,0.75rem)]" /> : <DoorClosed className="w-[var(--pc-i3,0.75rem)] h-[var(--pc-i3,0.75rem)]" />}
                 </span>
               )}
+              {single && <NozzleSizeBadge diameters={installedNozzleDiameters(status)} type={status?.nozzles?.[0]?.nozzle_type} />}
               </div>
             </div>
           )}
@@ -4958,6 +4960,7 @@ function PrinterCard({
                         rackPrinter={trayLayout.rack}
                       />
                     )}
+                    {single && <PrintHoursTile hours={maintenanceInfo?.total_print_hours} />}
                   </div>
                   <div className="mt-2 flex items-center gap-1.5">
                     {fanItems.map(({ key, label, value, Icon, activeClass }) => {
@@ -6863,7 +6866,7 @@ function PrinterCard({
                     Replaces the old Settings > General > Camera switch, which
                     made choosing between an overlay and a window a trip to
                     another page for something you decide per camera. */}
-                <div className="flex items-center flex-shrink-0">
+                <div className={single ? 'hidden' : 'flex items-center flex-shrink-0'}>
                   <Button
                     variant="secondary"
                     size="sm"

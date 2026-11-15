@@ -38,6 +38,7 @@ import {
 } from '../utils/sidebarLayout';
 import { HeaderSlot } from '../custom/layout/HeaderSlot';
 import { compactBugReportHidden } from '../custom/layout/headerFlags';
+import { useHideHeaderCamera } from '../custom/layout/useHideHeaderCamera';
 
 interface NavItem {
   id: string;
@@ -114,6 +115,7 @@ export function Layout() {
   // render — refresh with the real catalog names. See #857.
   useColorCatalogVersion();
   const { user, authEnabled, logout, hasPermission, hasAnyPermission, loading: authLoading } = useAuth();
+  const hideHeaderCamera = useHideHeaderCamera();
   const { showToast } = useToast();
   const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
   const [changePasswordData, setChangePasswordData] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
@@ -637,7 +639,7 @@ export function Layout() {
           </HeaderSlot>
           {/* A camera from any page (#2737), beside the bug report. */}
           <div className="ml-auto">
-            <CameraLauncher placement="down" open={cameraListOpen} onOpenChange={setCameraListOpen} />
+            {!hideHeaderCamera && <CameraLauncher placement="down" open={cameraListOpen} onOpenChange={setCameraListOpen} />}
           </div>
           {/* Bug report — the compact-layout home of the floating bubble. */}
           {!compactBugReportHidden() && (
