@@ -1,5 +1,6 @@
 import { lazy, Suspense, type ReactNode } from 'react';
 import { CameraPreview } from '../camera/CameraPreview';
+import { TwinFrame } from './TwinFrame';
 import { TwinSwitch } from './TwinSwitch';
 import { useTwinActive, useTwinAvailable } from './useTwinView';
 
@@ -39,11 +40,11 @@ export function CameraOrTwin({ printerId, className = 'relative w-full h-full', 
   return (
     <div className="contents">
       {active ? (
-        <div className={`${className} relative bg-[#171a21]`}>
+        <TwinFrame printerId={printerId} className={className}>
           <Suspense fallback={null}>
             <DigitalTwinView printerId={printerId} />
           </Suspense>
-        </div>
+        </TwinFrame>
       ) : (
         <>
           {children}

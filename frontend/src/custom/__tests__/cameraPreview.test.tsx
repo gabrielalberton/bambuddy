@@ -72,3 +72,15 @@ describe('CameraPreview (prévia instantânea da câmera)', () => {
     await waitFor(() => expect(screen.queryByTestId('custom-camera-preview')).toBeNull());
   });
 });
+
+describe('cameraAspect', () => {
+  it('lê a rotação do transform e calcula a proporção exibida', async () => {
+    const { rotationFromTransform, displayedAspect, fitRect } = await import('../camera/cameraAspect');
+    expect(rotationFromTransform('scale(1) translate(0px, 0px) rotate(270deg)')).toBe(270);
+    expect(rotationFromTransform('rotate(-90deg)')).toBe(270);
+    expect(rotationFromTransform('')).toBe(0);
+    expect(displayedAspect(2304, 1296, 270)).toBeCloseTo(1296 / 2304);
+    expect(displayedAspect(2304, 1296, 0)).toBeCloseTo(2304 / 1296);
+    expect(fitRect(390, 775, 1296 / 2304)).toEqual({ width: 390, height: 693 });
+  });
+});

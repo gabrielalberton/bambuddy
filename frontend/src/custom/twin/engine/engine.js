@@ -127,7 +127,7 @@ export function createTwin(container, opts) {
         const gltf = await new Promise((ok, err) => new GLTFLoader().parse(buf, '', ok, err));
         if (disposed) { disposeTree(gltf.scene); return; }
         model.attachCAD(gltf.scene);
-        stats.model = 'step'; view.fit = 1.2; view.ty = 125;
+        stats.model = 'step'; view.fit = 1.0; view.ty = 125;
       } catch (e) { if (DEBUG) console.warn('modelo STEP indisponível; procedural', e); }
       finally { clearTimeout(fallback); reveal(); }
     })();
@@ -139,9 +139,9 @@ export function createTwin(container, opts) {
   model.bed.add(object.group);
   object.group.position.set(-128, 0, 128);   // geometria do objeto vem em (X, Z, -Y) do G-code; a mesa tem origem no centro da placa
 
-  // ---------- câmera 3/4 com deriva sutil ----------
+  // ---------- câmera frontal com deriva sutil ----------
   const camera = new THREE.PerspectiveCamera(32, 1, 20, 5000);
-  const view = { az: -0.62, el: 0.43, dist: 900, tx: -30, ty: 95, tz: -10, dAz: 0, dEl: 0, zoom: 1, fit: 1, f: 0, fx: 0, fy: 0, fz: 0, lastInput: -1e9 };
+  const view = { az: 0, el: 0.30, dist: 900, tx: -5, ty: 95, tz: -10, dAz: 0, dEl: 0, zoom: 1, fit: 1, f: 0, fx: 0, fy: 0, fz: 0, lastInput: -1e9 };
   let W = 0, H = 0;
   function frame() {
     const w = Math.max(1, container.clientWidth), h = Math.max(1, container.clientHeight);
@@ -150,7 +150,7 @@ export function createTwin(container, opts) {
     renderer.setSize(w, h, false);
     camera.aspect = w / h;
     const t2 = 2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
-    view.dist = Math.max(600 / t2, 560 / (t2 * camera.aspect));       // enquadra ~600 mm de altura / 560 mm de largura
+    view.dist = Math.max(450 / t2, 415 / (t2 * camera.aspect));       // vista frontal: enquadra ~450 mm de altura / 415 mm de largura (a A1 de pilar a pilar)
     camera.updateProjectionMatrix();
   }
   const ro = new ResizeObserver(() => frame());

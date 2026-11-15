@@ -236,7 +236,7 @@ export class A1Model {
     this._ghost(unreliable, dt);
   }
 
-  // Posição não confiável (home_flag&7 != 7): cabeçote + viga X quase transparentes e avermelhados.
+  // Posição não confiável (home_flag&7 != 7): cabeçote + viga X avermelhados (opacos).
   // Materiais clonados por malha na primeira vez (podem ser compartilhados com a parte fixa).
   _ghost(on, dt) {
     this.ghost = this.ghost ?? 0;
@@ -260,11 +260,13 @@ export class A1Model {
     for (const o of this._ghostList) {
       const b = o.userData.ghostBase, m = o.material;
       const base = b.isHead ? this.headOpacity : b.opacity;   // cabeçote: opacidade já ajustada (translúcido ao imprimir)
-      if (b.color && m.color) m.color.copy(b.color).lerp(red, 0.75 * g);
+      if (b.color && m.color) m.color.copy(b.color).lerp(red, 0.6 * g);
       if (m.emissive && b.emissive) m.emissive.copy(b.emissive).lerp(red, 0.35 * g);
-      m.opacity = base * (1 - g) + 0.10 * g;
-      m.transparent = g > 0 || (b.isHead ? this.headOpacity < 0.999 : b.transparent);
-      m.depthWrite = g > 0.001 ? false : (b.isHead ? this.headOpacity > 0.97 : b.depthWrite);
+      // Opaco (sem transparência): peças translúcidas sem depthWrite mudavam de ordem de desenho conforme a câmera
+      // derivava e o vermelho "piscava". Só a cor indica a posição desconhecida.
+      m.opacity = base;
+      m.transparent = b.isHead ? this.headOpacity < 0.999 : b.transparent;
+      m.depthWrite = b.isHead ? this.headOpacity > 0.97 : b.depthWrite;
       m.needsUpdate = true;
     }
   }

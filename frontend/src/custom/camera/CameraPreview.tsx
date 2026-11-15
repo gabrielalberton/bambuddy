@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { withStreamToken } from '../../api/client';
 import { cameraPreviewEnabled } from './previewFlags';
+import { displayedAspect, rememberCameraAspect, rotationFromTransform } from './cameraAspect';
 
 /** Intervalo entre imagens da prévia (o Frigate atualiza a ~3 fps). */
 const PREVIEW_INTERVAL_MS = 300;
@@ -47,6 +48,7 @@ export function CameraPreview({ printerId }: { printerId: number }) {
   const anchorRef = useRef<HTMLSpanElement>(null);
   const [host, setHost] = useState<HTMLElement | null>(null);
   const [box, setBox] = useState<Box | null>(null);
+  const [rotation, setRotation] = useState(0);
   const [ready, setReady] = useState(false);
   const [streamFailed, setStreamFailed] = useState(false);
   const [src, setSrc] = useState<string | null>(null);
@@ -72,6 +74,9 @@ export function CameraPreview({ printerId }: { printerId: number }) {
       const nextBox = img ? frameBox(img) : null;
       setBox((prev) => (sameBox(prev, nextBox) ? prev : nextBox));
       const hasFrame = !!img && img.naturalWidth > 0;
+      const rot = rotationFromTransform(img?.style.transform);
+      setRotation(rot);
+      if (img && hasFrame) rememberCameraAspect(printerId, displayedAspect(img.naturalWidth, img.naturalHeight, rot));
       setReady(hasFrame);
       if (!hasFrame) setGone(false);
     };
@@ -81,7 +86,7 @@ export function CameraPreview({ printerId }: { printerId: number }) {
       window.clearInterval(id);
       current?.removeEventListener('error', onError);
     };
-  }, [enabled]);
+  }, [enabled, printerId]);
 
   // Depois do fade, desmonta a prévia (e para de baixar imagens).
   useEffect(() => {
@@ -160,7 +165,18 @@ export function CameraPreview({ printerId }: { printerId: number }) {
               transition: `opacity ${FADE_MS}ms ease-out`,
             }}
           >
-            <img src={src} alt="" className="max-w-full max-h-full object-contain select-none" draggable={false} />
+            <img
+              src={src}
+              alt=""
+              className="max-w-full max-h-full object-contain select-none"
+              draggable={false}
+              // mesma rotação configurada no Bambuddy; deitada (90/270) troca os limites de largura/altura
+              style={
+                rotation % 180 === 0
+                  ? rotation ? { transform: `rotate(${rotation}deg)` } : undefined
+                  : { transform: `rotate(${rotation}deg)`, maxWidth: box?.height ?? '100%', maxHeight: box?.width ?? '100%' }
+              }
+            />
             <div className="absolute top-2 left-2 flex items-center gap-1.5 rounded-full bg-black/60 px-2 py-0.5 text-[11px] text-white/80">
               <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-bambu-green" />
               HD…
