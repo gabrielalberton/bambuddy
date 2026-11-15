@@ -51,6 +51,10 @@ function pei() {
 
 const ROD_STEP = 37.4;   // mm: altura da face inferior da barra X acima da ponta, no STEP
 const ROD_DROP = 10.4;   // mm: 37,4 (STEP) -> 27 (medido na A1 real, 26-28 mm)
+function bedFixed() {
+  try { return localStorage.getItem('custom.twin.bedFixed') !== 'off'; } catch { return true; }
+}
+
 export class A1Model {
   constructor() {
     this.root = new THREE.Group();
@@ -220,6 +224,9 @@ export class A1Model {
     this.head.position.x = X - 128;
     this.gantry.position.y = Z;
     this.bed.position.set(0, 0, Y - 128);
+    // Referencial fixo no centro da placa (pedido do Gabriel): a mesa fica parada na tela e o resto da impressora
+    // anda ao contrário. `localStorage['custom.twin.bedFixed'] = 'off'` volta ao normal (mesa andando).
+    this.root.position.z = bedFixed() ? -(Y - 128) : 0;
   }
 
   // Estado visual: temperatura do bico (brilho), ventoinha de peça, translucidez durante a impressão
