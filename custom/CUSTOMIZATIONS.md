@@ -233,6 +233,49 @@ frio). Detalhes e medições: `custom/docs/camera-previa.md`.
 - Upstream: **nenhuma linha nova** (usa os ganchos do twin em `CameraPage.tsx`/`EmbeddedCameraViewer.tsx`). Depende de
   o `<img>` do stream ter `src` com `/camera/stream` e do `PUBLIC_API_PREFIXES` em `main.py` (conferir ao atualizar).
 
+## 6. Filamentos em lista no card da impressora (`custom(filaments)`)
+
+No modo impressora única, a seção FILAMENTS do card (página Impressoras) vira uma lista vertical minimalista: some o
+cabeçalho "FILAMENTS" (rótulo, botão de backup do AMS, linha e o olho do externo) e o cabeçalho de cada unidade
+("AMS-A" + umidade/temperatura, "Externo"); cada slot vira uma linha `bolinha | material | K | barra de nível`, AMS 1-4
+e depois o externo. As três primeiras colunas têm largura fixa, então a trilha da barra (= 100%) começa e termina no
+mesmo x em toda linha. Slot ativo mantém o anel verde do upstream; vazio fica esmaecido com "Vazio". Screenshots
+(390x844): `custom/docs/screenshots/filamentos/`.
+
+**Nada de lógica reimplementada**: os tiles continuam sendo os do upstream (mesmos `FilamentHoverCard` /
+`EmptySlotHoverCard`, ações carregar/descarregar/RFID/atribuir/configurar, cadeia de nível Spoolman → inventário →
+AMS, pílulas P1/↓). Só o contêiner da seção ganha uma classe e uma folha de estilo nossa (injetada uma vez em
+`<style id="custom-filament-list-style">`) reorganiza o DOM existente. Custo: os seletores dependem da estrutura da
+seção do upstream; o teste `filamentList.test.tsx` renderiza a PrintersPage real e falha se algum seletor deixar de
+achar o elemento esperado.
+
+Se o spool externo estiver oculto (preferência do upstream #1782), o cabeçalho da seção continua visível, porque é nele
+que fica o olho para mostrá-lo de novo.
+
+### Interruptor
+
+- Só age com `useSinglePrinter().single` (ver seção 1).
+- `frontend/src/custom/flags.ts`: `FILAMENT_LIST = 'on'`; no navegador `localStorage.setItem('custom.filamentList', 'off')`.
+  Nos testes o efetivo é `'off'`; testes nossos usam `setFilamentListOverride('on')`.
+
+### Código nosso
+
+| Arquivo | O que é |
+|---|---|
+| `frontend/src/custom/printer/filamentList.ts` | `useFilamentListClass(base, externalSpoolHidden)` (className do contêiner), `FILAMENT_LIST_SELECTORS`, CSS e larguras das colunas |
+| `frontend/src/custom/__tests__/filamentList.test.tsx` | seletores vs DOM do upstream, ordem, colunas fixas/barra, ativo, vazio, toque → hover card/ação do upstream, cabeçalho mantido com externo oculto, flag/modo desligados |
+
+### Pontos de contato no upstream
+
+| Arquivo | Âncora | +/− | O que / por quê |
+|---|---|---|---|
+| `frontend/src/pages/PrintersPage.tsx` | import após `import { useSinglePrinter } from '../custom/useSinglePrinter';`; após o `useCallback` de `toggleExternalSpool` (`}, [printer.id]);`); `<div className="mt-3">` logo acima de `{/* Section Header */}` + `{t('printers.filaments')}` | +3/−1 | `const filamentListClass = useFilamentListClass('mt-3', externalSpoolHidden);` e `<div className={filamentListClass}>`. Fora do modo/flag devolve `'mt-3'` (DOM idêntico ao upstream). |
+
+Estrutura do upstream da qual o CSS depende (conferir ao atualizar a base): contêiner com 2 filhos (cabeçalho, `flex
+flex-wrap` com um cartão por unidade); cada cartão com o cabeçalho como 1º filho e os slots em `.grid`; o visual do
+slot é o 1º filho de `[data-testid="filament-slot"]`/`[data-testid="empty-slot"]`, com os `div` na ordem bolinha,
+material, `KValueLine` (opcional) e trilha da barra por último.
+
 ## Build e imagem
 
 - `custom/build.sh [--no-docker]`: lê `custom/BASE_VERSION`, confere que o `CMD` do `Dockerfile` do upstream é o mesmo do

@@ -75,3 +75,35 @@ export function isModelCatalogEnabled(): boolean {
   }
   return MODEL_CATALOG === 'on';
 }
+
+/**
+ * FILAMENT_LIST ("filamentos em lista" no card da impressora, só no modo impressora única):
+ *  - 'on':  seção FILAMENTS sem cabeçalhos, um slot por linha (bolinha, material, barra);
+ *  - 'off': grade de tiles do upstream.
+ * Nos testes o efetivo é 'off'; testes nossos usam setFilamentListOverride(). No navegador:
+ *   localStorage.setItem('custom.filamentList', 'off')
+ */
+export type FilamentListMode = 'on' | 'off';
+
+export const FILAMENT_LIST: FilamentListMode = 'on';
+
+export const FILAMENT_LIST_STORAGE_KEY = 'custom.filamentList';
+
+let filamentListOverride: FilamentListMode | null = null;
+
+/** Só para testes. */
+export function setFilamentListOverride(mode: FilamentListMode | null): void {
+  filamentListOverride = mode;
+}
+
+export function isFilamentListEnabled(): boolean {
+  if (filamentListOverride) return filamentListOverride === 'on';
+  if (import.meta.env.MODE === 'test') return false;
+  try {
+    const stored = localStorage.getItem(FILAMENT_LIST_STORAGE_KEY);
+    if (stored === 'on' || stored === 'off') return stored === 'on';
+  } catch {
+    /* localStorage indisponível */
+  }
+  return FILAMENT_LIST === 'on';
+}
