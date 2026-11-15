@@ -35,7 +35,7 @@ function writeHidden(id: number, hidden: boolean) {
  * status, no lugar da janela flutuante. Reaproveita o EmbeddedCameraViewer do upstream inteiro; o CSS só o tira do
  * `position: fixed`. A altura segue a proporção da imagem (sem faixas pretas). O X recolhe para um botão.
  */
-export function InlineCamera({ printerId, printerName, rotation }: { printerId: number; printerName: string; rotation?: number | null }) {
+export function InlineCamera({ printerId, rotation }: { printerId: number; printerName?: string; rotation?: number | null }) {
   const { hasPermission } = useAuth();
   const allowed = inlineCameraEnabled() && hasPermission('camera:view');
   const [hidden, setHidden] = useState(() => readHidden(printerId));
@@ -101,7 +101,8 @@ export function InlineCamera({ printerId, printerName, rotation }: { printerId: 
         <Suspense fallback={null}>
           <EmbeddedCameraViewer
             printerId={printerId}
-            printerName={printerName}
+            // nome da impressora não aparece embutido (modo impressora única: o card já é dela)
+            printerName=""
             onClose={() => {
               writeHidden(printerId, true);
               setHidden(true);

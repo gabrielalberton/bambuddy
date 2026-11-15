@@ -26,3 +26,10 @@
 [data-custom-header-status] > div > div ~ :not(button) {
   display: none !important; /* fila (PrinterQueueWidget) fica fora do cabeçalho */
 }
+[data-custom-header-status] span.rounded-full {
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+}
+[data-custom-header-status] > div > div > div {
+  justify-content: center !important;
+}
