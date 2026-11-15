@@ -11,6 +11,31 @@ const FADE_MS = 250;
 const MAX_FAILURES = 3;
 
 const STREAM_IMG_SELECTOR = 'img[src*="/camera/stream"]';
+/** Tamanho mínimo para considerar um ancestral como "o quadro" (antes do 1º quadro o contêiner do <img> pode ter 0 px). */
+const MIN_FRAME_PX = 120;
+
+type Box = { top: number; left: number; width: number; height: number };
+
+/** Retângulo do primeiro ancestral com tamanho real, em coordenadas do contêiner do <img> (onde a prévia é desenhada). */
+function frameBox(img: HTMLImageElement): Box | null {
+  const host = img.parentElement;
+  if (!host) return null;
+  let frame: HTMLElement | null = host;
+  while (frame && (frame.clientHeight < MIN_FRAME_PX || frame.clientWidth < MIN_FRAME_PX)) frame = frame.parentElement;
+  if (!frame) return null;
+  const h = host.getBoundingClientRect();
+  const f = frame.getBoundingClientRect();
+  return {
+    top: Math.round(f.top - h.top),
+    left: Math.round(f.left - h.left),
+    width: Math.round(f.width),
+    height: Math.round(f.height),
+  };
+}
+
+function sameBox(a: Box | null, b: Box | null) {
+  return a === b || (!!a && !!b && a.top === b.top && a.left === b.left && a.width === b.width && a.height === b.height);
+}
 
 /**
  * Prévia instantânea: enquanto o <img> MJPEG do upstream ainda não tem o primeiro quadro (~8 s com a Thingino),
@@ -21,6 +46,7 @@ const STREAM_IMG_SELECTOR = 'img[src*="/camera/stream"]';
 export function CameraPreview({ printerId }: { printerId: number }) {
   const anchorRef = useRef<HTMLSpanElement>(null);
   const [host, setHost] = useState<HTMLElement | null>(null);
+  const [box, setBox] = useState<Box | null>(null);
   const [ready, setReady] = useState(false);
   const [streamFailed, setStreamFailed] = useState(false);
   const [src, setSrc] = useState<string | null>(null);
@@ -43,6 +69,8 @@ export function CameraPreview({ printerId }: { printerId: number }) {
         setStreamFailed(false);
       }
       setHost(img?.parentElement ?? null);
+      const nextBox = img ? frameBox(img) : null;
+      setBox((prev) => (sameBox(prev, nextBox) ? prev : nextBox));
       const hasFrame = !!img && img.naturalWidth > 0;
       setReady(hasFrame);
       if (!hasFrame) setGone(false);
@@ -125,8 +153,12 @@ export function CameraPreview({ printerId }: { printerId: number }) {
           <div
             data-testid="custom-camera-preview"
             aria-hidden="true"
-            className="absolute inset-0 z-[11] flex items-center justify-center bg-black pointer-events-none"
-            style={{ opacity: ready ? 0 : 1, transition: `opacity ${FADE_MS}ms ease-out` }}
+            className="absolute z-[11] flex items-center justify-center overflow-hidden bg-black pointer-events-none"
+            style={{
+              ...(box ?? { top: 0, left: 0, width: '100%', height: '100%' }),
+              opacity: ready ? 0 : 1,
+              transition: `opacity ${FADE_MS}ms ease-out`,
+            }}
           >
             <img src={src} alt="" className="max-w-full max-h-full object-contain select-none" draggable={false} />
             <div className="absolute top-2 left-2 flex items-center gap-1.5 rounded-full bg-black/60 px-2 py-0.5 text-[11px] text-white/80">
