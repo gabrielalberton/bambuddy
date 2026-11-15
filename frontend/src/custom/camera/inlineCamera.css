@@ -1,0 +1,19 @@
+/* Janela da câmera do upstream (EmbeddedCameraViewer) embutida no card: vira um bloco do tamanho do contêiner.
+   Só no modo janela (.rounded-lg); em tela cheia o upstream continua com fixed inset-0. */
+[data-custom-inline-camera] > div.rounded-lg {
+  position: absolute !important;
+  left: 0 !important;
+  top: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  z-index: auto !important;
+  box-shadow: none !important;
+}
+[data-custom-inline-camera] .cursor-se-resize,
+[data-custom-inline-camera] button[title='Minimize'],
+[data-custom-inline-camera] button[title='Expand'] {
+  display: none !important;
+}
+[data-custom-inline-camera] .cursor-grab {
+  cursor: default !important;
+}

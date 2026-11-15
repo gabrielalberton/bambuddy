@@ -6,6 +6,7 @@ import { useAuth } from './AuthContext';
 import { listenForCameraPopIn, registerCameraTab } from '../utils/camera';
 import { recoverFromMissingChunk } from '../utils/lazyPage';
 import type { EmbeddedCameraViewerProps } from '../components/EmbeddedCameraViewer';
+import { isInlineCamera, useInlineCameraVersion } from '../custom/camera/inlineCameraStore';
 
 /**
  * The floating camera overlays (#2737).
@@ -163,9 +164,10 @@ export function EmbeddedCameraProvider({ children }: { children: ReactNode }) {
 
   const openCameras = useMemo(() => Array.from(cameras.values()), [cameras]);
   const onPrintersPage = useLocation().pathname === '/';
+  const inlineVersion = useInlineCameraVersion();
   const shownCameras = useMemo(
-    () => openCameras.filter(c => c.scope === 'app' || onPrintersPage),
-    [openCameras, onPrintersPage],
+    () => openCameras.filter(c => (c.scope === 'app' || onPrintersPage) && !(inlineVersion >= 0 && isInlineCamera(c.id))),
+    [openCameras, onPrintersPage, inlineVersion],
   );
   const value = useMemo(
     () => ({ openCameras, openEmbeddedCamera, closeEmbeddedCamera }),

@@ -14,6 +14,7 @@ import { isSideways, useSidewaysBox } from '../hooks/useSidewaysBox';
 import { isStandaloneWebApp, openCameraWindow } from '../utils/camera';
 import { useIsSidebarCompact } from '../hooks/useIsSidebarCompact';
 import { CameraOrTwin, useTwinActive } from '../custom/twin';
+import { useFitCameraWindow } from '../custom/camera/useFitCameraWindow';
 
 export interface EmbeddedCameraViewerProps {
   printerId: number;
@@ -144,6 +145,7 @@ export function EmbeddedCameraViewer({ printerId, printerName, viewerIndex = 0, 
   const videoAreaRef = useRef<HTMLDivElement>(null);
   const sideways = isSideways(printer?.camera_rotation);
   const videoArea = useSidewaysBox(videoAreaRef, sideways && !isMinimized);
+  useFitCameraWindow(printerId, state, setState, !isMinimized && !isFullscreen);
 
   // Fetch printer status for light toggle and skip objects
   const { data: status } = useQuery({
