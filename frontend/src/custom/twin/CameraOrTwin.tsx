@@ -1,4 +1,5 @@
 import { lazy, Suspense, type ReactNode } from 'react';
+import { CameraPreview } from '../camera/CameraPreview';
 import { TwinSwitch } from './TwinSwitch';
 import { useTwinActive, useTwinAvailable } from './useTwinView';
 
@@ -23,7 +24,8 @@ export interface CameraOrTwinProps {
 export function CameraOrTwin({ printerId, className = 'relative w-full h-full', switchPlacement = 'frame', children }: CameraOrTwinProps) {
   const available = useTwinAvailable(printerId);
   const active = useTwinActive(printerId);
-  if (!available) return <>{children}</>;
+  // Prévia instantânea da câmera (custom/docs/camera-previa.md): vale com ou sem o gêmeo digital.
+  if (!available) return <>{children}<CameraPreview printerId={printerId} /></>;
   const pos = switchPlacement === 'viewport' ? 'fixed' : 'absolute';
   const overlay = (
     <div
@@ -43,7 +45,10 @@ export function CameraOrTwin({ printerId, className = 'relative w-full h-full', 
           </Suspense>
         </div>
       ) : (
-        children
+        <>
+          {children}
+          <CameraPreview printerId={printerId} />
+        </>
       )}
       {overlay}
     </div>

@@ -33,6 +33,11 @@ def install(app: FastAPI) -> list[str]:
     from .webpush import register as register_webpush
 
     register_webpush(app, app_settings.api_prefix)
+    # Prévia instantânea da câmera (custom/docs/camera-previa.md)
+    from .camera_preview import add_public_prefix, router as camera_preview_router
+
+    app.include_router(camera_preview_router, prefix=app_settings.api_prefix)
+    add_public_prefix(app_settings.api_prefix)
     added = [r for r in app.router.routes if r not in before]
     if added:
         remaining = [r for r in app.router.routes if r not in added]

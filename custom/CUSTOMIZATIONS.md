@@ -214,6 +214,18 @@ alertas próprios (é só visualização; os eventos da impressão já vêm do `
 
 Total do Web Push no upstream (`git diff --stat gabriel..custom-webpush` sem os diretórios nossos): 8 arquivos, +20/−2.
 
+## 5. Prévia instantânea da câmera (`custom(camera)`)
+
+A câmera abre na hora com a imagem do Frigate (~3 fps, baixa) e troca para o vídeo em alta quando ele chega (~8 s a
+frio). Detalhes e medições: `custom/docs/camera-previa.md`.
+
+- Interruptores: `BAMBUDDY_CUSTOM_CAMERA_PREVIEW_URL` (sem ela, 404 e nada aparece); `localStorage['custom.cameraPreview']`.
+- Código nosso: `backend/app/custom/camera_preview.py` (rota + prefixo público em tempo de execução, como o twin),
+  `backend/app/custom/api.py` (+5), `frontend/src/custom/camera/`, `frontend/src/custom/twin/CameraOrTwin.tsx` (monta a
+  prévia), testes `backend/tests/custom/test_camera_preview.py` e `frontend/src/custom/__tests__/cameraPreview.test.tsx`.
+- Upstream: **nenhuma linha nova** (usa os ganchos do twin em `CameraPage.tsx`/`EmbeddedCameraViewer.tsx`). Depende de
+  o `<img>` do stream ter `src` com `/camera/stream` e do `PUBLIC_API_PREFIXES` em `main.py` (conferir ao atualizar).
+
 ## Build e imagem
 
 - `custom/build.sh [--no-docker]`: lê `custom/BASE_VERSION`, confere que o `CMD` do `Dockerfile` do upstream é o mesmo do
