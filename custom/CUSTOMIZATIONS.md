@@ -297,3 +297,15 @@ material, `KValueLine` (opcional) e trilha da barra por último.
   O contexto é `custom/.build/` porque o `.dockerignore` do upstream exclui `static/`.
 - Deploy (não automatizado aqui): trocar a imagem no stack `23-bambuddy.yml` em compose-migration. Se o compose
   definir `command:` próprio, ele precisa apontar para `backend.app.custom.asgi:app` (hoje não define).
+
+## 7. Celular enxuto (2026-11-15)
+
+| Ponto de contato (upstream) | O que faz | Interruptor |
+|---|---|---|
+| `components/EmbeddedCameraViewer.tsx` (1 import + `useFitCameraWindow(...)`) | janela flutuante da câmera na proporção da imagem (sem faixas pretas) | `custom.fitCameraWindow=off` |
+| `contexts/EmbeddedCameraContext.tsx` (`shownCameras` filtra `isInlineCamera`) | não abre a janela flutuante da impressora cuja câmera está embutida no card | — |
+| `pages/PrintersPage.tsx` (`<InlineCamera>` antes de Temperatures) | modo impressora única: câmera/3D com os botões dentro do card (`custom/camera/InlineCamera.tsx`) | `custom.inlineCamera=off` |
+| `pages/PrintersPage.tsx` (`<InHeader>` em volta do bloco de status; rótulo STATUS oculto) + `components/Layout.tsx` (`<HeaderSlot>` em volta do logo) | bloco de status do card vira o cabeçalho do celular no lugar do logo (`custom/layout/`) | `custom.headerStatus=off` |
+| `components/Layout.tsx` (botão de bug report do cabeçalho compacto) | escondido | `custom.bugReportButton=on` traz de volta |
+| `pages/InventoryPage.tsx` (2 classes) | estoque sem busca e sem linha de filtros (voltam se houver filtro ativo) | `custom.minimalInventory=off` |
+| `pages/MaintenancePage.tsx` (`data-custom-maint-card`) | cards de manutenção em uma linha, ações à direita (`custom/maintenance/`) | `custom.compactMaintenance=off` |
