@@ -88,6 +88,7 @@ function dryingBlockedKey(reasons: Array<number | string> | undefined): string {
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { useSinglePrinter } from '../custom/useSinglePrinter';
+import { useFilamentListClass } from '../custom/printer/filamentList';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import {
@@ -2202,6 +2203,7 @@ function PrinterCard({
       return next;
     });
   }, [printer.id]);
+  const filamentListClass = useFilamentListClass('mt-3', externalSpoolHidden);
   const [showStopConfirm, setShowStopConfirm] = useState(false);
   const [showPauseConfirm, setShowPauseConfirm] = useState(false);
   const [showSpeedMenu, setShowSpeedMenu] = useState<number | null>(null);
@@ -5449,7 +5451,7 @@ function PrinterCard({
               };
 
               return (
-                <div className="mt-3">
+                <div className={filamentListClass}>
                   {/* Section Header */}
                   <div className="flex items-center gap-2 mb-2">
                     <span className="text-[length:var(--pc-t10,10px)] uppercase tracking-wider text-bambu-gray font-medium">
