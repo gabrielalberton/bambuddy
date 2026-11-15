@@ -21,3 +21,13 @@
 [data-custom-inline-camera] .cursor-grab svg.lucide-grip-vertical {
   display: none !important;
 }
+[data-custom-inline-camera] .cursor-grab > div:first-child {
+  display: none !important; /* nome da impressora */
+}
+[data-custom-inline-camera] .cursor-grab {
+  justify-content: space-around !important;
+}
+[data-custom-inline-camera] .cursor-grab > div:last-child {
+  width: 100%;
+  justify-content: space-between;
+}

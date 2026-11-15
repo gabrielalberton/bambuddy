@@ -15,7 +15,7 @@
 [data-custom-header-status] span,
 [data-custom-header-status] div {
   font-size: 11px !important;
-  line-height: 12px !important;
+  line-height: 11px !important;
   min-height: 0 !important;
 }
 [data-custom-header-status] > div > button {
@@ -32,4 +32,11 @@
 }
 [data-custom-header-status] > div > div > div {
   justify-content: center !important;
+}
+/* barra de progresso: linha fina */
+[data-custom-header-status] > div > div > div > div:nth-child(3) {
+  height: 5px !important;
+}
+[data-custom-header-status] > div > div > div > div:nth-child(3) > span {
+  display: none !important; /* ---% (a barra já mostra) */
 }
