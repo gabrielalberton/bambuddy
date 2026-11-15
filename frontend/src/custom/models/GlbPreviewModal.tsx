@@ -10,6 +10,25 @@ import type { CatalogSourceId } from './types';
 
 /** Decodificador Draco copiado de three/examples/jsm/libs/draco/gltf (servido de public/custom/draco). */
 const DRACO_PATH = '/custom/draco/';
+const DRACO_WORKER = '/custom/draco/draco_worker.js';
+
+/**
+ * O DRACOLoader cria o worker a partir de um blob:, que o CSP do upstream bloqueia. Este usa o worker de mesma origem
+ * (public/custom/draco/draco_worker.js, com CSP próprio que libera só a compilação de WASM; ver
+ * backend/app/custom/draco_worker_csp.py).
+ */
+class SameOriginDracoLoader extends DRACOLoader {
+  constructor() {
+    super();
+    const self = this as unknown as { _initDecoder: () => Promise<void>; workerSourceURL: string };
+    const init = self._initDecoder.bind(this);
+    self._initDecoder = () =>
+      init().then(() => {
+        if (self.workerSourceURL.startsWith('blob:')) URL.revokeObjectURL(self.workerSourceURL);
+        self.workerSourceURL = DRACO_WORKER;
+      });
+  }
+}
 
 async function fetchPlate(source: CatalogSourceId, modelId: string, fileId: string, plate: number, signal: AbortSignal) {
   const token = getAuthToken();
@@ -92,7 +111,7 @@ export function GlbPreviewModal({
     };
     loop();
 
-    const draco = new DRACOLoader().setDecoderPath(DRACO_PATH);
+    const draco = new SameOriginDracoLoader().setDecoderPath(DRACO_PATH);
     const loader = new GLTFLoader().setDRACOLoader(draco);
     fetchPlate(source, modelId, fileId, plate, ctrl.signal)
       .then(({ buffer, plates: count }) => {

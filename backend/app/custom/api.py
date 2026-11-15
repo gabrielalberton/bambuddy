@@ -38,6 +38,9 @@ def install(app: FastAPI) -> list[str]:
 
     app.include_router(camera_preview_router, prefix=app_settings.api_prefix)
     add_public_prefix(app_settings.api_prefix)
+    from .draco_worker_csp import allow_draco_worker
+
+    allow_draco_worker()
     added = [r for r in app.router.routes if r not in before]
     if added:
         remaining = [r for r in app.router.routes if r not in added]
