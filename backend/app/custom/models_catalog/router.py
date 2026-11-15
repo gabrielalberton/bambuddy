@@ -315,6 +315,48 @@ async def reviews(
         raise _map_service_error(exc) from exc
 
 
+# Prévia 3D (GLB leve do MakerWorld): poucas entradas em memória, cada uma pode ter alguns MB.
+_preview_cache: dict[tuple[str, str], list[bytes]] = {}
+_PREVIEW_CACHE_MAX = 4
+
+
+@router.get("/{source_id}/{model_id}/preview/{file_id}", dependencies=[Depends(require_auth_if_enabled)])
+async def preview(
+    source_id: str,
+    model_id: str,
+    file_id: str,
+    plate: int = Query(default=1, ge=1, le=64),
+    credentials: HTTPAuthorizationCredentials | None = Depends(security),
+    x_api_key: str | None = Header(default=None, alias="X-API-Key"),
+):
+    """GLB de uma placa do perfil (o mesmo arquivo do visualizador 3D do site), sem baixar o 3MF."""
+    source = get_source(source_id)
+    if not getattr(source, "preview", None):
+        raise HTTPException(404, "This source has no 3D preview")
+    await authorize_view(source, credentials, x_api_key)
+    check_id(model_id)
+    if not file_id.isdigit() or len(file_id) > 20:
+        raise HTTPException(400, "Invalid file id")
+    key = (model_id, file_id)
+    plates = _preview_cache.pop(key, None)
+    if plates is None:
+        try:
+            async with httpx.AsyncClient(timeout=60) as client:
+                plates = await source.preview(client, model_id, file_id)
+        except ProviderError as exc:
+            raise _map_service_error(exc) from exc
+    _preview_cache[key] = plates
+    while len(_preview_cache) > _PREVIEW_CACHE_MAX:
+        _preview_cache.pop(next(iter(_preview_cache)))
+    if plate > len(plates):
+        raise HTTPException(404, "Plate not found")
+    return Response(
+        content=plates[plate - 1],
+        media_type="model/gltf-binary",
+        headers={"X-Plate-Count": str(len(plates)), "Cache-Control": "private, max-age=3600"},
+    )
+
+
 @router.post("/{source_id}/{model_id}/save", response_model=SavedFile, dependencies=[Depends(require_auth_if_enabled)])
 async def save(
     source_id: str,

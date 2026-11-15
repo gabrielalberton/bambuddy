@@ -5,6 +5,7 @@ import { ArrowLeft, Box, Check, ExternalLink, Loader2, Save, Scissors } from 'lu
 import { api, type LibraryFolderTree } from '../../api/client';
 import { SliceModal } from '../../components/SliceModal';
 import { ModelViewerModal } from '../../components/ModelViewerModal';
+import { GlbPreviewModal } from './GlbPreviewModal';
 import { useAuth } from '../../contexts/AuthContext';
 import { catalogApi } from './api';
 import { useCatalogT, type CatalogKey } from './i18n';
@@ -67,6 +68,7 @@ export function ModelDetail({ source, id, printer, onBack, onOpenModel, onOpenAu
   const [saved, setSaved] = useState<CatalogSavedFile | null>(null);
   const [sliceFile, setSliceFile] = useState<CatalogSavedFile | null>(null);
   const [viewFile, setViewFile] = useState<CatalogSavedFile | null>(null);
+  const [glbOpen, setGlbOpen] = useState(false);
   const [imageIndex, setImageIndex] = useState(0);
   const [reviewsRequested, setReviewsRequested] = useState(false);
   const openReviews = () => {
@@ -253,7 +255,7 @@ export function ModelDetail({ source, id, printer, onBack, onOpenModel, onOpenAu
                   {busy === 'slice' ? <Loader2 className="h-4 w-4 motion-safe:animate-spin" aria-hidden="true" /> : <Scissors className="h-4 w-4" aria-hidden="true" />}
                   {t(busy === 'slice' ? 'preparing' : 'slice')}
                 </button>
-                <button type="button" className={controlClass} disabled={!file || busy !== null} onClick={() => void run('view3d')} aria-label={t('view3d')} title={t('view3d')}>
+                <button type="button" className={controlClass} disabled={!file || busy !== null} onClick={() => (file?.metadata?.preview_3d ? setGlbOpen(true) : void run('view3d'))} aria-label={t(file?.metadata?.preview_3d ? 'preview3d' : 'view3d')} title={t(file?.metadata?.preview_3d ? 'preview3d' : 'view3d')}>
                   {busy === 'view3d' ? <Loader2 className="h-4 w-4 motion-safe:animate-spin" aria-hidden="true" /> : <Box className="h-4 w-4" aria-hidden="true" />}
                   3D
                 </button>
@@ -289,6 +291,9 @@ export function ModelDetail({ source, id, printer, onBack, onOpenModel, onOpenAu
         </>
       ) : null}
       {canSave && (data?.files.length ?? 0) > 0 && <div className="h-36 md:hidden" aria-hidden="true" />}
+      {glbOpen && file && (
+        <GlbPreviewModal source={source} modelId={id} fileId={file.id} title={`${data?.title ?? ''} · ${file.name}`} onClose={() => setGlbOpen(false)} />
+      )}
       {viewFile && (
         <ModelViewerModal libraryFileId={viewFile.library_file_id} title={data?.title ?? viewFile.filename} fileType="3mf" onClose={() => setViewFile(null)} />
       )}

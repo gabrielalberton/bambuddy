@@ -28,7 +28,7 @@ from backend.app.services.model_providers.makerworld.service import MakerWorldSe
 
 from .base import BrowseRequest, CatalogSource, ReviewsRequest, order_files, review_item
 from .printer_models import makerworld_codes
-from .transport import HEADERS
+from .transport import HEADERS, fetch_asset
 
 SEARCH_BASE = "https://api.bambulab.com/v1/search-service"
 # Avaliações e comentários (o mesmo backend não oficial do site/Bambu Handy; anônimo para leitura).
@@ -277,6 +277,44 @@ def parse_review(hit: dict[str, Any]) -> dict[str, Any] | None:
     return None
 
 
+PREVIEW_MAX_UNZIPPED = 150 * 1024 * 1024
+
+
+def preview_zip_url(instance: dict[str, Any]) -> str | None:
+    """Zip com o GLB leve (Draco) de cada placa que o próprio MakerWorld usa no visualizador 3D do site."""
+    for f in (instance.get("extention") or {}).get("extensionModelFileList") or []:
+        url = f.get("modelFile") if isinstance(f, dict) else None
+        if isinstance(url, str) and "glb" in str(f.get("compressType") or "") and urlsplit(url).hostname in MAKERWORLD_CDN_HOSTS:
+            return url
+    return None
+
+
+def extract_plates(data: bytes) -> list[bytes]:
+    """GLBs do zip, em ordem de placa (``input_plate_<n>.glb``). Limita nomes, quantidade e tamanho descompactado."""
+    import io
+    import re
+    import zipfile
+
+    try:
+        zf = zipfile.ZipFile(io.BytesIO(data))
+    except zipfile.BadZipFile as exc:
+        raise ProviderUnavailableError("MakerWorld preview is not a valid archive") from exc
+    entries = [i for i in zf.infolist() if i.filename.lower().endswith(".glb") and "/" not in i.filename][:64]
+    if sum(i.file_size for i in entries) > PREVIEW_MAX_UNZIPPED:
+        raise ProviderUnavailableError("MakerWorld preview exceeds the size limit")
+
+    def plate_no(name: str) -> int:
+        m = re.search(r"(\d+)\.glb$", name, re.I)
+        return int(m.group(1)) if m else 0
+
+    entries.sort(key=lambda i: plate_no(i.filename))
+    plates = [zf.read(i) for i in entries]
+    plates = [p for p in plates if p[:4] == b"glTF"]
+    if not plates:
+        raise ProviderUnavailableError("MakerWorld preview has no 3D model")
+    return plates
+
+
 class MakerWorldSource(CatalogSource):
     id = "makerworld"
     name = "MakerWorld"
@@ -339,6 +377,18 @@ class MakerWorldSource(CatalogSource):
             "author": {"id": author_id, "name": name},
         }
 
+    async def preview(self, client: httpx.AsyncClient, model_id: str, file_id: str) -> list[bytes]:
+        service = MakerWorldService(client=client)
+        resolved = await service.resolve(ProviderResourceRef(source_type="makerworld", external_id=model_id))
+        instances = [*(resolved.design.get("instances") or []), *resolved.instances]
+        for instance in instances:
+            if isinstance(instance, dict) and str(instance.get("profileId")) == file_id:
+                url = preview_zip_url(instance)
+                if url:
+                    data, _ = await fetch_asset(client, url, MAKERWORLD_CDN_HOSTS)
+                    return extract_plates(data)
+        raise ProviderNotFoundError("This profile has no 3D preview")
+
     async def categories(self, client: httpx.AsyncClient) -> list[dict[str, str]]:
         service = MakerWorldService(client=client)
         root = await service._get_json("/design/category")
@@ -391,6 +441,7 @@ class MakerWorldSource(CatalogSource):
                         "requires_ams": bool(instance.get("needAms", False)),
                         "creator": (instance.get("instanceCreator") or instance.get("creator") or {}).get("name"),
                         "downloads": instance.get("downloadCount"),
+                        "preview_3d": bool(preview_zip_url(instance)),
                         **_profile_rating(instance),
                         **_profile_stats(instance, info, design),
                     },

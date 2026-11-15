@@ -20,7 +20,7 @@ def test_routes_sit_before_spa_catch_all():
 
     paths = [getattr(r, "path", "") for r in app.router.routes]
     custom = [i for i, p in enumerate(paths) if p.startswith(BASE)]
-    assert len(custom) == 8
+    assert len(custom) == 9
     assert max(custom) < paths.index("/{full_path:path}")
 
 
@@ -171,3 +171,33 @@ async def test_makerworld_author_lists_designs(async_client):
     assert "/published/99/design" in fake.await_args.args[1]
     assert (await async_client.get(f"{BASE}/makerworld/author/abc")).status_code == 400
     assert (await async_client.get(f"{BASE}/printables/author/1")).status_code == 404
+
+
+async def test_makerworld_preview_serves_plate_glb(async_client):
+    from backend.app.custom.models_catalog import makerworld
+
+    catalog._preview_cache.clear()
+    fake = AsyncMock(return_value=[b"glTF-one", b"glTF-two"])
+    with patch.object(makerworld.MakerWorldSource, "preview", fake):
+        r = await async_client.get(f"{BASE}/makerworld/42/preview/7", params={"plate": 2})
+        missing = await async_client.get(f"{BASE}/makerworld/42/preview/7", params={"plate": 3})
+    assert r.status_code == 200 and r.content == b"glTF-two"
+    assert r.headers["x-plate-count"] == "2" and r.headers["content-type"] == "model/gltf-binary"
+    assert missing.status_code == 404 and fake.await_count == 1  # segunda vez veio do cache
+    assert (await async_client.get(f"{BASE}/makerworld/42/preview/x")).status_code == 400
+    assert (await async_client.get(f"{BASE}/printables/42/preview/7")).status_code == 404
+
+
+def test_extract_plates_orders_and_filters():
+    import io
+    import zipfile
+
+    from backend.app.custom.models_catalog.makerworld import extract_plates
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as z:
+        z.writestr("input_plate_10.glb", b"glTF-10")
+        z.writestr("input_plate_2.glb", b"glTF-2")
+        z.writestr("readme.txt", b"x")
+        z.writestr("input_plate_3.glb", b"not-gltf")
+    assert extract_plates(buf.getvalue()) == [b"glTF-2", b"glTF-10"]
