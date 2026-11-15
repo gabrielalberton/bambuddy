@@ -2172,6 +2172,7 @@ function PrinterCard({
   aiLastErrorCode?: string | null;
 }) {
   const { t } = useTranslation();
+  const { single } = useSinglePrinter();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const { showToast } = useToast();
@@ -3986,12 +3987,12 @@ function PrinterCard({
               <img
                 src={getPrinterImage(printer.model)}
                 alt={printer.model || t('common.printer')}
-                className={`object-contain rounded-lg flex-shrink-0 ${getImageSize()}`}
+                className={`object-contain rounded-lg flex-shrink-0 ${getImageSize()}${single ? ' hidden' : ''}`}
               />
               <div className="min-w-0 flex-1">
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex min-w-0 items-center gap-2">
-                    <h3 className={`font-semibold text-white ${getTitleSize()}`}>{printer.name}</h3>
+                    <h3 className={`font-semibold text-white ${getTitleSize()}${single ? ' hidden' : ''}`}>{printer.name}</h3>
                     {/* Connection indicator dot for compact mode */}
                     {viewMode === 'compact' && (() => {
                       const hmsErrors = status?.connected && status.hms_errors ? filterKnownHMSErrors(status.hms_errors) : [];
@@ -4035,7 +4036,7 @@ function PrinterCard({
                   )}
                 </div>
                 <p className="text-sm text-bambu-gray">
-                  {printer.model || 'Unknown Model'}
+                  {!single && (printer.model || 'Unknown Model')}
                   {/* Nozzle Info - only in expanded. Every fitted size, not
                       just nozzles[0]: the array is indexed by extruder, so on a
                       dual-nozzle machine with two sizes fitted showing the
@@ -4043,8 +4044,8 @@ function PrinterCard({
                       whole printer. Deduplicated, so the usual matching pair
                       still reads as a single "0.4mm". */}
                   {viewMode === 'expanded' && installedNozzleDiameters(status).length > 0 && (
-                    <span className="ml-1.5 text-bambu-gray" title={status?.nozzles?.[0]?.nozzle_type || 'Nozzle'}>
-                      • {installedNozzleDiameters(status).join(' / ')}mm
+                    <span className={single ? 'text-bambu-gray' : 'ml-1.5 text-bambu-gray'} title={status?.nozzles?.[0]?.nozzle_type || 'Nozzle'}>
+                      {single ? '' : '• '}{installedNozzleDiameters(status).join(' / ')}mm
                     </span>
                   )}
                   {viewMode === 'expanded' && maintenanceInfo && maintenanceInfo.total_print_hours > 0 && (
@@ -4089,7 +4090,7 @@ function PrinterCard({
                   ) : (
                     <Unlink className="w-[var(--pc-i3,0.75rem)] h-[var(--pc-i3,0.75rem)]" />
                   )}
-                  {status?.connected ? t('printers.connection.connected') : t('printers.connection.offline')}
+                  {status?.connected ? (single ? null : t('printers.connection.connected')) : t('printers.connection.offline')}
                 </span>
               )}
               {/* Run connection diagnostic — offered when the printer is offline, NOT in maintenance */}
@@ -4114,7 +4115,7 @@ function PrinterCard({
                 </span>
               )}
               {/* WiFi signal indicator */}
-              {status?.connected && !status?.wired_network && wifiSignal != null && (
+              {!single && status?.connected && !status?.wired_network && wifiSignal != null && (
                 <span
                   className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs ${
                     wifiSignal >= -50
@@ -4255,9 +4256,9 @@ function PrinterCard({
                   }
                 >
                   {firmwareInfo.update_available ? <Download className="w-[var(--pc-i3,0.75rem)] h-[var(--pc-i3,0.75rem)]" /> : <CheckCircle className="w-[var(--pc-i3,0.75rem)] h-[var(--pc-i3,0.75rem)]" />}
-                  {firmwareInfo.current_version}
+                  {!single && firmwareInfo.current_version}
                 </button>
-              ) : status?.firmware_version ? (
+              ) : status?.firmware_version && !single ? (
                 <span className="flex items-center gap-1 px-2 py-1 rounded-full text-xs bg-bambu-dark-tertiary/50 text-bambu-gray">
                   {status.firmware_version}
                 </span>

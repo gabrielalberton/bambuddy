@@ -15,6 +15,7 @@ import { useCameraViewerId } from '../hooks/useCameraViewerId';
 import { isSideways, useSidewaysBox } from '../hooks/useSidewaysBox';
 import { isStandaloneWebApp, readOpenerTabId, requestCameraPopIn } from '../utils/camera';
 import { CameraOrTwin, useTwinActive } from '../custom/twin';
+import { useSinglePrinter } from '../custom/useSinglePrinter';
 
 const MAX_RECONNECT_ATTEMPTS = 5;
 // The server's Retry-After for a snapshot while a live view starts.
@@ -65,6 +66,7 @@ function CameraView({ onPoppedIn }: { onPoppedIn: () => void }) {
 
   const [streamMode, setStreamMode] = useState<'stream' | 'snapshot'>('stream');
   const twinActive = useTwinActive(id);
+  const { single } = useSinglePrinter();
   const [showSkipObjectsModal, setShowSkipObjectsModal] = useState(false);
   const [showDiagnoseModal, setShowDiagnoseModal] = useState(false);
   const [streamError, setStreamError] = useState(false);
@@ -749,7 +751,7 @@ function CameraView({ onPoppedIn }: { onPoppedIn: () => void }) {
             </button>
           )}
           <Camera className="w-4 h-4" />
-          {printer?.name || `Printer ${id}`}
+          {!single && (printer?.name || `Printer ${id}`)}
         </h1>
         <div className="flex items-center gap-2">
           {/* Mode toggle */}

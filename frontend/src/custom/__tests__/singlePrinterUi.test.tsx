@@ -44,13 +44,34 @@ describe('PrintersPage — barra de ferramentas no modo impressora única', () =
     expect(localStorage.getItem('printerStatusFilter')).toBe('printing');
   });
 
+  it('cabeçalho do cartão enxuto: sem imagem, nome, modelo, texto "Connected" e sinal WiFi', async () => {
+    setSinglePrinterModeOverride('auto');
+    mockPrinterList([{ ...printerA1, firmware_version: '01.09.00.00' }]);
+    server.use(
+      http.get('/api/v1/printers/:id/status', () =>
+        HttpResponse.json({ connected: true, state: 'IDLE', awaiting_plate_clear: false, progress: 0, layer_num: 0,
+          total_layers: 0, temperatures: { nozzle: 25, bed: 25, chamber: 25 }, remaining_time: 0, filename: null,
+          wifi_signal: -50, vt_tray: [], firmware_version: '01.09.00.00' }),
+      ),
+    );
+    render(<PrintersPage />);
+    const name = await screen.findByText('A1 do Gabriel', { selector: 'h3' });
+    await waitFor(() => expect(screen.queryByText('Connected')).toBeNull());
+    expect(name.className).toContain('hidden');
+    expect(screen.getByAltText('A1').className).toContain('hidden');
+    expect(screen.queryByText(/-50\s*dBm/)).toBeNull();
+    expect(screen.queryByText('01.09.00.00')).toBeNull();
+  });
+
   it('com duas impressoras (auto) mantém a UI original', async () => {
     setSinglePrinterModeOverride('auto');
     mockPrinterList([printerA1, printerP1S]);
     render(<PrintersPage />);
     expect(await screen.findByText('A1 do Gabriel')).not.toBeNull();
     expect(screen.getByPlaceholderText('Search printers...')).not.toBeNull();
-    expect(screen.getByTitle('Cam wall')).not.toBeNull();
+    expect(screen.getByTitle('Cam wall')).not.toBeNull();    // cabeçalho do cartão como no upstream
+    await waitFor(() => expect(screen.getAllByText('Connected').length).toBeGreaterThan(0));
+    expect(screen.getAllByText('A1 do Gabriel', { selector: 'h3' })[0].className).not.toContain('hidden');
   });
 });
 

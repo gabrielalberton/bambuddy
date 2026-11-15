@@ -74,6 +74,13 @@ Total no upstream (`git diff --stat v1.3.1..gabriel -- . ':!custom' ':!AGENTS.md
 - **MaintenancePage**: cabeçalho `PrinterSection` (traz os selos de vencidos) e chips atribuir/remover tipo por impressora (função real de ligar/desligar um tipo) mantidos.
 - **Rotas `/camwall` e `/printer-locations`**: continuam existindo; só os links da página de impressoras somem.
 
+### Cabeçalhos enxutos (2026-11-14)
+
+| Arquivo | Âncora | +/− | O que |
+|---|---|---|---|
+| `pages/PrintersPage.tsx` (PrinterCard) | `const { t } = useTranslation();` no início do `PrinterCard`; `<img src={getPrinterImage(printer.model)}`; `<h3 ...>{printer.name}</h3>`; `{printer.model \|\| 'Unknown Model'}`; span do bico (`• {installedNozzleDiameters...}`); texto do badge de conexão; condição `{/* WiFi signal indicator */}`; texto `{firmwareInfo.current_version}` e o span de reserva `status?.firmware_version` | +10/−9 | No modo único: sem imagem, nome e modelo (fica "0.4mm · 🕒 10h"); badge de conexão só com o ícone (Offline continua com texto); sem badge de WiFi; firmware só com o ícone (versão no `title`), sem o span de reserva. Imagem/nome ficam no DOM com `hidden` (1 linha cada). |
+| `pages/CameraPage.tsx` | import após o de `../custom/twin`; após `const twinActive = useTwinActive(id);`; `{printer?.name \|\| \`Printer ${id}\`}` do `<h1>` | +3/−1 | Sem o nome da impressora no cabeçalho da câmera (apertava os botões no celular). |
+
 ## 2. Catálogo de modelos (`custom(models)`)
 
 Aba **Catálogo** (primeira, padrão) em *Fontes de modelos* (`/model-sources?tab=catalog`), no estilo do navegador
