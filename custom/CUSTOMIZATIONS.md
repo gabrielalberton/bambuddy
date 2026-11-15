@@ -91,7 +91,7 @@ no celular (390x844, toque): grade de 2 colunas, chips roláveis, chave grande, 
 Detalhe também mostra avaliações (nota, quantidade, comentários), estatísticas (downloads, impulsionamentos, datas por
 perfil), dados por perfil (filamento, peso, tempo, placas, bico), links da descrição clicáveis (link para outro modelo
 do MakerWorld abre **dentro** do catálogo), autor clicável (catálogo interno do autor, `AuthorView.tsx`) e botão **3D**
-(salva o perfil na biblioteca e abre o `ModelViewerModal` do upstream). Importar por URL do MakerWorld: ícone de link
+(MakerWorld: abre o GLB leve com Draco que o próprio site usa no visualizador, sem baixar o 3MF nem salvar, rota `<id>/preview/<perfil>?plate=N`, `GlbPreviewModal.tsx`; outras fontes: salva e abre o `ModelViewerModal`). O decodificador Draco fica em `frontend/public/custom/draco/` (copiado de `three/examples/jsm/libs/draco/gltf`; `draco_worker.js` é gerado do `DRACOWorker` do `DRACOLoader.js`: **refazer ao atualizar o three**). Ele roda num worker de mesma origem, e `backend/app/custom/draco_worker_csp.py` põe esse caminho na regex `_PDF_WORKER_ASSET_RE` do `main.py`: o worker recebe só `'wasm-unsafe-eval'`, e o CSP do documento continua igual. Importar por URL do MakerWorld: ícone de link
 ao lado da ordenação (`ImportModal.tsx`).
 
 Baseado no trabalho de 1337faye/bambuddy-model-search (AGPL-3.0, commit `1b3b65b59`), **portado** (não cherry-pick)
