@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { useQuery, useQueries, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { MultiPrinterOnly } from '../custom/MultiPrinterOnly';
+import { minimalInventory } from '../custom/inventory/minimalInventory';
 import {
   Plus, Loader2, Trash2, Archive, RotateCcw, Edit2, Package,
   Search, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight,
@@ -1834,7 +1835,7 @@ function InventoryPage({ spoolmanMode = false, spoolmanModeReady = true }: { spo
 
       {/* Toolbar: Search + View toggle */}
       <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
-        <div className={`relative flex-1 max-w-md ${viewMode === 'forecast' ? 'invisible pointer-events-none' : ''}`}>
+        <div className={`relative flex-1 max-w-md ${viewMode === 'forecast' ? 'invisible pointer-events-none' : ''} ${minimalInventory(hasActiveFilters || !!search) ? 'hidden' : ''}`}>
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-bambu-gray/50" />
           <input
             type="text"
@@ -1922,7 +1923,7 @@ function InventoryPage({ spoolmanMode = false, spoolmanModeReady = true }: { spo
       </div>
 
       {/* Filter chips row — hidden in forecast mode */}
-      <div className={`flex flex-wrap items-center gap-2 ${viewMode === 'forecast' ? 'hidden' : ''}`}>
+      <div className={`flex flex-wrap items-center gap-2 ${viewMode === 'forecast' || minimalInventory(hasActiveFilters || !!search) ? 'hidden' : ''}`}>
         {/* Active / Archived chips */}
         <div className="flex items-center rounded-lg border border-bambu-dark-tertiary overflow-hidden">
           <button
