@@ -88,6 +88,11 @@ MakerWorld do Bambu Handy: busca, fontes, ordem, categorias, detalhe com perfis,
 **Fatiar no Bambuddy** (salva e abre o `SliceModal` existente; nunca inicia impressão). Projetada primeiro para o PWA
 no celular (390x844, toque): grade de 2 colunas, chips roláveis, chave grande, barra Salvar/Fatiar fixa no rodapé com
 `safe-area`, estado na URL (o "voltar" do Android fecha o detalhe). Screenshots: `custom/docs/screenshots/catalogo/`.
+Detalhe também mostra avaliações (nota, quantidade, comentários), estatísticas (downloads, impulsionamentos, datas por
+perfil), dados por perfil (filamento, peso, tempo, placas, bico), links da descrição clicáveis (link para outro modelo
+do MakerWorld abre **dentro** do catálogo), autor clicável (catálogo interno do autor, `AuthorView.tsx`) e botão **3D**
+(salva o perfil na biblioteca e abre o `ModelViewerModal` do upstream). Importar por URL do MakerWorld: ícone de link
+ao lado da ordenação (`ImportModal.tsx`).
 
 Baseado no trabalho de 1337faye/bambuddy-model-search (AGPL-3.0, commit `1b3b65b59`), **portado** (não cherry-pick)
 para os diretórios do fork. Ficaram de fora: tudo de X2D, o CSS das setas de select, edições nos locales do upstream,
@@ -122,7 +127,7 @@ fallback quando o usuário não enxerga impressora nenhuma.
 |---|---|
 | `backend/app/custom/asgi.py` | ponto de entrada da imagem: importa `backend.app.main.app` e chama `install()` |
 | `backend/app/custom/api.py` | `install(app)`: inclui os routers do fork e os move para **antes** da rota pega-tudo do SPA (`GET /{full_path:path}`) |
-| `backend/app/custom/models_catalog/` | `router.py` (`/api/v1/custom/models/{sources, <fonte>/browse, categories, thumbnail, <id>, <id>/save}`), `makerworld.py`, `printables.py`, `thingiverse.py`, `transport.py` (cache, allowlist de CDN, validação STL/3MF), `printer_models.py` (modelo → `devModelName`/id do Printables) |
+| `backend/app/custom/models_catalog/` | `router.py` (`/api/v1/custom/models/{sources, <fonte>/browse, categories, thumbnail, <id>, <id>/reviews, <id>/save, author/<uid>}`), `makerworld.py`, `printables.py`, `thingiverse.py`, `transport.py` (cache, allowlist de CDN, validação STL/3MF), `printer_models.py` (modelo → `devModelName`/id do Printables) |
 | `backend/tests/custom/` | transporte, fontes (transporte simulado), rotas com a biblioteca real e permissões |
 | `custom/scripts/smoke_models_catalog.py` | smoke ao vivo (poucas requisições, sem download) |
 | `frontend/src/custom/models/` | `ModelCatalog.tsx`, `ModelDetail.tsx`, `catalogTab.ts` (gancho), `usePrinterModels.ts`, `api.ts`, `i18n.ts` (pt-BR/en próprio), `shared.tsx`, `constants.ts`, `utils.ts`, `types.ts` |

@@ -10,6 +10,12 @@ import httpx
 
 PrinterFilterMode = Literal["server", "author_printer", "none"]
 Sort = Literal["trending", "popular", "newest", "relevance"]
+# Avaliações/comentários: "ratings" (estrelas), "comments" (sem nota) ou "all" (a fonte mistura os dois).
+ReviewKind = Literal["ratings", "comments", "all"]
+ReviewSort = Literal["top", "newest"]
+REVIEWS_PAGE_SIZE = 10
+_MAX_REVIEW_TEXT = 4000
+_MAX_REVIEW_IMAGES = 6
 
 # Ordem dos perfis/arquivos no detalhe: o que serve na impressora do usuário primeiro.
 MATCH_ORDER = {"native": 0, "compatible": 1, "unknown": 2, "other": 3}
@@ -30,6 +36,18 @@ class BrowseRequest:
 
 
 @dataclass
+class ReviewsRequest:
+    kind: ReviewKind
+    sort: ReviewSort = "top"
+    page: int = 1
+    page_size: int = REVIEWS_PAGE_SIZE
+
+    @property
+    def offset(self) -> int:
+        return (self.page - 1) * self.page_size
+
+
+@dataclass
 class DownloadedFile:
     data: bytes
     filename: str
@@ -46,6 +64,9 @@ class CatalogSource(ABC):
     permission_kind: Literal["makerworld", "library"] = "library"
     printer_filter: PrinterFilterMode = "none"
     sorts: tuple[Sort, ...] = ("popular", "newest", "relevance")
+    # Vazio = a fonte não expõe avaliações/comentários. O primeiro é o padrão.
+    review_kinds: tuple[ReviewKind, ...] = ()
+    review_sorts: tuple[ReviewSort, ...] = ("top",)
 
     def enabled(self) -> tuple[bool, str | None]:
         """(ligada?, motivo quando desligada)."""
@@ -63,6 +84,11 @@ class CatalogSource(ABC):
     @abstractmethod
     async def detail(self, client: httpx.AsyncClient, model_id: str, models: list[str]) -> dict[str, Any]: ...
 
+    supports_author = False
+
+    async def author(self, client: httpx.AsyncClient, author_id: str, offset: int, limit: int) -> dict[str, Any]:
+        raise NotImplementedError
+
     def page_url(self, model_id: str) -> str:
         raise NotImplementedError
 
@@ -71,6 +97,14 @@ class CatalogSource(ABC):
         return f"{self.page_url(model_id)}#file-{file_id}"
 
     async def download(self, client: httpx.AsyncClient, model_id: str, file_id: str) -> DownloadedFile:
+        raise NotImplementedError
+
+    def review_capabilities(self) -> dict[str, Any] | None:
+        if not self.review_kinds:
+            return None
+        return {"kinds": list(self.review_kinds), "sorts": list(self.review_sorts), "page_size": REVIEWS_PAGE_SIZE}
+
+    async def reviews(self, client: httpx.AsyncClient, model_id: str, req: ReviewsRequest) -> dict[str, Any]:
         raise NotImplementedError
 
 
@@ -84,3 +118,56 @@ def order_files(files: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], str 
     if preselect is None:
         preselect = next((f["id"] for f in ordered if f.get("sliceable") and f.get("printer_match") != "other"), None)
     return ordered, preselect
+
+
+def clean_text(value: Any, limit: int = _MAX_REVIEW_TEXT) -> str:
+    """Texto puro: sem caracteres de controle (mantém quebra de linha/tab), tamanho limitado.
+
+    O frontend renderiza como texto (nunca HTML); aqui só se evita lixo e payload enorme.
+    """
+    if not isinstance(value, str):
+        return ""
+    text = "".join(c for c in value if c in "\n\t" or (ord(c) >= 32 and ord(c) != 127))
+    text = text.replace("\r", "").strip()
+    return text[:limit] + ("…" if len(text) > limit else "")
+
+
+def safe_count(value: Any) -> int | None:
+    return value if isinstance(value, int) and not isinstance(value, bool) and value >= 0 else None
+
+
+def review_item(
+    *,
+    item_id: str,
+    kind: Literal["rating", "comment"],
+    author: Any,
+    text: Any,
+    created: Any,
+    rating: Any = None,
+    likes: Any = None,
+    replies: Any = None,
+    images: list[dict[str, str]] | None = None,
+    profile: dict[str, str] | None = None,
+    printed: bool | None = None,
+    issues: list[str] | None = None,
+    boosted: bool = False,
+    reply_preview: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    """Formato único de avaliação/comentário entregue ao frontend (todas as fontes)."""
+    score = rating if isinstance(rating, (int, float)) and not isinstance(rating, bool) and 0 < rating <= 5 else None
+    return {
+        "id": item_id,
+        "kind": kind,
+        "author": clean_text(author, 80) or "—",
+        "rating": score,
+        "text": clean_text(text),
+        "created": created if isinstance(created, str) and len(created) <= 40 else None,
+        "likes": safe_count(likes),
+        "replies": safe_count(replies),
+        "images": (images or [])[:_MAX_REVIEW_IMAGES],
+        "profile": profile,
+        "printed": printed,
+        "issues": [clean_text(i, 120) for i in (issues or []) if clean_text(i, 120)][:5],
+        "boosted": boosted,
+        "reply_preview": (reply_preview or [])[:3],
+    }

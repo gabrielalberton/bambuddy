@@ -47,7 +47,7 @@ from backend.app.schemas.makerworld import MakerWorldImportRequest
 from backend.app.services.library_folder_access import default_import_folder, get_writable_folder
 from backend.app.services.model_providers.base import ProviderError
 
-from .base import BrowseRequest, CatalogSource
+from .base import BrowseRequest, CatalogSource, ReviewsRequest
 from .makerworld import MakerWorldSource
 from .printables import PrintablesSource
 from .printer_models import display_name, makerworld_codes, printables_ids, resolve_models
@@ -228,6 +228,33 @@ async def thumbnail(source_id: str, url: str = Query(max_length=3000)):
     )
 
 
+@router.get("/{source_id}/author/{author_id}", dependencies=[Depends(require_auth_if_enabled)])
+async def author_models(
+    source_id: str,
+    author_id: str,
+    offset: int = Query(default=0, ge=0, le=5000),
+    limit: int = Query(default=24, ge=1, le=60),
+    credentials: HTTPAuthorizationCredentials | None = Depends(security),
+    x_api_key: str | None = Header(default=None, alias="X-API-Key"),
+):
+    """Modelos publicados por um autor (link interno do nome do autor no detalhe)."""
+    source = get_source(source_id)
+    await authorize_view(source, credentials, x_api_key)
+    if not source.supports_author:
+        raise HTTPException(404, "This source does not list models by author")
+    if not author_id.isdigit() or len(author_id) > 20:
+        raise HTTPException(400, "Invalid author id")
+
+    async def load():
+        async with httpx.AsyncClient(timeout=30) as client:
+            return await source.author(client, author_id, offset, limit)
+
+    try:
+        return await cached((source_id, "author", author_id, offset, limit), load)
+    except ProviderError as exc:
+        raise _map_service_error(exc) from exc
+
+
 @router.get("/{source_id}/{model_id}", dependencies=[Depends(require_auth_if_enabled)])
 async def detail(
     source_id: str,
@@ -243,10 +270,47 @@ async def detail(
 
     async def load():
         async with httpx.AsyncClient(timeout=30) as client:
-            return await source.detail(client, model_id, models)
+            result = await source.detail(client, model_id, models)
+        result.setdefault("rating", None)
+        result.setdefault("stats", {})
+        result["reviews"] = source.review_capabilities()
+        return result
 
     try:
         return await cached((source_id, "detail", model_id, tuple(models)), load)
+    except ProviderError as exc:
+        raise _map_service_error(exc) from exc
+
+
+@router.get("/{source_id}/{model_id}/reviews", dependencies=[Depends(require_auth_if_enabled)])
+async def reviews(
+    source_id: str,
+    model_id: str,
+    kind: Literal["ratings", "comments", "all"] | None = None,
+    sort: Literal["top", "newest"] | None = None,
+    page: int = Query(default=1, ge=1, le=200),
+    credentials: HTTPAuthorizationCredentials | None = Depends(security),
+    x_api_key: str | None = Header(default=None, alias="X-API-Key"),
+):
+    """Avaliações/comentários públicos da fonte, paginados (texto puro; imagens via ``/thumbnail``)."""
+    source = get_source(source_id)
+    await authorize_view(source, credentials, x_api_key)
+    check_id(model_id)
+    if not source.review_kinds:
+        raise HTTPException(404, "This source does not expose reviews")
+    req = ReviewsRequest(
+        kind=kind if kind in source.review_kinds else source.review_kinds[0],
+        sort=sort if sort in source.review_sorts else source.review_sorts[0],
+        page=page,
+    )
+
+    async def load():
+        async with httpx.AsyncClient(timeout=30) as client:
+            result = await source.reviews(client, model_id, req)
+        return {**result, "kind": req.kind, "sort": req.sort, "page": req.page, "page_size": req.page_size}
+
+    try:
+        return await cached((source_id, "reviews", model_id, req.kind, req.sort, req.page), load)
     except ProviderError as exc:
         raise _map_service_error(exc) from exc
 

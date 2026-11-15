@@ -1,13 +1,16 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, Download, Heart, Search } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Search } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { catalogApi } from './api';
 import { useCatalogT } from './i18n';
 import { ModelDetail } from './ModelDetail';
+import { MakerworldImportButton } from './ImportModal';
 import { controlClass, sourceName } from './constants';
-import { CatalogError, CatalogImage, Switch } from './shared';
+import { CatalogError, Switch } from './shared';
+import { ModelCard } from './ModelCard';
+import { AuthorView } from './AuthorView';
 import type { CatalogCard, CatalogSort, CatalogSourceId, CatalogSourceInfo } from './types';
 import { usePrinterModels } from './usePrinterModels';
 import { AUTHOR_PRINTER_KEY, PRINTER_FILTER_KEY, readBool, writeBool } from './utils';
@@ -60,6 +63,8 @@ export function ModelCatalog() {
   const category = current === 'all' ? '' : params.get('cat') ?? '';
   const model = params.get('model');
   const modelSource = params.get('msrc') as CatalogSourceId | null;
+  const author = params.get('author');
+  const authorSource = params.get('asrc') as CatalogSourceId | null;
   const [input, setInput] = useState(query);
 
   useEffect(() => {
@@ -98,12 +103,34 @@ export function ModelCatalog() {
       { replace: true },
     );
   // push (não replace): o "voltar" do celular fecha o detalhe.
-  const openModel = (card: CatalogCard) =>
+  const openModel = (card: Pick<CatalogCard, 'id' | 'provider'>) =>
     setParams((prev) => {
       const next = new URLSearchParams(prev);
       next.set('tab', 'catalog');
       next.set('model', card.id);
       next.set('msrc', card.provider);
+      return next;
+    });
+  // links internos: autor (catálogo dele) e outro modelo citado na descrição — push, o "voltar" retorna
+  const openAuthor = (src: CatalogSourceId, id: string, name: string) =>
+    setParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.set('tab', 'catalog');
+      next.delete('model');
+      next.delete('msrc');
+      next.set('author', id);
+      next.set('asrc', src);
+      next.set('aname', name);
+      return next;
+    });
+  // Voltar = histórico (modelo -> autor -> modelo...); aberto direto por link/notificação, só fecha.
+  const goBack = (close: () => void) => ((window.history.state as { idx?: number } | null)?.idx ?? 0) > 0 ? window.history.back() : close();
+  const closeAuthor = () =>
+    setParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.delete('author');
+      next.delete('asrc');
+      next.delete('aname');
       return next;
     });
   const closeModel = () =>
@@ -115,7 +142,29 @@ export function ModelCatalog() {
     });
 
   if (model && modelSource && enabled.some((s) => s.id === modelSource)) {
-    return <ModelDetail key={`${modelSource}:${model}`} source={modelSource} id={model} printer={printer} onBack={closeModel} />;
+    return (
+      <ModelDetail
+        key={`${modelSource}:${model}`}
+        source={modelSource}
+        id={model}
+        printer={printer}
+        onBack={() => goBack(closeModel)}
+        onOpenModel={(src, mid) => openModel({ id: mid, provider: src })}
+        onOpenAuthor={openAuthor}
+      />
+    );
+  }
+  if (author && authorSource && enabled.some((s) => s.id === authorSource)) {
+    return (
+      <AuthorView
+        key={`${authorSource}:${author}`}
+        source={authorSource}
+        authorId={author}
+        name={params.get('aname')}
+        onBack={() => goBack(closeAuthor)}
+        onOpen={openModel}
+      />
+    );
   }
 
   return (
@@ -171,6 +220,7 @@ export function ModelCatalog() {
             </select>
           </label>
           {current !== 'all' && <Categories source={current} value={category} onChange={(v) => change('cat', v)} />}
+          <MakerworldImportButton />
         </div>
       </div>
 
@@ -328,33 +378,7 @@ function SourceResults({ source, query, sort, category, printerModels, printerLa
         <ul className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
           {results.data.items.map((card) => (
             <li key={`${card.provider}:${card.id}`} className="min-w-0">
-              <button
-                type="button"
-                onClick={() => onOpen(card)}
-                className="block w-full overflow-hidden rounded-xl border border-bambu-dark-tertiary bg-bambu-dark-secondary text-left active:border-bambu-green focus-visible:outline focus-visible:outline-2 focus-visible:outline-bambu-green md:hover:border-bambu-green"
-              >
-                <div className="aspect-square overflow-hidden bg-bambu-dark">
-                  <CatalogImage source={card.provider} url={card.thumbnail} alt="" className="h-full w-full object-cover" />
-                </div>
-                <div className="p-2.5">
-                  <h3 className="line-clamp-2 break-words text-sm font-semibold leading-snug text-white">{card.title}</h3>
-                  <p className="mt-1 truncate text-xs text-bambu-gray">{card.creator}</p>
-                  <div className="mt-1.5 flex gap-3 text-xs text-bambu-gray">
-                    {card.downloads != null && (
-                      <span className="flex items-center gap-1">
-                        <Download className="h-3.5 w-3.5" aria-hidden="true" />
-                        {compact.format(card.downloads)}
-                      </span>
-                    )}
-                    {card.likes != null && (
-                      <span className="flex items-center gap-1">
-                        <Heart className="h-3.5 w-3.5" aria-hidden="true" />
-                        {compact.format(card.likes)}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </button>
+<ModelCard card={card} compact={compact} onOpen={onOpen} />
             </li>
           ))}
         </ul>

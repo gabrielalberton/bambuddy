@@ -27,7 +27,7 @@ from backend.app.services.model_providers.base import (
     ProviderUrlError,
 )
 
-from .base import BrowseRequest, CatalogSource, DownloadedFile, order_files
+from .base import BrowseRequest, CatalogSource, DownloadedFile, ReviewsRequest, order_files, review_item, safe_count
 from .printer_models import printables_ids
 from .transport import HEADERS, fetch_asset, safe_filename
 
@@ -38,6 +38,7 @@ DETAIL_FIELDS = (
     CARD_FIELDS
     + """
  description license { name } images { filePath } printer { id name }
+ ratingAvg ratingCount makesCount datePublished
  stls { id name fileSize } otherFiles { id name fileSize }
  gcodes { id name fileSize printer { id name } } slas { id name fileSize }
 """
@@ -45,7 +46,13 @@ DETAIL_FIELDS = (
 ORDERING = {"trending": "popular", "popular": "popular", "newest": "latest", "relevance": "best_match"}
 
 
-_IMAGE_PATH = re.compile(r"^(?P<dir>media/prints/\d+/images/[^/]+)/(?P<stem>[^/]+)\.(?P<ext>[A-Za-z0-9]{2,5})$")
+_IMAGE_PATH = re.compile(
+    r"^(?P<dir>media/(?:prints/\d+/images/[^/]+|comment_images/[0-9a-f]{2}/[0-9a-f-]{8,40}))"
+    r"/(?P<stem>[^/]+)\.(?P<ext>[A-Za-z0-9]{2,5})$"
+)
+# Comentários (com nota opcional de 1-5): ``print.comments(limit, offset)`` já vem ordenado por curtidas.
+# A raiz ``comments(targetObjectId, targetType: print)`` também existe, mas o tipo dela não traz ``rating``.
+COMMENT_FIELDS = "id text created likesCount rating author { publicUsername } images { filePath } replies { id }"
 
 
 def image_url(image: dict | None, size: str | None = None) -> str | None:
@@ -64,6 +71,16 @@ def image_url(image: dict | None, size: str | None = None) -> str | None:
     if size and match:
         return f"https://media.printables.com/{match['dir']}/thumbs/{size}/{match['ext'].lower()}/{match['stem']}.webp"
     return "https://media.printables.com/" + path
+
+
+def rating_summary(model: dict) -> dict[str, Any]:
+    # ``ratingAvg`` vem como string ("4.9404194471").
+    try:
+        average = round(float(model.get("ratingAvg")), 2) if model.get("ratingAvg") not in (None, "") else None
+    except (TypeError, ValueError):
+        average = None
+    count = safe_count(model.get("ratingCount")) or 0
+    return {"average": average if count and average and 0 < average <= 5 else None, "count": count}
 
 
 def card(model: dict) -> dict:
@@ -115,6 +132,8 @@ class PrintablesSource(CatalogSource):
     permission_kind = "library"
     printer_filter = "author_printer"
     sorts = ("popular", "newest", "relevance")
+    review_kinds = ("all",)
+    review_sorts = ("top",)
 
     def printer_filter_note(self) -> str:
         return "not applicable: no dimensions/printer profiles; optional author-declared printer (printerIds)"
@@ -213,7 +232,50 @@ class PrintablesSource(CatalogSource):
             "preselect_file_id": preselect,
             "printer_models": models,
             "metadata": {"author_printer": author_printer},
+            "rating": rating_summary(model),
+            "stats": {
+                "downloads": safe_count(model.get("downloadCount")),
+                "likes": safe_count(model.get("likesCount")),
+                "makes": safe_count(model.get("makesCount")),
+                "published": model.get("datePublished") if isinstance(model.get("datePublished"), str) else None,
+            },
         }
+
+    async def reviews(self, client: httpx.AsyncClient, model_id: str, req: ReviewsRequest) -> dict[str, Any]:
+        # Pede um a mais para saber se há próxima página (a API não dá total de comentários de primeiro nível).
+        data = await graphql(
+            client,
+            "query Reviews($id:ID!,$limit:Int,$offset:Int) { print(id:$id) { comments(limit:$limit,offset:$offset) { "
+            + COMMENT_FIELDS
+            + " } } }",
+            {"id": model_id, "limit": req.page_size + 1, "offset": req.offset},
+        )
+        model = data.get("print")
+        if not isinstance(model, dict):
+            raise ProviderNotFoundError("This Printables model is deleted, private, or unavailable")
+        raw = [c for c in model.get("comments") or [] if isinstance(c, dict) and c.get("id")]
+        items = []
+        for c in raw[: req.page_size]:
+            images = [
+                {"thumb": thumb, "full": image_url(img, "inside/1280x960") or thumb}
+                for img in (c.get("images") or [])[:6]
+                if isinstance(img, dict) and (thumb := image_url(img, "inside/320x240"))
+            ]
+            rating = c.get("rating")
+            items.append(
+                review_item(
+                    item_id=f"c{c['id']}",
+                    kind="rating" if isinstance(rating, int) and rating > 0 else "comment",
+                    author=(c.get("author") or {}).get("publicUsername"),
+                    rating=rating,
+                    text=c.get("text"),
+                    created=c.get("created"),
+                    likes=c.get("likesCount"),
+                    replies=len(c["replies"]) if isinstance(c.get("replies"), list) else None,
+                    images=images,
+                )
+            )
+        return {"items": items, "total": None, "has_more": len(raw) > req.page_size}
 
     async def download(self, client: httpx.AsyncClient, model_id: str, file_id: str) -> DownloadedFile:
         model = await self._model(client, model_id)

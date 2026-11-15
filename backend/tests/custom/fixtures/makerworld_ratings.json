@@ -1,0 +1,187 @@
+{
+ "total": 942,
+ "hits": [
+  {
+   "type": 2,
+   "ratingItem": {
+    "id": 900000,
+    "designId": 42,
+    "instanceId": 7,
+    "score": 5,
+    "content": "Very light and fast print",
+    "contentTranslated": "",
+    "lowScoreDetails": [],
+    "images": [
+     "https://makerworld.bblmw.com/makerworld/comment/20260101/1000/fake0_0.jpg"
+    ],
+    "replyCount": 0,
+    "likeCount": 1,
+    "status": 1,
+    "createTime": "2026-11-02T19:41:11Z",
+    "successPrinted": true,
+    "uid": 1000,
+    "creator": {
+     "uid": 1000,
+     "name": "Maker 0",
+     "avatar": "https://public-cdn.bblmw.com/avatar/1000/fake.jpg",
+     "status": 1,
+     "handle": "maker0",
+     "isBlocked": false
+    },
+    "instInfo": {
+     "id": 7,
+     "profileId": 5,
+     "status": 1,
+     "title": "0.4 Nozzle - 0.28mm layer, 3 walls, 0% infill",
+     "compatibility": {
+      "devModelName": "N1",
+      "devProductName": "A1 mini",
+      "nozzleDiameter": 0.4,
+      "devSettingName": ""
+     }
+    }
+   },
+   "comment": null
+  },
+  {
+   "type": 2,
+   "ratingItem": {
+    "id": 900001,
+    "designId": 42,
+    "instanceId": 7,
+    "score": 5,
+    "content": "great bed adhesion, but my first attempt failed somehow. also, the print is very cost affordable, and easy to print.",
+    "contentTranslated": "",
+    "lowScoreDetails": [],
+    "images": [
+     "https://makerworld.bblmw.com/makerworld/comment/20260101/1000/fake1_0.jpg",
+     "https://makerworld.bblmw.com/makerworld/comment/20260101/1000/fake1_1.jpg"
+    ],
+    "replyCount": 0,
+    "likeCount": 1,
+    "status": 1,
+    "createTime": "2026-08-27T02:18:05Z",
+    "successPrinted": true,
+    "uid": 1001,
+    "creator": {
+     "uid": 1001,
+     "name": "Maker 1",
+     "avatar": "https://public-cdn.bblmw.com/avatar/1000/fake.jpg",
+     "status": 1,
+     "handle": "maker1",
+     "isBlocked": false
+    },
+    "instInfo": {
+     "id": 7,
+     "profileId": 5,
+     "status": 1,
+     "title": "0.4 Nozzle - 0.28mm layer, 3 walls, 0% infill",
+     "compatibility": {
+      "devModelName": "N1",
+      "devProductName": "A1 mini",
+      "nozzleDiameter": 0.4,
+      "devSettingName": ""
+     }
+    }
+   },
+   "comment": null
+  },
+  {
+   "type": 2,
+   "ratingItem": {
+    "id": 900002,
+    "designId": 42,
+    "instanceId": 7,
+    "score": 5,
+    "content": "Too fast, too furious !",
+    "contentTranslated": "",
+    "lowScoreDetails": [],
+    "images": [
+     "https://makerworld.bblmw.com/makerworld/comment/20260101/1000/fake2_0.jpg"
+    ],
+    "replyCount": 0,
+    "likeCount": 1,
+    "status": 1,
+    "createTime": "2026-08-07T14:20:06Z",
+    "successPrinted": true,
+    "uid": 1002,
+    "creator": {
+     "uid": 1002,
+     "name": "Maker 2",
+     "avatar": "https://public-cdn.bblmw.com/avatar/1000/fake.jpg",
+     "status": 1,
+     "handle": "maker2",
+     "isBlocked": false
+    },
+    "instInfo": {
+     "id": 7,
+     "profileId": 5,
+     "status": 1,
+     "title": "0.4 Nozzle - 0.28mm layer, 3 walls, 0% infill",
+     "compatibility": {
+      "devModelName": "N1",
+      "devProductName": "A1 mini",
+      "nozzleDiameter": 0.4,
+      "devSettingName": ""
+     }
+    }
+   },
+   "comment": null
+  },
+  {
+   "type": 2,
+   "ratingItem": {
+    "id": 900099,
+    "designId": 42,
+    "instanceId": 7,
+    "score": 2,
+    "content": "",
+    "contentTranslated": "",
+    "lowScoreDetails": [
+     {
+      "key": "UPDATE_RATING_REASON_STRENGTH_ISSUE",
+      "reason": "Strength Issue",
+      "reasonDescription": "Broke when removing from the bed",
+      "reasonDescriptionTranslated": ""
+     }
+    ],
+    "images": [],
+    "replyCount": 0,
+    "likeCount": 0,
+    "status": 1,
+    "createTime": "2026-11-02T19:41:11Z",
+    "successPrinted": false,
+    "uid": 1009,
+    "creator": {
+     "uid": 1009,
+     "name": "Maker 9",
+     "avatar": "https://public-cdn.bblmw.com/avatar/1000/fake.jpg",
+     "status": 1,
+     "handle": "maker9",
+     "isBlocked": false
+    },
+    "instInfo": {
+     "id": 7,
+     "profileId": 5,
+     "status": 1,
+     "title": "0.4 Nozzle - 0.28mm layer, 3 walls, 0% infill",
+     "compatibility": {
+      "devModelName": "N1",
+      "devProductName": "A1 mini",
+      "nozzleDiameter": 0.4,
+      "devSettingName": ""
+     }
+    }
+   },
+   "comment": null
+  }
+ ],
+ "firstReply": {
+  "type": 0,
+  "ratingItem": null,
+  "comment": null
+ },
+ "pinnedRemarks": null,
+ "commentCount": 133,
+ "ratingCount": 948
+}

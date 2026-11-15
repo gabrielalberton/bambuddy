@@ -25,7 +25,7 @@ from backend.app.services.model_providers.base import (
     ProviderUnavailableError,
 )
 
-from .base import BrowseRequest, CatalogSource, DownloadedFile, order_files
+from .base import BrowseRequest, CatalogSource, DownloadedFile, ReviewsRequest, order_files, review_item, safe_count
 from .transport import HEADERS, fetch_asset, safe_filename
 
 API = "https://api.thingiverse.com"
@@ -61,6 +61,9 @@ class ThingiverseSource(CatalogSource):
     permission_kind = "library"
     printer_filter = "none"
     sorts = ("popular", "newest", "relevance")
+    # Thingiverse não tem estrelas; só comentários (``/things/{id}/comments``, NÃO verificado ao vivo: sem token).
+    review_kinds = ("comments",)
+    review_sorts = ("newest",)
 
     def enabled(self) -> tuple[bool, str | None]:
         if api_key():
@@ -166,7 +169,31 @@ class ThingiverseSource(CatalogSource):
             "preselect_file_id": preselect,
             "printer_models": models,
             "metadata": {},
+            "rating": None,
+            "stats": {
+                "downloads": safe_count(thing.get("download_count")),
+                "likes": safe_count(thing.get("like_count")),
+                "makes": safe_count(thing.get("make_count")),
+                "published": thing.get("added") if isinstance(thing.get("added"), str) else None,
+            },
         }
+
+    async def reviews(self, client: httpx.AsyncClient, model_id: str, req: ReviewsRequest) -> dict[str, Any]:
+        raw = await self._get(
+            client, f"/things/{model_id}/comments", {"page": req.page, "per_page": req.page_size}
+        )
+        hits = [c for c in raw if isinstance(c, dict) and c.get("id")] if isinstance(raw, list) else []
+        items = [
+            review_item(
+                item_id=f"c{c['id']}",
+                kind="comment",
+                author=(c.get("user") or {}).get("name"),
+                text=c.get("body"),
+                created=c.get("added"),
+            )
+            for c in hits
+        ]
+        return {"items": items, "total": None, "has_more": len(hits) >= req.page_size}
 
     async def download(self, client: httpx.AsyncClient, model_id: str, file_id: str) -> DownloadedFile:
         files = await self._files(client, model_id)

@@ -27,6 +27,7 @@ export interface CatalogCard {
   title: string;
   url: string;
   creator: string;
+  creator_id?: string | null;
   thumbnail: string | null;
   downloads: number | null;
   likes: number | null;
@@ -60,6 +61,67 @@ export interface CatalogDetail extends CatalogCard {
   preselect_file_id: string | null;
   printer_models: string[];
   metadata: Record<string, unknown>;
+  /** Nota média (1-5) e quantidade de avaliações; null = a fonte não tem notas. */
+  rating?: CatalogRating | null;
+  stats?: CatalogStats;
+  /** null/ausente = a fonte não expõe avaliações/comentários. */
+  reviews?: CatalogReviewCapabilities | null;
+}
+
+export interface CatalogRating {
+  average: number | null;
+  count: number;
+}
+
+export interface CatalogStats {
+  downloads?: number | null;
+  prints?: number | null;
+  likes?: number | null;
+  collections?: number | null;
+  boosts?: number | null;
+  makes?: number | null;
+  published?: string | null;
+}
+
+export type CatalogReviewKind = 'ratings' | 'comments' | 'all';
+export type CatalogReviewSort = 'top' | 'newest';
+
+export interface CatalogReviewCapabilities {
+  kinds: CatalogReviewKind[];
+  sorts: CatalogReviewSort[];
+  page_size: number;
+}
+
+export interface CatalogReviewImage {
+  thumb: string;
+  full: string;
+}
+
+export interface CatalogReview {
+  id: string;
+  kind: 'rating' | 'comment';
+  author: string;
+  rating: number | null;
+  text: string;
+  created: string | null;
+  likes: number | null;
+  replies: number | null;
+  images: CatalogReviewImage[];
+  profile: { id: string; name: string } | null;
+  printed: boolean | null;
+  issues: string[];
+  boosted: boolean;
+  reply_preview: CatalogReview[];
+}
+
+export interface CatalogReviewsResponse {
+  items: CatalogReview[];
+  total: number | null;
+  has_more: boolean;
+  kind: CatalogReviewKind;
+  sort: CatalogReviewSort;
+  page: number;
+  page_size: number;
 }
 
 export interface CatalogSavedFile {
@@ -78,4 +140,11 @@ export interface CatalogBrowseParams {
   printerModels: string[];
   printerFilter: boolean;
   authorPrinter: boolean;
+}
+
+export interface CatalogAuthorResponse {
+  items: CatalogCard[];
+  total: number | null;
+  has_more: boolean;
+  author: { id: string; name: string | null };
 }

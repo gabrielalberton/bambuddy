@@ -1,14 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, Check, ExternalLink, Loader2, Save, Scissors } from 'lucide-react';
+import { ArrowLeft, Box, Check, ExternalLink, Loader2, Save, Scissors } from 'lucide-react';
 import { api, type LibraryFolderTree } from '../../api/client';
 import { SliceModal } from '../../components/SliceModal';
+import { ModelViewerModal } from '../../components/ModelViewerModal';
 import { useAuth } from '../../contexts/AuthContext';
 import { catalogApi } from './api';
 import { useCatalogT, type CatalogKey } from './i18n';
 import { controlClass, sourceName } from './constants';
 import { CatalogError, CatalogImage } from './shared';
+import { ModelStatsRow, ProfileDetails } from './ModelInfo';
+import { RatingSummary, ReviewsSection } from './Reviews';
 import type { CatalogFile, CatalogSavedFile, CatalogSourceId, PrinterMatch } from './types';
 import type { PrinterModels } from './usePrinterModels';
 import { safeExternalUrl, sanitizeDescription } from './utils';
@@ -36,7 +39,16 @@ const MATCH_CLASS: Record<PrinterMatch, string> = {
   other: 'bg-yellow-500/10 text-yellow-400',
 };
 
-export function ModelDetail({ source, id, printer, onBack }: { source: CatalogSourceId; id: string; printer: PrinterModels; onBack: () => void }) {
+export function ModelDetail({ source, id, printer, onBack, onOpenModel, onOpenAuthor }: {
+  source: CatalogSourceId;
+  id: string;
+  printer: PrinterModels;
+  onBack: () => void;
+  /** link para outro modelo (ex.: na descrição) aberto dentro do catálogo */
+  onOpenModel?: (source: CatalogSourceId, id: string) => void;
+  /** catálogo do autor dentro do Bambuddy */
+  onOpenAuthor?: (source: CatalogSourceId, authorId: string, name: string) => void;
+}) {
   const t = useCatalogT();
   const { hasPermission } = useAuth();
   const client = useQueryClient();
@@ -50,11 +62,17 @@ export function ModelDetail({ source, id, printer, onBack }: { source: CatalogSo
   const folders = useQuery({ queryKey: ['library-folders'], queryFn: api.getLibraryFolders, enabled: canSave, retry: false });
   const [picked, setPicked] = useState<string | null>(null);
   const [folderId, setFolderId] = useState<number | null>(null);
-  const [busy, setBusy] = useState<'save' | 'slice' | null>(null);
+  const [busy, setBusy] = useState<'save' | 'slice' | 'view3d' | null>(null);
   const [error, setError] = useState<unknown>(null);
   const [saved, setSaved] = useState<CatalogSavedFile | null>(null);
   const [sliceFile, setSliceFile] = useState<CatalogSavedFile | null>(null);
+  const [viewFile, setViewFile] = useState<CatalogSavedFile | null>(null);
   const [imageIndex, setImageIndex] = useState(0);
+  const [reviewsRequested, setReviewsRequested] = useState(false);
+  const openReviews = () => {
+    setReviewsRequested(true);
+    document.getElementById('catalog-reviews')?.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
+  };
   const mounted = useRef(true);
   const heading = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
@@ -75,7 +93,7 @@ export function ModelDetail({ source, id, printer, onBack }: { source: CatalogSo
   const images = Array.from(new Set([...(data?.images ?? []), ...(data?.thumbnail ? [data.thumbnail] : [])]));
   const folderList = writableFolders(folders.data ?? []);
 
-  const run = async (action: 'save' | 'slice') => {
+  const run = async (action: 'save' | 'slice' | 'view3d') => {
     if (!file || busy) return;
     setBusy(action);
     setError(null);
@@ -85,6 +103,7 @@ export function ModelDetail({ source, id, printer, onBack }: { source: CatalogSo
       if (!mounted.current) return;
       for (const key of ['library-files', 'library-folders', 'library-stats']) void client.invalidateQueries({ queryKey: [key] });
       if (action === 'slice') setSliceFile(result);
+      else if (action === 'view3d') setViewFile(result);
       else setSaved(result);
     } catch (e) {
       if (mounted.current) setError(e);
@@ -95,10 +114,28 @@ export function ModelDetail({ source, id, printer, onBack }: { source: CatalogSo
 
   return (
     <div className="space-y-4 pb-2">
-      <button type="button" className={controlClass} onClick={onBack}>
-        <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-        {t('back')}
-      </button>
+      <div className="flex items-center justify-between gap-3">
+        <button type="button" className={controlClass} onClick={onBack}>
+          <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+          {t('back')}
+        </button>
+        {data && (
+          <div className="flex min-w-0 items-center gap-3 text-sm">
+            <span className="truncate text-bambu-green">{sourceName[source]}</span>
+            {safeExternalUrl(data.url) && (
+              <a
+                className="inline-flex min-h-11 shrink-0 items-center gap-1 text-bambu-green underline underline-offset-4 md:min-h-0"
+                href={safeExternalUrl(data.url)}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                {t('original')}
+                <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
+              </a>
+            )}
+          </div>
+        )}
+      </div>
       {detail.isPending ? (
         <div role="status" className="flex min-h-48 items-center justify-center gap-2 rounded-xl bg-bambu-dark-secondary text-bambu-gray">
           <Loader2 className="h-5 w-5 motion-safe:animate-spin" aria-hidden="true" />
@@ -109,20 +146,28 @@ export function ModelDetail({ source, id, printer, onBack }: { source: CatalogSo
       ) : data ? (
         <>
           <header>
-            <p className="mb-1 text-sm text-bambu-green">{sourceName[source]}</p>
             <h2 ref={heading} tabIndex={-1} className="break-words text-xl font-bold text-white focus:outline-none md:text-3xl">
               {data.title}
             </h2>
+            {data.rating && (
+              <div className="mt-1">
+                <RatingSummary rating={data.rating} onClick={data.reviews ? openReviews : undefined} />
+              </div>
+            )}
             <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-bambu-gray">
-              <span>{t('by', { creator: data.creator })}</span>
-              {data.license && <span>{t('license', { license: data.license })}</span>}
-              {safeExternalUrl(data.url) && (
-                <a className="inline-flex min-h-11 items-center gap-1 text-bambu-green underline underline-offset-4 md:min-h-0" href={safeExternalUrl(data.url)} target="_blank" rel="noopener noreferrer">
-                  {t('original')}
-                  <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
-                </a>
+              {data.creator_id && onOpenAuthor ? (
+                <button
+                  type="button"
+                  className="text-left text-bambu-green underline underline-offset-4"
+                  onClick={() => onOpenAuthor(source, data.creator_id as string, data.creator)}
+                >
+                  {t('by', { creator: data.creator })}
+                </button>
+              ) : (
+                <span>{t('by', { creator: data.creator })}</span>
               )}
             </div>
+            <ModelStatsRow stats={data.stats} />
           </header>
 
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
@@ -199,7 +244,7 @@ export function ModelDetail({ source, id, printer, onBack }: { source: CatalogSo
               className="fixed inset-x-0 bottom-0 z-30 border-t border-bambu-dark-tertiary bg-bambu-dark/95 px-4 pt-3 backdrop-blur md:static md:rounded-xl md:border"
               style={{ paddingBottom: 'calc(0.75rem + env(safe-area-inset-bottom))' }}
             >
-              <div className="grid grid-cols-2 gap-2 md:flex md:flex-wrap">
+              <div className="grid grid-cols-[1fr_1fr_auto] gap-2 md:flex md:flex-wrap">
                 <button type="button" className={`${controlClass} !border-bambu-green !bg-bambu-green font-semibold !text-bambu-dark`} disabled={!file || busy !== null} onClick={() => void run('save')}>
                   {busy === 'save' ? <Loader2 className="h-4 w-4 motion-safe:animate-spin" aria-hidden="true" /> : <Save className="h-4 w-4" aria-hidden="true" />}
                   {t(busy === 'save' ? 'saving' : 'save')}
@@ -207,6 +252,10 @@ export function ModelDetail({ source, id, printer, onBack }: { source: CatalogSo
                 <button type="button" className={controlClass} disabled={!file?.sliceable || busy !== null} onClick={() => void run('slice')}>
                   {busy === 'slice' ? <Loader2 className="h-4 w-4 motion-safe:animate-spin" aria-hidden="true" /> : <Scissors className="h-4 w-4" aria-hidden="true" />}
                   {t(busy === 'slice' ? 'preparing' : 'slice')}
+                </button>
+                <button type="button" className={controlClass} disabled={!file || busy !== null} onClick={() => void run('view3d')} aria-label={t('view3d')} title={t('view3d')}>
+                  {busy === 'view3d' ? <Loader2 className="h-4 w-4 motion-safe:animate-spin" aria-hidden="true" /> : <Box className="h-4 w-4" aria-hidden="true" />}
+                  3D
                 </button>
               </div>
               <p className="mt-2 text-xs text-bambu-gray">{t('sliceHint')}</p>
@@ -219,14 +268,30 @@ export function ModelDetail({ source, id, printer, onBack }: { source: CatalogSo
               <div
                 className="overflow-x-auto break-words text-sm leading-relaxed text-bambu-gray [&_a]:text-bambu-green [&_a]:underline [&_h2]:text-lg [&_h2]:text-white [&_h3]:text-white [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:mb-3 [&_pre]:whitespace-pre-wrap [&_ul]:list-disc [&_ul]:pl-5"
                 dangerouslySetInnerHTML={{ __html: html }}
+                onClick={(e) => {
+                  // link para outro modelo do MakerWorld: abre aqui dentro (o href externo fica como alternativa)
+                  const a = (e.target as HTMLElement).closest('a[data-internal-model]');
+                  const target = a?.getAttribute('data-internal-model');
+                  if (target && onOpenModel) {
+                    e.preventDefault();
+                    onOpenModel('makerworld', target);
+                  }
+                }}
               />
             ) : (
               <p className="text-sm text-bambu-gray">{t('noDescription')}</p>
             )}
           </section>
+
+          {data.reviews && data.reviews.kinds.length > 0 && (
+            <ReviewsSection source={source} modelId={id} capabilities={data.reviews} rating={data.rating} forceLoad={reviewsRequested} />
+          )}
         </>
       ) : null}
       {canSave && (data?.files.length ?? 0) > 0 && <div className="h-36 md:hidden" aria-hidden="true" />}
+      {viewFile && (
+        <ModelViewerModal libraryFileId={viewFile.library_file_id} title={data?.title ?? viewFile.filename} fileType="3mf" onClose={() => setViewFile(null)} />
+      )}
       {sliceFile && (
         <SliceModal source={{ kind: 'libraryFile', id: sliceFile.library_file_id, filename: sliceFile.filename }} onClose={() => setSliceFile(null)} />
       )}
@@ -249,10 +314,11 @@ function FileRow({ file, checked, printerLabel, onPick }: { file: CatalogFile; c
           {file.printer && file.printer_match !== 'native' && <span>{file.printer}</span>}
           <span>{file.format.toUpperCase()}</span>
           {size && <span>{size}</span>}
-          {plates > 0 && <span>{t('plates', { count: plates })}</span>}
+          {plates > 0 && file.metadata.plate_count == null && <span>{t('plates', { count: plates })}</span>}
           {file.metadata.requires_ams === true && <span>{t('ams')}</span>}
           {!file.sliceable && <span>{t('saveOnly')}</span>}
         </span>
+        <ProfileDetails file={file} />
       </span>
     </label>
   );

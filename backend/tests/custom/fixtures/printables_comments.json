@@ -1,0 +1,125 @@
+{
+ "data": {
+  "print": {
+   "id": "42",
+   "comments": [
+    {
+     "id": "700000",
+     "text": "Davy Jones edition",
+     "created": "2022-11-26T11:13:20.449632+00:00",
+     "likesCount": 65,
+     "rating": null,
+     "author": {
+      "publicUsername": "Printer 0",
+      "handle": "printer_0"
+     },
+     "images": [
+      {
+       "filePath": "media/comment_images/ab/00000000-0000-0000-0000-000000000000/photo_0.jpg"
+      }
+     ],
+     "replies": [
+      {
+       "id": "710000"
+      },
+      {
+       "id": "710001"
+      },
+      {
+       "id": "710002"
+      },
+      {
+       "id": "710003"
+      },
+      {
+       "id": "710004"
+      },
+      {
+       "id": "710005"
+      },
+      {
+       "id": "710006"
+      },
+      {
+       "id": "710007"
+      },
+      {
+       "id": "710008"
+      },
+      {
+       "id": "710009"
+      },
+      {
+       "id": "710010"
+      },
+      {
+       "id": "710011"
+      }
+     ]
+    },
+    {
+     "id": "700001",
+     "text": "Printed fine on my A1.",
+     "created": "2022-07-07T18:57:07.231900+00:00",
+     "likesCount": 30,
+     "rating": 4,
+     "author": {
+      "publicUsername": "Printer 1",
+      "handle": "printer_1"
+     },
+     "images": [
+      {
+       "filePath": "media/comment_images/ab/00000000-0000-0000-0000-000000000001/photo_1.jpg"
+      }
+     ],
+     "replies": []
+    },
+    {
+     "id": "700002",
+     "text": "Benchymania",
+     "created": "2022-06-16T19:52:20.370911+00:00",
+     "likesCount": 27,
+     "rating": null,
+     "author": {
+      "publicUsername": "Printer 2",
+      "handle": "printer_2"
+     },
+     "images": [
+      {
+       "filePath": "media/comment_images/ab/00000000-0000-0000-0000-000000000002/photo_2.jpg"
+      }
+     ],
+     "replies": [
+      {
+       "id": "710000"
+      }
+     ]
+    },
+    {
+     "id": "700003",
+     "text": "Printed with PETG and spite",
+     "created": "2025-01-08T19:29:36.707489+00:00",
+     "likesCount": 16,
+     "rating": null,
+     "author": {
+      "publicUsername": "Printer 3",
+      "handle": "printer_3"
+     },
+     "images": [
+      {
+       "filePath": "media/comment_images/ab/00000000-0000-0000-0000-000000000003/photo_3.jpg"
+      }
+     ],
+     "replies": [
+      {
+       "id": "710000"
+      },
+      {
+       "id": "710001"
+      }
+     ]
+    }
+   ]
+  }
+ }
+}

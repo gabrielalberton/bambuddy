@@ -20,7 +20,7 @@ def test_routes_sit_before_spa_catch_all():
 
     paths = [getattr(r, "path", "") for r in app.router.routes]
     custom = [i for i, p in enumerate(paths) if p.startswith(BASE)]
-    assert len(custom) == 6
+    assert len(custom) == 8
     assert max(custom) < paths.index("/{full_path:path}")
 
 
@@ -157,3 +157,17 @@ async def test_save_sends_web_push_once_and_on_failure(async_client):
         assert failed.status_code >= 500
         assert sent.await_count == 2
         assert sent.await_args.args[1].startswith("Catálogo") and sent.await_args.args[3] == "/model-sources"
+
+
+async def test_makerworld_author_lists_designs(async_client):
+    envelope = {"total": 3, "hits": [{"id": 11, "title": "a", "designCreator": {"uid": 99, "name": "Ana"}}, {"id": 12, "title": "b", "nsfw": True}]}
+    fake = AsyncMock(return_value=envelope)
+    with patch("backend.app.custom.models_catalog.makerworld._api_json", fake):
+        r = await async_client.get(f"{BASE}/makerworld/author/99", params={"offset": 0, "limit": 2})
+    assert r.status_code == 200, r.text
+    data = r.json()
+    assert [i["id"] for i in data["items"]] == ["11"] and data["items"][0]["creator_id"] == "99"
+    assert data["has_more"] is True and data["author"] == {"id": "99", "name": "Ana"}
+    assert "/published/99/design" in fake.await_args.args[1]
+    assert (await async_client.get(f"{BASE}/makerworld/author/abc")).status_code == 400
+    assert (await async_client.get(f"{BASE}/printables/author/1")).status_code == 404

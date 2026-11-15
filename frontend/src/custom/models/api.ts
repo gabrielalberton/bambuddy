@@ -1,8 +1,12 @@
 import { ApiError, getAuthToken } from '../../api/client';
 import type {
+  CatalogAuthorResponse,
   CatalogBrowseParams,
   CatalogBrowseResponse,
   CatalogDetail,
+  CatalogReviewKind,
+  CatalogReviewSort,
+  CatalogReviewsResponse,
   CatalogSavedFile,
   CatalogSourceId,
   CatalogSourcesResponse,
@@ -50,6 +54,16 @@ export const catalogApi = {
     call<CatalogDetail>(`/${source}/${encodeURIComponent(id)}?${modelsQuery(new URLSearchParams(), printerModels)}`, {
       signal,
     }),
+  author: (source: CatalogSourceId, authorId: string, offset: number, limit: number, signal?: AbortSignal) =>
+    call<CatalogAuthorResponse>(
+      `/${source}/author/${encodeURIComponent(authorId)}?${new URLSearchParams({ offset: String(offset), limit: String(limit) })}`,
+      { signal },
+    ),
+  reviews: (source: CatalogSourceId, id: string, kind: CatalogReviewKind, sort: CatalogReviewSort, page: number, signal?: AbortSignal) =>
+    call<CatalogReviewsResponse>(
+      `/${source}/${encodeURIComponent(id)}/reviews?${new URLSearchParams({ kind, sort, page: String(page) })}`,
+      { signal },
+    ),
   save: (source: CatalogSourceId, id: string, fileId: string, folderId: number | null) =>
     call<CatalogSavedFile>(`/${source}/${encodeURIComponent(id)}/save`, {
       method: 'POST',

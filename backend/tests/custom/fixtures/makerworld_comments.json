@@ -1,0 +1,87 @@
+{
+ "total": 109,
+ "hits": [
+  {
+   "type": 1,
+   "ratingItem": null,
+   "comment": {
+    "id": 800000,
+    "designId": 42,
+    "content": "Great design, saved me a lot of filament! <b>not html</b>",
+    "contentTranslated": "",
+    "images": [
+     "https://makerworld.bblmw.com/makerworld/comment/20260101/1020/c0.jpg"
+    ],
+    "createTime": "2026-03-25T20:15:56Z",
+    "replyCount": 6,
+    "likeCount": 77,
+    "hasEdited": true,
+    "isValid": true,
+    "boosted": true,
+    "isPinned": false,
+    "user": {
+     "uid": 1020,
+     "name": "Maker 20",
+     "avatar": "https://public-cdn.bblmw.com/avatar/1000/fake.jpg",
+     "status": 1,
+     "handle": "maker20",
+     "isBlocked": false
+    },
+    "commentReply": [
+     {
+      "id": 810000,
+      "designId": 42,
+      "content": "Thanks!",
+      "images": [],
+      "createTime": "2026-03-25T20:15:56Z",
+      "likeCount": 1,
+      "replyCount": 0,
+      "user": {
+       "uid": 1030,
+       "name": "Maker 30",
+       "avatar": "https://public-cdn.bblmw.com/avatar/1000/fake.jpg",
+       "status": 1,
+       "handle": "maker30",
+       "isBlocked": false
+      }
+     }
+    ]
+   }
+  },
+  {
+   "type": 1,
+   "ratingItem": null,
+   "comment": {
+    "id": 800001,
+    "designId": 42,
+    "content": "Does this fit the A1 bed?",
+    "contentTranslated": "",
+    "images": [],
+    "createTime": "2026-04-23T22:36:16Z",
+    "replyCount": 2,
+    "likeCount": 53,
+    "hasEdited": false,
+    "isValid": true,
+    "boosted": false,
+    "isPinned": false,
+    "user": {
+     "uid": 1021,
+     "name": "Maker 21",
+     "avatar": "https://public-cdn.bblmw.com/avatar/1000/fake.jpg",
+     "status": 1,
+     "handle": "maker21",
+     "isBlocked": false
+    },
+    "commentReply": []
+   }
+  }
+ ],
+ "firstReply": {
+  "type": 0,
+  "ratingItem": null,
+  "comment": null
+ },
+ "pinnedRemarks": null,
+ "commentCount": 133,
+ "ratingCount": 948
+}
