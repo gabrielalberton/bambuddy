@@ -36,7 +36,8 @@ import {
   saveSidebarOrder,
   SIDEBAR_LAYOUT_CHANGED_EVENT,
 } from '../utils/sidebarLayout';
-
+import { HeaderSlot } from '../custom/layout/HeaderSlot';
+import { compactBugReportHidden } from '../custom/layout/headerFlags';
 
 interface NavItem {
   id: string;
@@ -627,16 +628,19 @@ export function Layout() {
           >
             <Menu className="w-6 h-6 text-white" />
           </button>
+          <HeaderSlot>
           <img
             src={resolvedMode === 'dark' ? '/img/bambuddy_logo_dark_transparent.png' : '/img/bambuddy_logo_light.png'}
             alt="Bambuddy"
             className="h-8 ml-3"
           />
+          </HeaderSlot>
           {/* A camera from any page (#2737), beside the bug report. */}
           <div className="ml-auto">
             <CameraLauncher placement="down" open={cameraListOpen} onOpenChange={setCameraListOpen} />
           </div>
           {/* Bug report — the compact-layout home of the floating bubble. */}
+          {!compactBugReportHidden() && (
           <button
             onClick={() => setBugReportOpen(true)}
             className={`p-2 -mr-2 rounded-lg hover:bg-bambu-dark-tertiary transition-colors ${
@@ -647,6 +651,7 @@ export function Layout() {
           >
             <Bug className={`w-5 h-5 ${bugReportLogging ? 'animate-pulse' : ''}`} />
           </button>
+          )}
         </header>
       )}
 

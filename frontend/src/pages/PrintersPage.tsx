@@ -88,6 +88,9 @@ function dryingBlockedKey(reasons: Array<number | string> | undefined): string {
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { useSinglePrinter } from '../custom/useSinglePrinter';
+import { InlineCamera } from '../custom/camera/InlineCamera';
+import { InHeader } from '../custom/layout/HeaderSlot';
+import { headerStatusEnabled } from '../custom/layout/headerFlags';
 import { useFilamentListClass } from '../custom/printer/filamentList';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -4468,7 +4471,7 @@ function PrinterCard({
             ) : (
               /* Expanded: Full status section */
               <>
-                <div className="flex items-center gap-2 mb-2">
+                <div className={single && headerStatusEnabled() ? 'hidden' : 'flex items-center gap-2 mb-2'}>
                   <span className="text-[length:var(--pc-t10,10px)] uppercase tracking-wider text-bambu-gray font-medium">
                     {t('printers.status.title', 'Status')}
                   </span>
@@ -4494,6 +4497,7 @@ function PrinterCard({
                   const canSkipObjects = isActivePrint && objectCount !== 1 && hasPermission('printers:control');
 
                   return (
+                    <InHeader enabled={single}>
                     <div className="p-2 bg-bambu-dark rounded-[10px] relative overflow-hidden">
                       <button
                         onClick={() => setShowSkipObjectsModal(true)}
@@ -4613,11 +4617,13 @@ function PrinterCard({
                         variant="panelExtension"
                       />
                     </div>
+                    </InHeader>
                   );
                 })()}
               </>
             )}
 
+            {single && viewMode === 'expanded' && <InlineCamera printerId={printer.id} printerName={printer.name} rotation={printer.camera_rotation} />}
             {/* Temperatures */}
             {status.temperatures && viewMode === 'expanded' && (() => {
               // Use actual heater states from MQTT stream

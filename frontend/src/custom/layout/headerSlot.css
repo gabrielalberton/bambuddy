@@ -1,0 +1,28 @@
+/* Bloco de status do card (PrintersPage) dentro do cabeçalho de 56 px: sem capa, texto menor, linhas coladas. */
+[data-custom-header-status] > div {
+  padding: 0 !important;
+  background: transparent !important;
+}
+[data-custom-header-status] > div > div > :first-child:not(:only-child) {
+  display: none !important; /* capa */
+}
+[data-custom-header-status] > div > div > div {
+  height: auto !important;
+  padding-top: 0 !important;
+  gap: 1px;
+}
+[data-custom-header-status] p,
+[data-custom-header-status] span,
+[data-custom-header-status] div {
+  font-size: 11px !important;
+  line-height: 12px !important;
+  min-height: 0 !important;
+}
+[data-custom-header-status] > div > button {
+  top: 0 !important;
+  right: 0 !important;
+  padding: 2px !important;
+}
+[data-custom-header-status] > div > div ~ :not(button) {
+  display: none !important; /* fila (PrinterQueueWidget) fica fora do cabeçalho */
+}
