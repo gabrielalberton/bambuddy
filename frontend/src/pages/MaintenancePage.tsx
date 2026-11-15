@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { MultiPrinterOnly } from '../custom/MultiPrinterOnly';
 import { useAutoSelectSinglePrinter } from '../custom/useSinglePrinter';
+import { compactMaintenance } from '../custom/maintenance/compactMaintenance';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Wrench,
@@ -196,7 +197,7 @@ function MaintenanceCard({
   };
 
   return (
-    <div className={`rounded-xl border p-4 transition-all ${getBgColor()}`}>
+    <div className={`rounded-xl border p-4 transition-all ${getBgColor()}`} data-custom-maint-card={compactMaintenance() ? '' : undefined}>
       <div className="flex items-start gap-3 max-[550px]:flex-wrap">
         {/* Icon with status indicator */}
         <div className={`relative p-2.5 rounded-lg shrink-0 ${

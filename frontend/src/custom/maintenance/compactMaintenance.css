@@ -1,0 +1,47 @@
+[data-custom-maint-card] {
+  padding: 8px 10px !important;
+}
+[data-custom-maint-card] > div {
+  flex-wrap: nowrap !important;
+  align-items: center !important;
+  gap: 8px !important;
+}
+/* ícone */
+[data-custom-maint-card] > div > div:first-child {
+  padding: 6px !important;
+}
+[data-custom-maint-card] h3 {
+  font-size: 14px !important;
+  line-height: 18px !important;
+}
+/* barra e status mais colados */
+[data-custom-maint-card] > div > div:nth-child(2) > div:nth-child(2) {
+  margin-top: 4px !important;
+  margin-bottom: 2px !important;
+}
+/* ações na mesma linha, à direita; "Redefinir" só com o ícone */
+[data-custom-maint-card] > div > div:last-child {
+  width: auto !important;
+  margin-top: 0 !important;
+  gap: 6px !important;
+}
+[data-custom-maint-card] > div > div:last-child button {
+  font-size: 0 !important;
+  gap: 0 !important;
+  padding: 8px !important;
+}
+[data-custom-maint-card] > div > div:last-child button svg {
+  width: 16px !important;
+  height: 16px !important;
+}
+/* lista de cards: espaço menor entre eles */
+div:has(> [data-custom-maint-card]) {
+  gap: 8px !important;
+  padding-top: 8px !important;
+}
+@media (max-width: 640px) {
+  :has(> div > [data-custom-maint-card]) {
+    padding-left: 8px !important;
+    padding-right: 8px !important;
+  }
+}
