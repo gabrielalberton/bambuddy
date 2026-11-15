@@ -209,6 +209,8 @@ export class A1Model {
     });
     made.head.traverse((o) => { if (o.isMesh) { o.material.transparent = true; this.headMats.push(o.material); } });
     this.glb = true; this.cad = true;
+    // a lista do "fantasma" (posição desconhecida) pode ter sido montada com as peças do procedural: refaz com as reais
+    this._ghostList = null; this.ghost = 0;
     this.setPose(this.pos.x, this.pos.y, this.pos.z);
   }
 

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { withStreamToken } from '../../api/client';
 import { cameraPreviewEnabled } from './previewFlags';
-import { displayedAspect, rememberCameraAspect, rotationFromTransform } from './cameraAspect';
+import { displayedAspect, fitRect, rememberCameraAspect, rotationFromTransform } from './cameraAspect';
 
 /** Intervalo entre imagens da prévia (o Frigate atualiza a ~3 fps). */
 const PREVIEW_INTERVAL_MS = 300;
@@ -34,6 +34,22 @@ function frameBox(img: HTMLImageElement): Box | null {
   };
 }
 
+function previewStyle(box: Box | null, natural: { w: number; h: number } | null, rotation: number) {
+  const transform = rotation ? `rotate(${rotation}deg)` : undefined;
+  if (!box || !natural) return { maxWidth: '100%', maxHeight: '100%', transform };
+  const aspect = natural.w / natural.h;
+  const sideways = rotation % 180 !== 0;
+  const shown = fitRect(box.width, box.height, sideways ? 1 / aspect : aspect);
+  return {
+    width: sideways ? shown.height : shown.width,
+    height: sideways ? shown.width : shown.height,
+    maxWidth: 'none',
+    maxHeight: 'none',
+    flex: 'none',
+    transform,
+  };
+}
+
 function sameBox(a: Box | null, b: Box | null) {
   return a === b || (!!a && !!b && a.top === b.top && a.left === b.left && a.width === b.width && a.height === b.height);
 }
@@ -49,6 +65,7 @@ export function CameraPreview({ printerId }: { printerId: number }) {
   const [host, setHost] = useState<HTMLElement | null>(null);
   const [box, setBox] = useState<Box | null>(null);
   const [rotation, setRotation] = useState(0);
+  const [natural, setNatural] = useState<{ w: number; h: number } | null>(null);
   const [ready, setReady] = useState(false);
   const [streamFailed, setStreamFailed] = useState(false);
   const [src, setSrc] = useState<string | null>(null);
@@ -168,14 +185,15 @@ export function CameraPreview({ printerId }: { printerId: number }) {
             <img
               src={src}
               alt=""
-              className="max-w-full max-h-full object-contain select-none"
+              className="object-contain select-none"
               draggable={false}
-              // mesma rotação configurada no Bambuddy; deitada (90/270) troca os limites de largura/altura
-              style={
-                rotation % 180 === 0
-                  ? rotation ? { transform: `rotate(${rotation}deg)` } : undefined
-                  : { transform: `rotate(${rotation}deg)`, maxWidth: box?.height ?? '100%', maxHeight: box?.width ?? '100%' }
-              }
+              onLoad={(e) => {
+                const { naturalWidth: w, naturalHeight: h } = e.currentTarget;
+                if (w > 0 && h > 0 && (natural?.w !== w || natural?.h !== h)) setNatural({ w, h });
+              }}
+              // Mesmo tamanho e rotação que a alta vai ter: a imagem (640 px) é ampliada até caber no quadro; deitada
+              // (90/270) o retângulo exibido tem a proporção invertida e a imagem é desenhada com largura/altura trocadas.
+              style={previewStyle(box, natural, rotation)}
             />
             <div className="absolute top-2 left-2 flex items-center gap-1.5 rounded-full bg-black/60 px-2 py-0.5 text-[11px] text-white/80">
               <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-bambu-green" />
