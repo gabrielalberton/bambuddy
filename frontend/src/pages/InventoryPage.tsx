@@ -1631,9 +1631,10 @@ function InventoryPage({ spoolmanMode = false, spoolmanModeReady = true }: { spo
             <Package className="w-7 h-7 text-bambu-green" />
             {t('inventory.title')}
           </h1>
-          <p className="text-bambu-gray mt-1">{t('inventory.subtitle')}</p>
+          {!minimalInventory(false) && <p className="text-bambu-gray mt-1">{t('inventory.subtitle')}</p>}
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          {!minimalInventory(false) && (<>{/* custom(inventory): ações raras escondidas */}
           {/* CSV import/export (#1576). Operates on Bambuddy's local inventory.
               In Spoolman mode the buttons stay visible (feature parity) but are
               disabled with a hint pointing at Spoolman's own CSV export, since
@@ -1691,6 +1692,7 @@ function InventoryPage({ spoolmanMode = false, spoolmanModeReady = true }: { spo
             <QrCode className="w-4 h-4" />
             {t('inventory.qrAssign.button')}
           </Button>
+          </>)}
           <Button onClick={() => setFormModal({ spool: null, mode: 'create' })}>
             <Plus className="w-4 h-4" />
             {t('inventory.addSpool')}

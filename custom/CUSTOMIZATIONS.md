@@ -327,3 +327,7 @@ material, `KValueLine` (opcional) e trilha da barra por último.
 - `custom/build.sh` copia os PNGs por cima de `static/img/` com os nomes do upstream (manifest e `index.html` intocados).
 - `frontend/public/custom/sw-push.js` apaga uma vez os ícones antigos do cache do service worker (`ICON_VERSION`); subir a versão ao trocar o ícone de novo.
 - Desligar: remover a linha `cp ... custom/brand/png` do build.
+
+## Inventário sem ações raras (2026-11-16)
+
+- `frontend/src/pages/InventoryPage.tsx` (+3/−1): com `minimalInventory()` ligado, some o subtítulo e os botões Importar/Exportar CSV, Locais, Fornecedores, Imprimir etiquetas e Atribuir por QR; fica só "Adicionar Carretel". Religar: `localStorage['custom.minimalInventory']='off'`.
