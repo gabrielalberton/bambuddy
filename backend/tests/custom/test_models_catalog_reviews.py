@@ -136,6 +136,9 @@ async def test_makerworld_detail_profile_card_fields():
                 "prediction": 34920,
                 "weight": 302,
                 "instanceFilaments": [{"type": "PLA", "color": "#C0C0C0", "usedM": "100.1", "usedG": "302"}],
+                "cover": "https://makerworld.bblmw.com/p/cover.jpg",
+                "pictures": [{"url": "https://makerworld.bblmw.com/p/cover.jpg"}, {"url": "https://makerworld.bblmw.com/p/2.jpg"}, {"x": 1}],
+                "summary": "<p>Use 3 walls</p>",
                 "extention": {
                     "modelInfo": {
                         "compatibility": {"devModelName": "N2S", "devProductName": "A1", "nozzleDiameter": 0.4},
@@ -161,6 +164,9 @@ async def test_makerworld_detail_profile_card_fields():
     assert (meta["print_time_s"], meta["weight_g"], meta["nozzle_mm"]) == (34920, 302.0, 0.4)
     assert meta["filaments"] == [{"type": "PLA", "color": "#C0C0C0", "grams": 302.0}]
     assert meta["compatible_printers"] == ["A1", "P1S"]
+    assert meta["cover"] == "https://makerworld.bblmw.com/p/cover.jpg?x-oss-process=image/resize,w_300/format,webp"
+    assert [u.split("?")[0].rsplit("/", 1)[1] for u in meta["pictures"]] == ["cover.jpg", "2.jpg"]
+    assert meta["summary_html"] == "<p>Use 3 walls</p>"
     assert detail["rating"] == {"average": 5.0, "count": 81}
     assert detail["stats"]["boosts"] == 3 and detail["stats"]["downloads"] == 10
 

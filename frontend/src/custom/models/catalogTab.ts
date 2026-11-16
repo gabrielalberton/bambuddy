@@ -24,3 +24,17 @@ export function useCatalogTab<T extends { id: string; label: string; icon: Compo
     tabs.unshift({ id: CATALOG_TAB, label: t('tab'), icon: Compass } as unknown as T);
   }
 }
+
+/**
+ * Gancho da ModelSourcesPage: com o catálogo aberto, some o título "Fontes de modelos" e a barra de abas
+ * (Catálogo/MakerWorld/Manyfold) para a busca ficar no topo da tela do celular. O link do MakerWorld continua no
+ * botão de importar ao lado dos filtros. localStorage `custom.catalogSourcesHeader = 'on'` traz tudo de volta.
+ */
+export function hideSourcesHeader(active: string | undefined): boolean {
+  if (active !== CATALOG_TAB) return false;
+  try {
+    return localStorage.getItem('custom.catalogSourcesHeader') !== 'on';
+  } catch {
+    return true;
+  }
+}

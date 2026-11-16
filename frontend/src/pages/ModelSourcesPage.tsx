@@ -7,7 +7,7 @@ import { api } from '../api/client';
 import { ManyfoldTab } from '../components/ManyfoldTab';
 import { useAuth } from '../contexts/AuthContext';
 import { MakerworldPage } from './MakerworldPage';
-import { CatalogTab, useCatalogTab } from '../custom/models/catalogTab';
+import { CatalogTab, hideSourcesHeader, useCatalogTab } from '../custom/models/catalogTab';
 
 type SourceTab = 'makerworld' | 'manyfold' | 'catalog';
 
@@ -44,14 +44,14 @@ export function ModelSourcesPage() {
 
   return (
     <div className="p-4 md:p-8 max-w-screen-2xl">
-      <div className="mb-6">
+      <div className={hideSourcesHeader(active) ? 'sr-only' : 'mb-6'}>
         <h1 className="text-2xl font-bold text-white flex items-center gap-3">
           <Globe className="w-7 h-7 text-bambu-green" />
           {t('modelSources.title')}
         </h1>
       </div>
 
-      {tabs.length > 1 && (
+      {tabs.length > 1 && !hideSourcesHeader(active) && (
         <div className="flex border-b border-bambu-dark-tertiary mb-6" role="tablist">
           {tabs.map(({ id, label, icon: Icon }) => (
             <button

@@ -137,7 +137,7 @@ fallback quando o usuário não enxerga impressora nenhuma.
 
 | Arquivo | Âncora | +/− | O que / por quê |
 |---|---|---|---|
-| `frontend/src/pages/ModelSourcesPage.tsx` | import após `import { MakerworldPage }`; `type SourceTab`; após `if (showManyfold) tabs.push(...)`; antes de `{active === 'makerworld' && <MakerworldPage embedded />}` | +4/−1 | `useCatalogTab(tabs)` põe a aba em primeiro (com a flag desligada não faz nada) e `{active === 'catalog' && <CatalogTab />}`. |
+| `frontend/src/pages/ModelSourcesPage.tsx` | import após `import { MakerworldPage }`; `type SourceTab`; após `if (showManyfold) tabs.push(...)`; antes de `{active === 'makerworld' && <MakerworldPage embedded />}` | +6/−3 | `useCatalogTab(tabs)` põe a aba em primeiro (com a flag desligada não faz nada) e `{active === 'catalog' && <CatalogTab />}`. Com o catálogo aberto, `hideSourcesHeader(active)` esconde o título e as abas (localStorage `custom.catalogSourcesHeader='on'` traz de volta). |
 | `backend/app/main.py` | — | 0 | **Não tocado.** As rotas entram por `backend.app.custom.asgi` (ver Build). |
 
 Desvio de rota conhecido: em dev local, `uvicorn backend.app.main:app` **não** tem as rotas do catálogo; use
@@ -309,3 +309,7 @@ material, `KValueLine` (opcional) e trilha da barra por último.
 | `components/Layout.tsx` (botão de bug report do cabeçalho compacto) | escondido | `custom.bugReportButton=on` traz de volta |
 | `pages/InventoryPage.tsx` (2 classes) | estoque sem busca e sem linha de filtros (voltam se houver filtro ativo) | `custom.minimalInventory=off` |
 | `pages/MaintenancePage.tsx` (`data-custom-maint-card`) | cards de manutenção em uma linha, ações à direita (`custom/maintenance/`) | `custom.compactMaintenance=off` |
+
+### Catálogo no celular (2026-11-16)
+- Busca: seletor de fonte + campo + botão de lupa; busca só ao tocar na lupa ou dar Enter (antes buscava sozinha ao digitar). Sem título de seção quando há uma fonte só, e sem a nota "Filtrado pelo MakerWorld".
+- Perfis: miniatura própria do perfil (`metadata.cover`), fotos do perfil selecionado no começo da galeria (`metadata.pictures`), texto do autor do perfil quando selecionado (`metadata.summary_html`, higienizado) e números como ícone + número. Sem autor do perfil, sem selo "Designer" e sem a lista de impressoras.

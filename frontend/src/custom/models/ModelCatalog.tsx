@@ -70,24 +70,18 @@ export function ModelCatalog() {
   useEffect(() => {
     setInput(query);
   }, [query]);
-  useEffect(() => {
-    if (input.trim() === query) return;
-    const timer = window.setTimeout(
-      () =>
-        setParams(
-          (prev) => {
-            const next = new URLSearchParams(prev);
-            if (input.trim()) next.set('q', input.trim());
-            else next.delete('q');
-            for (const key of Array.from(next.keys())) if (key.endsWith('Off')) next.delete(key);
-            return next;
-          },
-          { replace: true },
-        ),
-      400,
+  // Busca só ao tocar na lupa (ou Enter no teclado); limpar o campo volta para a lista na hora.
+  const submitSearch = (value: string) =>
+    setParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        if (value.trim()) next.set('q', value.trim());
+        else next.delete('q');
+        for (const key of Array.from(next.keys())) if (key.endsWith('Off')) next.delete(key);
+        return next;
+      },
+      { replace: true },
     );
-    return () => window.clearTimeout(timer);
-  }, [input, query, setParams]);
 
   const change = (key: string, value: string) =>
     setParams(
@@ -170,42 +164,52 @@ export function ModelCatalog() {
   return (
     <div className="space-y-4">
       <div className="space-y-3">
-        <label className="block">
-          <span className="sr-only">{t('search')}</span>
-          <div className="relative">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-bambu-gray" aria-hidden="true" />
+        <form
+          role="search"
+          className="flex gap-2"
+          onSubmit={(e) => {
+            e.preventDefault();
+            submitSearch(input);
+            (document.activeElement as HTMLElement | null)?.blur?.();
+          }}
+        >
+          <select
+            value={current}
+            onChange={(e) => change('src', e.target.value === 'all' ? '' : e.target.value)}
+            aria-label={t('sources')}
+            className={`${controlClass} w-28 shrink-0 truncate bg-bambu-dark-secondary px-2 md:w-40`}
+          >
+            {enabled.length > 1 && <option value="all">{t('allSources')}</option>}
+            {enabled.map((s) => (
+              <option key={s.id} value={s.id}>{sourceName[s.id]}</option>
+            ))}
+            {sources
+              .filter((s) => !s.enabled)
+              .map((s) => (
+                <option key={s.id} value={s.id} disabled title={s.disabled_reason ?? ''}>
+                  {s.name} · {t('sourceDisabledHint')}
+                </option>
+              ))}
+          </select>
+          <label className="min-w-0 flex-1">
+            <span className="sr-only">{t('search')}</span>
             <input
               type="search"
               inputMode="search"
               enterKeyHint="search"
               value={input}
-              onChange={(e) => setInput(e.target.value)}
+              onChange={(e) => {
+                setInput(e.target.value);
+                if (!e.target.value && query) submitSearch('');
+              }}
               placeholder={t('searchPlaceholder')}
-              className="w-full min-h-11 rounded-lg border border-bambu-dark-tertiary bg-bambu-dark-secondary pl-10 pr-3 text-base text-white placeholder:text-bambu-gray focus:border-bambu-green focus:outline-none"
+              className="w-full min-h-11 rounded-lg border border-bambu-dark-tertiary bg-bambu-dark-secondary px-3 text-base text-white placeholder:text-bambu-gray focus:border-bambu-green focus:outline-none"
             />
-          </div>
-        </label>
-
-        <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 md:mx-0 md:flex-wrap md:px-0" role="group" aria-label={t('sources')}>
-          {(enabled.length > 1 ? ['all' as const, ...enabled.map((s) => s.id)] : enabled.map((s) => s.id)).map((id) => (
-            <button
-              key={id}
-              type="button"
-              aria-pressed={current === id}
-              onClick={() => change('src', id === 'all' ? '' : id)}
-              className={`${controlClass} shrink-0 rounded-full ${current === id ? '!border-bambu-green bg-bambu-green/15 !text-bambu-green' : ''}`}
-            >
-              {id === 'all' ? t('allSources') : sourceName[id]}
-            </button>
-          ))}
-          {sources
-            .filter((s) => !s.enabled)
-            .map((s) => (
-              <span key={s.id} title={s.disabled_reason ?? ''} className="inline-flex min-h-11 shrink-0 items-center rounded-full border border-dashed border-bambu-dark-tertiary px-3 text-sm text-bambu-gray/70">
-                {s.name} · {t('sourceDisabledHint')}
-              </span>
-            ))}
-        </div>
+          </label>
+          <button type="submit" className={`${controlClass} shrink-0 !px-3`} aria-label={t('search')} title={t('search')}>
+            <Search className="h-5 w-5" aria-hidden="true" />
+          </button>
+        </form>
 
         <div className="flex flex-wrap items-center gap-2">
           <Switch id="catalog-printer-filter" checked={printerFilter} onChange={setPrinterFilter} label={t('printerFilter', { printer: printer.label })} />
@@ -231,6 +235,7 @@ export function ModelCatalog() {
         <SourceResults
           key={`${s.id}:${query}:${sort}:${category}:${printerFilter}:${authorPrinter}:${printer.label}`}
           source={s}
+          single={visible.length === 1}
           query={query}
           sort={sort}
           category={category}
@@ -284,8 +289,8 @@ function FilterNote({ source, printerLabel, printerFilter, applied, authorPrinte
 }) {
   const t = useCatalogT();
   if (!printerFilter) return <p className="text-xs text-bambu-gray">{t('filterNotApplied')}</p>;
-  if (source.printer_filter === 'server')
-    return <p className="text-xs text-bambu-green">{applied === false ? t('filterNotApplied') : t('filterServer', { printer: printerLabel })}</p>;
+  // filtro aplicado pelo próprio MakerWorld: nada a avisar (a chave "Só para minha A1" já diz)
+  if (source.printer_filter === 'server') return applied === false ? <p className="text-xs text-bambu-gray">{t('filterNotApplied')}</p> : null;
   if (source.printer_filter === 'author_printer')
     return (
       <div className="space-y-1 text-xs">
@@ -299,8 +304,10 @@ function FilterNote({ source, printerLabel, printerFilter, applied, authorPrinte
   return <p className="text-xs text-yellow-400/90">{t('filterNaThingiverse', { printer: printerLabel })}</p>;
 }
 
-function SourceResults({ source, query, sort, category, printerModels, printerLabel, printerFilter, authorPrinter, onAuthorPrinter, onOpen }: {
+function SourceResults({ source, single, query, sort, category, printerModels, printerLabel, printerFilter, authorPrinter, onAuthorPrinter, onOpen }: {
   source: CatalogSourceInfo;
+  /** só uma fonte na tela: sem título (a fonte já está no seletor ao lado da busca) */
+  single: boolean;
   query: string;
   sort: CatalogSort;
   category: string;
@@ -340,8 +347,8 @@ function SourceResults({ source, query, sort, category, printerModels, printerLa
 
   return (
     <section aria-labelledby={heading} className="space-y-3">
-      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-        <h2 id={heading} className="text-lg font-semibold text-white">
+      <div className={`flex flex-wrap items-baseline gap-x-3 gap-y-1 ${single ? 'justify-end' : 'justify-between'}`}>
+        <h2 id={heading} className={single ? 'sr-only' : 'text-lg font-semibold text-white'}>
           {source.name}
           <span className="ml-2 text-sm font-normal text-bambu-gray">
             {t(effectiveSort === 'newest' && source.id === 'makerworld' ? 'recentMakerworld' : effectiveSort)}

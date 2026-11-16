@@ -132,6 +132,26 @@ def _profile_stats(instance: dict[str, Any], info: dict[str, Any], design: dict[
     }
 
 
+PROFILE_SUMMARY_MAX = 20_000
+
+
+def _profile_media(instance: dict[str, Any]) -> dict[str, Any]:
+    """Foto e descrição próprias do perfil: a capa (miniatura na lista), as fotos (vão para a galeria quando o perfil
+    está selecionado) e o texto do autor do perfil (HTML, higienizado no navegador como a descrição do modelo)."""
+    pictures = [
+        sized(p["url"], 1200)
+        for p in instance.get("pictures") or []
+        if isinstance(p, dict) and isinstance(p.get("url"), str) and p["url"]
+    ]
+    cover = instance.get("cover") if isinstance(instance.get("cover"), str) else None
+    summary = instance.get("summary")
+    return {
+        "cover": sized(cover, 300),
+        "pictures": list(dict.fromkeys(u for u in pictures if u))[:12],
+        "summary_html": summary[:PROFILE_SUMMARY_MAX] if isinstance(summary, str) else "",
+    }
+
+
 def design_stats(design: dict[str, Any]) -> dict[str, Any]:
     """Números do topo do modelo (como no Handy): downloads, impressões, curtidas, impulsos, publicação."""
     boost = design.get("boostInfo") if isinstance(design.get("boostInfo"), dict) else {}
@@ -442,6 +462,7 @@ class MakerWorldSource(CatalogSource):
                         "creator": (instance.get("instanceCreator") or instance.get("creator") or {}).get("name"),
                         "downloads": instance.get("downloadCount"),
                         "preview_3d": bool(preview_zip_url(instance)),
+                        **_profile_media(instance),
                         **_profile_rating(instance),
                         **_profile_stats(instance, info, design),
                     },

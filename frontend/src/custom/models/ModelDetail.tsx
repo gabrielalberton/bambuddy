@@ -92,7 +92,9 @@ export function ModelDetail({ source, id, printer, onBack, onOpenModel, onOpenAu
   const selectedId = picked ?? data?.preselect_file_id ?? null;
   const file = data?.files.find((f) => f.id === selectedId);
   const html = useMemo(() => sanitizeDescription(data?.description_html ?? ''), [data?.description_html]);
-  const images = Array.from(new Set([...(data?.images ?? []), ...(data?.thumbnail ? [data.thumbnail] : [])]));
+  // fotos do perfil selecionado primeiro (a "foto específica" dele), depois as do modelo
+  const profilePictures = (Array.isArray(file?.metadata.pictures) ? file.metadata.pictures : []).filter((u): u is string => typeof u === 'string');
+  const images = Array.from(new Set([...profilePictures, ...(data?.images ?? []), ...(data?.thumbnail ? [data.thumbnail] : [])]));
   const folderList = writableFolders(folders.data ?? []);
 
   const run = async (action: 'save' | 'slice' | 'view3d') => {
@@ -205,7 +207,7 @@ export function ModelDetail({ source, id, printer, onBack, onOpenModel, onOpenAu
                 <fieldset disabled={busy !== null} className="max-h-[50vh] space-y-2 overflow-y-auto md:max-h-96">
                   <legend className="sr-only">{t('files')}</legend>
                   {data.files.map((f) => (
-                    <FileRow key={f.id} file={f} checked={f.id === selectedId} printerLabel={printer.label} onPick={() => { setPicked(f.id); setSaved(null); setError(null); }} />
+                    <FileRow key={f.id} file={f} checked={f.id === selectedId} printerLabel={printer.label} source={source} onPick={() => { setPicked(f.id); setImageIndex(0); setSaved(null); setError(null); }} />
                   ))}
                 </fieldset>
               )}
@@ -304,7 +306,7 @@ export function ModelDetail({ source, id, printer, onBack, onOpenModel, onOpenAu
   );
 }
 
-function FileRow({ file, checked, printerLabel, onPick }: { file: CatalogFile; checked: boolean; printerLabel: string; onPick: () => void }) {
+function FileRow({ file, checked, printerLabel, source, onPick }: { file: CatalogFile; checked: boolean; printerLabel: string; source: CatalogSourceId; onPick: () => void }) {
   const t = useCatalogT();
   const plates = Array.isArray(file.metadata.plates) ? file.metadata.plates.length : 0;
   const size = file.size ? `${(file.size / 1048576).toFixed(1)} MB` : null;
@@ -312,6 +314,9 @@ function FileRow({ file, checked, printerLabel, onPick }: { file: CatalogFile; c
   return (
     <label className={`flex min-h-11 cursor-pointer items-start gap-3 rounded-lg border p-3 ${checked ? 'border-bambu-green bg-bambu-green/5' : 'border-bambu-dark-tertiary'}`}>
       <input type="radio" name="catalog-file" checked={checked} onChange={onPick} className="mt-0.5 h-5 w-5 shrink-0 accent-bambu-green" />
+      {typeof file.metadata.cover === 'string' && (
+        <CatalogImage source={source} url={file.metadata.cover} alt="" className="h-16 w-16 shrink-0 rounded-md object-cover" />
+      )}
       <span className="min-w-0 flex-1">
         <span className="block break-words text-sm font-medium text-white">{file.name}</span>
         <span className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-bambu-gray">
@@ -323,7 +328,7 @@ function FileRow({ file, checked, printerLabel, onPick }: { file: CatalogFile; c
           {file.metadata.requires_ams === true && <span>{t('ams')}</span>}
           {!file.sliceable && <span>{t('saveOnly')}</span>}
         </span>
-        <ProfileDetails file={file} />
+        <ProfileDetails file={file} expanded={checked} />
       </span>
     </label>
   );

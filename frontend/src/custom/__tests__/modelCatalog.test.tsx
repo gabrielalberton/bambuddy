@@ -108,7 +108,26 @@ describe('flag do catálogo', () => {
 describe('aba Catálogo', () => {
   beforeEach(() => setModelCatalogOverride('on'));
 
+  it('sem título nem abas por padrão; fonte num seletor e busca só pela lupa', async () => {
+    const captured = mockCatalog();
+    mockPrinterList([printerA1]);
+    render(<ModelSourcesPage />);
+    expect(await screen.findByText('makerworld model')).not.toBeNull();
+    expect(screen.queryAllByRole('tab')).toHaveLength(0);
+    const select = screen.getByRole('combobox', { name: /Sources/ }) as HTMLSelectElement;
+    expect(Array.from(select.options).some((o) => o.textContent === 'MakerWorld')).toBe(true);
+    const box = screen.getByRole('searchbox');
+    fireEvent.change(box, { target: { value: 'benchy' } });
+    await new Promise((r) => setTimeout(r, 500));
+    expect(captured.browse.some((u) => u.searchParams.get('query') === 'benchy' || u.searchParams.get('q') === 'benchy')).toBe(false);
+    fireEvent.click(screen.getByRole('button', { name: /^Search/ }));
+    await waitFor(() =>
+      expect(captured.browse.some((u) => u.searchParams.get('query') === 'benchy' || u.searchParams.get('q') === 'benchy')).toBe(true),
+    );
+  });
+
   it('é a primeira aba e a padrão; a aba do importador MakerWorld continua', async () => {
+    store.set('custom.catalogSourcesHeader', 'on');
     mockCatalog();
     mockPrinterList([printerA1]);
     render(<ModelSourcesPage />);
@@ -129,7 +148,6 @@ describe('aba Catálogo', () => {
     const mw = captured.browse.filter((u) => u.pathname.endsWith('/makerworld/browse')).at(-1)!;
     expect(mw.searchParams.get('printer_filter')).toBe('true');
     expect(mw.searchParams.getAll('printer_models')).toEqual(['A1']);
-    expect(await screen.findByText(/Filtered by MakerWorld: models with a profile for A1/)).not.toBeNull();
 
     fireEvent.click(toggle);
     await waitFor(() => {
