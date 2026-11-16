@@ -60,7 +60,7 @@ export class A1Model {
     this.root = new THREE.Group();
     const graphite = M({ color: 0x3b4048, roughness: 0.5, metalness: 0.2 });
     const dark = M({ color: 0x22252b, roughness: 0.65, metalness: 0.1 });
-    const light = M({ color: 0xc9ccd2, roughness: 0.45, metalness: 0.2 });
+    const light = M({ color: 0xa7abb2, roughness: 0.45, metalness: 0.2 });
     const alu = M({ color: 0xb9bdc6, roughness: 0.32, metalness: 0.9 });
     const brass = M({ color: 0xc8963e, roughness: 0.3, metalness: 1.0, emissive: 0xff5a14, emissiveIntensity: 0 });
     const rubber = M({ color: 0x0c0d0f, roughness: 0.9, metalness: 0 });
@@ -184,7 +184,7 @@ export class A1Model {
       for (const n of names[g]) {
         const src = find(n); if (!src) throw new Error('STEP sem o nó ' + n);
         const c = src.clone(true); c.matrixAutoUpdate = false; c.matrix.copy(src.matrixWorld);
-        c.traverse((o) => { if (o.isMesh) { o.castShadow = g !== 'bed'; o.receiveShadow = true; o.material = o.material.clone(); o.material.side = THREE.FrontSide; const c0 = o.material.color; if (Math.max(c0.r, c0.g, c0.b) > 0.6) c0.multiplyScalar(0.58); o.material.roughness = 0.55; } });
+        c.traverse((o) => { if (o.isMesh) { o.castShadow = g !== 'bed'; o.receiveShadow = true; o.material = o.material.clone(); o.material.side = THREE.FrontSide; const c0 = o.material.color; if (Math.max(c0.r, c0.g, c0.b) > 0.6) c0.multiplyScalar(0.38); o.material.roughness = 0.55; } });
         if (n === 'NAUO5') { this.pei = c; }
         if (n === 'NAUO7') { this.rodLow = c; }
         grp.add(c);
