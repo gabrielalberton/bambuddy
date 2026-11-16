@@ -65,9 +65,8 @@ export function useTwinAvailable(printerId: number): boolean {
   return isTwinModel(p?.model);
 }
 
-/** Twin visível agora no lugar da câmera (para o visualizador pausar a detecção de travamento do stream). */
+/** Compatibility hook: the camera now remains live even while 3D is the main view. */
 export function useTwinActive(printerId: number): boolean {
-  const available = useTwinAvailable(printerId);
-  const [mode] = useTwinViewMode();
-  return available && mode === 'twin';
+  void printerId;
+  return false;
 }

@@ -1,0 +1,16 @@
+.custom-camera-pair { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 4px; overflow: hidden; }
+.custom-camera-pane { position: relative; min-width: 0; min-height: 0; overflow: hidden; background: #171a21; }
+.custom-camera-pane > div:first-child { width: 100%; height: 100% !important; }
+.custom-pane-select { position: absolute; inset: 0; z-index: 20; cursor: pointer; touch-action: pan-y; }
+.custom-pane-select span { position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%); padding: 3px 9px; border-radius: 6px; background: #000a; color: white; font-size: 12px; }
+.custom-pane-select:focus-visible { outline: 2px solid #00ae42; outline-offset: -3px; }
+.custom-camera-pair:not([data-layout='split']) { display: block; }
+.custom-camera-pair:not([data-layout='split']) > .custom-camera-pane { position: absolute; inset: 0; }
+.custom-camera-pair[data-layout='camera'] > [data-pane='twin'],
+.custom-camera-pair[data-layout='twin'] > [data-pane='camera'] { inset: 10px 10px auto auto; width: 30%; height: 30%; z-index: 25; border: 1px solid #ffffff45; border-radius: 8px; box-shadow: 0 2px 12px #0008; }
+.custom-pair-back { position: absolute; top: 10px; left: 10px; z-index: 30; display: grid; place-items: center; width: 44px; height: 44px; background: #0009; color: white; border: 1px solid #ffffff30; border-radius: 8px; touch-action: manipulation; }
+.custom-camera-pair[data-layout='split'] [title='Zoom in'],
+.custom-camera-pair[data-layout='split'] [title='Zoom out'],
+.custom-camera-pair[data-layout='split'] [title='Reset zoom'],
+.custom-camera-pair[data-layout='twin'] [data-pane='camera'] [title^='Zoom'],
+.custom-camera-pair[data-layout='twin'] [data-pane='camera'] [title='Reset zoom'] { display: none; }

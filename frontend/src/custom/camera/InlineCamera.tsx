@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
 import { Video } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { cameraAspect } from './cameraAspect';
@@ -95,7 +95,7 @@ export function InlineCamera({ printerId, rotation }: { printerId: number; print
       data-custom-inline-camera=""
       // no-drag: o cabeçalho do upstream não arrasta (nem bloqueia a rolagem da página no toque)
       className="no-drag relative mb-3 w-full overflow-hidden rounded-lg"
-      style={{ height: height || undefined, minHeight: height ? undefined : 200 }}
+      style={{ height: height || undefined, minHeight: height ? undefined : 200, '--camera-split-height': `${Math.round((width - 6) / (2 * aspect) + CHROME_PX)}px` } as CSSProperties}
     >
       {width > 0 && (
         <Suspense fallback={null}>

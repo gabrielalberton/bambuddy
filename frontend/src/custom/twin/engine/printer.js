@@ -184,7 +184,7 @@ export class A1Model {
       for (const n of names[g]) {
         const src = find(n); if (!src) throw new Error('STEP sem o nó ' + n);
         const c = src.clone(true); c.matrixAutoUpdate = false; c.matrix.copy(src.matrixWorld);
-        c.traverse((o) => { if (o.isMesh) { o.castShadow = g !== 'bed'; o.receiveShadow = true; o.material = o.material.clone(); o.material.side = THREE.FrontSide; const c0 = o.material.color; if (Math.max(c0.r, c0.g, c0.b) > 0.6) c0.multiplyScalar(0.74); o.material.roughness = 0.55; } });
+        c.traverse((o) => { if (o.isMesh) { o.castShadow = g !== 'bed'; o.receiveShadow = true; o.material = o.material.clone(); o.material.side = THREE.FrontSide; const c0 = o.material.color; if (Math.max(c0.r, c0.g, c0.b) > 0.6) c0.multiplyScalar(0.58); o.material.roughness = 0.55; } });
         if (n === 'NAUO5') { this.pei = c; }
         if (n === 'NAUO7') { this.rodLow = c; }
         grp.add(c);

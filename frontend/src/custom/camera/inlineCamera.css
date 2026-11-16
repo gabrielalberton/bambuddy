@@ -31,3 +31,7 @@
   width: 100%;
   justify-content: space-between;
 }
+/* The overview uses two half-width frames; expansion returns to the original full-width height. */
+[data-custom-inline-camera]:has(.custom-camera-pair[data-layout='split']) {
+  height: var(--camera-split-height) !important;
+}

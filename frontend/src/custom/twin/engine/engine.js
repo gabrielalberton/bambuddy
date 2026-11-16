@@ -15,7 +15,7 @@ const REST = { x: 40, y: 170, z: 90 };
 /**
  * @param {HTMLElement} container elemento que recebe o canvas (ocupa 100% dele)
  * @param {{ eventsUrl: () => string, jobUrl: (id: string) => string, modelUrl?: (() => string) | null,
- *           tuning?: { lead?: number, lat?: number, tau?: number }, debug?: boolean, procedural?: boolean }} opts
+ *           tuning?: { lead?: number, lat?: number, tau?: number, autoFocus?: boolean }, debug?: boolean, procedural?: boolean }} opts
  */
 // O GLB da A1 (~2,8 MB) vem com o token de stream na URL, que muda a cada sessão: o cache HTTP nunca acertava e o modelo
 // era baixado de novo a cada abertura. Guarda o arquivo no Cache Storage (chave sem o token) e na memória da página.
@@ -141,7 +141,7 @@ export function createTwin(container, opts) {
 
   // ---------- câmera frontal com deriva sutil ----------
   const camera = new THREE.PerspectiveCamera(32, 1, 20, 5000);
-  const view = { az: 0, el: 0.30, dist: 900, tx: -5, ty: 95, tz: -10, dAz: 0, dEl: 0, zoom: 1, fit: 1, f: 0, fx: 0, fy: 0, fz: 0, lastInput: -1e9 };
+  const view = { az: 0, el: 0.45, dist: 900, tx: -5, ty: 120, tz: -10, dAz: 0, dEl: 0, zoom: 0.72, fit: 1, f: 0, fx: 0, fy: 0, fz: 0, lastInput: -1e9 };
   let W = 0, H = 0;
   function frame() {
     const w = Math.max(1, container.clientWidth), h = Math.max(1, container.clientHeight);
@@ -189,11 +189,11 @@ export function createTwin(container, opts) {
   function updateCamera(tNow) {
     const idle = (performance.now() - view.lastInput) > 6000;
     if (idle) { view.dAz *= 0.995; view.dEl *= 0.995; }        // volta devagar ao enquadramento padrão
-    const drift = Math.sin(tNow * 0.05) * 0.06, driftE = Math.sin(tNow * 0.033 + 1) * 0.012;
+    const drift = 0, driftE = 0;
     const az = view.az + view.dAz + drift, el = Math.min(1.2, Math.max(0.05, view.el + view.dEl + driftE));
     // com um job ativo, a câmera se aproxima suavemente do objeto (centro/tamanho vindos do G-code)
     let fx = 0, fy = 0, fz = 0, ff = 0;
-    if (S.bbox && S.prog && object.fade > 0.5) {
+    if (opts.tuning?.autoFocus && S.bbox && S.prog && object.fade > 0.5) {
       const [x0, y0, x1, y1] = S.bbox;
       const size = Math.max(x1 - x0, y1 - y0, S.zmax || 0, 40);
       fx = (x0 + x1) / 2 - 128; fz = -(y0 + y1) / 2; fy = Math.min(S.zmax || 0, 120) / 2 + 20;

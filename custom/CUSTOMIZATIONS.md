@@ -313,3 +313,10 @@ material, `KValueLine` (opcional) e trilha da barra por último.
 ### Catálogo no celular (2026-11-16)
 - Busca: seletor de fonte + campo + botão de lupa; busca só ao tocar na lupa ou dar Enter (antes buscava sozinha ao digitar). Sem título de seção quando há uma fonte só, e sem a nota "Filtrado pelo MakerWorld".
 - Perfis: miniatura própria do perfil (`metadata.cover`), fotos do perfil selecionado no começo da galeria (`metadata.pictures`), texto do autor do perfil quando selecionado (`metadata.summary_html`, higienizado) e números como ícone + número. Sem autor do perfil, sem selo "Designer" e sem a lista de impressoras.
+
+## Câmera e 3D lado a lado (2026-11-16)
+
+- `frontend/src/custom/twin/CameraOrTwin.tsx` deixa câmera e gêmeo digital montados juntos, lado a lado, sem a chave Câmera | 3D. Tocar numa delas amplia; voltar fica no canto superior esquerdo e a outra continua ao vivo como PiP no canto superior direito (tocar no PiP troca).
+- `useTwinActive` passou a retornar `false`: o stream da câmera não é mais pausado quando o 3D está em destaque.
+- `frontend/src/custom/camera/useCameraImageFit.ts` dá largura/altura explícitas à imagem antes do `rotate()`; o flex não a encolhe mais com a câmera deitada (90/270°), causa das barras pretas no stream em resolução cheia.
+- Gêmeo: enquadramento frontal elevado fixo (`el=0.45`, `ty=120`, `zoom=0.72`), sem oscilação nem aproximação automática ao objeto; a impressora carregada fica mais cinza (cor clara × 0,58).

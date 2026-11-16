@@ -4,6 +4,8 @@ export interface TwinTuning {
   lead?: number;
   lat?: number;
   tau?: number;
+  /** aproxima a câmera do objeto durante a impressão (desligado: enquadramento fixo) */
+  autoFocus?: boolean;
 }
 
 export interface TwinOptions {
