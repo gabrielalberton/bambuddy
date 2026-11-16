@@ -4782,7 +4782,7 @@ function PrinterCard({
                         </NozzleSlotHoverCard>
                       ) : (
                         <>
-                          <p className="text-[length:var(--pc-t9,9px)] text-bambu-gray">{t('printers.temperatures.nozzle')}</p>
+                          <p className="text-[length:var(--pc-t9,9px)] text-bambu-gray">{t('printers.temperatures.nozzle')}{compactCard(single) && installedNozzleDiameters(status).length > 0 && ` · ${installedNozzleDiameters(status).join(' / ')}`}</p>
                           <p className="text-[length:var(--pc-t11,11px)] text-white">
                             {Math.round(status.temperatures.nozzle || 0)}°C
                           </p>
@@ -5272,7 +5272,7 @@ function PrinterCard({
                         );
                       })()}
 
-                      <div className={`inline-flex rounded-lg ${printer.plate_detection_enabled ? 'ring-1 ring-green-500' : ''} ${compactCard(single) && isPrinting ? 'hidden' : ''}`}>
+                      <div className={`inline-flex rounded-lg ${printer.plate_detection_enabled ? 'ring-1 ring-green-500' : ''} ${compactCard(single) && isPrinting ? '!hidden' : ''}`}>
                         <button
                           onClick={handleTogglePlateDetection}
                           disabled={!status.connected || plateDetectionMutation.isPending || !hasPermission('printers:update')}
