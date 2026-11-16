@@ -320,3 +320,10 @@ material, `KValueLine` (opcional) e trilha da barra por último.
 - `useTwinActive` passou a retornar `false`: o stream da câmera não é mais pausado quando o 3D está em destaque.
 - `frontend/src/custom/camera/useCameraImageFit.ts` dá largura/altura explícitas à imagem antes do `rotate()`; o flex não a encolhe mais com a câmera deitada (90/270°), causa das barras pretas no stream em resolução cheia.
 - Gêmeo: enquadramento frontal elevado fixo (`el=0.45`, `ty=120`, `zoom=0.72`), sem oscilação nem aproximação automática ao objeto; a impressora carregada fica mais cinza (cor clara × 0,38, exposição 0,82, ambiente 0,7, luz principal 2,4).
+
+## Ícone do app (2026-11-16)
+
+- Fonte: `custom/brand/icon.svg` (broto impresso em camadas sob o bico, desenho original). `custom/brand/render.sh` gera `custom/brand/png/`.
+- `custom/build.sh` copia os PNGs por cima de `static/img/` com os nomes do upstream (manifest e `index.html` intocados).
+- `frontend/public/custom/sw-push.js` apaga uma vez os ícones antigos do cache do service worker (`ICON_VERSION`); subir a versão ao trocar o ícone de novo.
+- Desligar: remover a linha `cp ... custom/brand/png` do build.

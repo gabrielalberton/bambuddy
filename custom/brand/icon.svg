@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Ícone do fork: broto impresso em camadas sob o bico (original, 2026-11-16). Conteúdo no círculo seguro (maskable). -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#14d065"/><stop offset="1" stop-color="#00782f"/></linearGradient>
+    <linearGradient id="metal" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#d4d9df"/><stop offset=".5" stop-color="#ffffff"/><stop offset="1" stop-color="#bfc5cc"/></linearGradient>
+    <clipPath id="sprout"><path d="M256 412C142 392 108 304 140 214C196 226 250 262 256 318C262 262 316 226 372 214C404 304 370 392 256 412Z"/></clipPath>
+  </defs>
+  <rect width="512" height="512" fill="url(#bg)"/>
+  <g clip-path="url(#sprout)" fill="#0c1a11">
+    <rect x="96" y="214" width="320" height="18"/><rect x="96" y="239" width="320" height="18"/>
+    <rect x="96" y="264" width="320" height="18"/><rect x="96" y="289" width="320" height="18"/>
+    <rect x="96" y="314" width="320" height="18"/><rect x="96" y="339" width="320" height="18"/>
+    <rect x="96" y="364" width="320" height="18"/><rect x="96" y="389" width="320" height="18"/>
+  </g>
+  <rect x="251" y="308" width="10" height="104" fill="#00a443"/>
+  <rect x="192" y="88" width="128" height="68" rx="16" fill="url(#metal)"/>
+  <rect x="192" y="108" width="128" height="7" fill="#0002"/><rect x="192" y="128" width="128" height="7" fill="#0002"/>
+  <path d="M222 156h68l-19 42h-30z" fill="url(#metal)"/>
+  <path d="M248 198h16l-3 12h-10z" fill="#ffad5c"/>
+  <rect x="252" y="210" width="8" height="58" rx="4" fill="#0c1a11"/>
+</svg>

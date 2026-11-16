@@ -52,6 +52,8 @@ mkdir -p "$OUT"
 "${CAP[@]}" npx vite build --outDir "$OUT/static" --emptyOutDir
 # Mesmo passo do "npm run build" do upstream (check:baseline), no diretório nosso.
 node scripts/check-browser-baseline.mjs "$OUT/static/assets"
+# Ícone próprio do fork (custom/brand) por cima dos PNGs do upstream, com os mesmos nomes do manifest.
+cp "$ROOT"/custom/brand/png/*.png "$OUT/static/img/"
 
 # Backend nosso: só backend/app/custom (sem __pycache__), no contexto do docker build.
 rm -rf "$OUT/backend_custom"

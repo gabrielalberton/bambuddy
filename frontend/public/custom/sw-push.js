@@ -6,6 +6,26 @@
 (function () {
   var DEFAULT_ICON = '/img/android-chrome-192x192.png';
   var DEFAULT_BADGE = '/custom/webpush-badge.png';
+  // Ícone do fork (2026-11-16): o sw.js serve /img/ do cache primeiro; tira os PNGs antigos uma vez.
+  var ICON_VERSION = 'sprout-1';
+  self.addEventListener('activate', function (event) {
+    event.waitUntil(caches.keys().then(function (names) {
+      return Promise.all(names.map(function (name) {
+        return caches.open(name).then(function (cache) {
+          return cache.match('/custom/icon-version').then(function (seen) {
+            if (seen) return seen.text().then(function (v) { return v === ICON_VERSION ? null : purge(cache); });
+            return purge(cache);
+          });
+        });
+      }));
+    }));
+  });
+  function purge(cache) {
+    var icons = ['favicon.png', 'favicon-16x16.png', 'favicon-32x32.png', 'apple-touch-icon.png', 'android-chrome-192x192.png', 'android-chrome-512x512.png'];
+    return Promise.all(icons.map(function (n) { return cache.delete('/img/' + n); })).then(function () {
+      return cache.put('/custom/icon-version', new Response(ICON_VERSION));
+    });
+  }
 
   function parsePayload(event) {
     if (!event.data) return null;
