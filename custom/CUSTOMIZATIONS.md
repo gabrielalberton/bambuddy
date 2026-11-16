@@ -358,9 +358,9 @@ material, `KValueLine` (opcional) e trilha da barra por último.
 ### Dados importados da Bambu Cloud (2026-11-16, uma vez, sem código no repo)
 
 - **Histórico**: 32 impressões de `user-service/my/tasks`, de 2026-10-21 a 11-10.
-  - Viraram `print_archives` no formato do upstream para impressão sem 3MF: `file_path=''` e `extra_data.no_3mf_available`, mais `source=bambu_cloud_history` e `cloud_task_id` (também em `subtask_id`).
+  - Viraram `print_archives` sem 3MF (`file_path=''`). Usam `extra_data.imported_without_3mf`, e não o `no_3mf_available` do upstream, porque esse dispara o aviso de "Armazenar arquivos no SD" dos últimos 30 dias. Também levam `source=bambu_cloud_history` e `cloud_task_id` (repetido em `subtask_id`).
   - Cada uma tem a miniatura da nuvem, a `print_log_entries` correspondente (estatísticas) e uma linha em `spool_usage_history` por cor.
   - Nas 10 que falharam, o gasto é estimado pela fração do tempo decorrido.
   - Scripts em `/tmp/bbui/import_cloud.py`, `import_log.py` e `fix_failed.py`.
   - Backup prévio: `/app/data/bambuddy.db.bak-20261116-antes-import-nuvem`.
-- **Carretéis**: pesados em 2026-11-16 (`weight_locked`). Os carretéis 5 (laranja) e 6 (preto) foram criados a partir do histórico da nuvem.
+- **Carretéis**: pesados em 2026-11-16 (`weight_locked`). `last_scale_weight` é **inteiro** no schema: gravar com decimal dá 500 em `GET /inventory/spools`. Os carretéis 5 (laranja) e 6 (preto) foram criados a partir do histórico da nuvem.
