@@ -67,7 +67,7 @@ export function createTwin(container, opts) {
   let pr = PR_MAX;
   renderer.setPixelRatio(pr);
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 0.95;
+  renderer.toneMappingExposure = 0.82;
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFShadowMap;
@@ -79,9 +79,9 @@ export function createTwin(container, opts) {
   const envTex = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
   pmrem.dispose();
   scene.environment = envTex;
-  scene.environmentIntensity = 1.25;
+  scene.environmentIntensity = 0.7;
 
-  const key = new THREE.DirectionalLight(0xfff2e0, 3.4);
+  const key = new THREE.DirectionalLight(0xfff2e0, 2.4);
   key.position.set(330, 620, 420);
   key.castShadow = true;
   key.shadow.mapSize.set(isMobile ? 1024 : 2048, isMobile ? 1024 : 2048);
