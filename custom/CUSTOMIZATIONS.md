@@ -331,3 +331,10 @@ material, `KValueLine` (opcional) e trilha da barra por último.
 ## Inventário sem ações raras (2026-11-16)
 
 - `frontend/src/pages/InventoryPage.tsx` (+3/−1): com `minimalInventory()` ligado, some o subtítulo e os botões Importar/Exportar CSV, Locais, Fornecedores, Imprimir etiquetas e Atribuir por QR; fica só "Adicionar Carretel". Religar: `localStorage['custom.minimalInventory']='off'`.
+
+## Card compacto da impressora (2026-11-16)
+
+- `frontend/src/custom/printer/compactCard.ts` (+ `compactCard.css`): interruptor `compactCard(single)` (só modo impressora única; `localStorage['custom.compactCard']='off'` desliga).
+- `frontend/src/pages/PrintersPage.tsx` (~13 ganchos de 1 linha, todos com `compactCard(single)`, comentário `custom(compact-card)`): selos de conexão/HMS/IA/manutenção/firmware só com problema; diâmetro do bico no rótulo do tile Bico (no lugar do selo); ventiladores só imprimindo ou girando; sem título "Controles" e sem a luz duplicada; parada mostra mover + verificação de placa, imprimindo mostra velocidade + Pausar + Parar.
+  Acima do limite de ~10 linhas: são pontos distintos do mesmo card, cada um uma condição de uma linha; juntar tudo exigiria copiar o card.
+- `frontend/src/custom/camera/inlineCamera.css`: barra da câmera sem recarregar, diagnóstico, abrir em janela e botões desativados.

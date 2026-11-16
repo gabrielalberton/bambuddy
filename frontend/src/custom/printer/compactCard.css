@@ -1,0 +1,4 @@
+/* Linha de selos vazia (tudo normal): some sem deixar margem. */
+.mt-2:has(> .flex.flex-wrap.items-center.gap-2:empty) {
+  display: none;
+}

@@ -90,6 +90,7 @@ import { useTranslation } from 'react-i18next';
 import { useSinglePrinter } from '../custom/useSinglePrinter';
 import { InlineCamera } from '../custom/camera/InlineCamera';
 import { NozzleSizeBadge, PrintHoursTile } from '../custom/printer/CardExtras';
+import { compactCard, isPrintingState } from '../custom/printer/compactCard';
 import { InHeader } from '../custom/layout/HeaderSlot';
 import { headerStatusEnabled } from '../custom/layout/headerFlags';
 import { useFilamentListClass } from '../custom/printer/filamentList';
@@ -4083,7 +4084,7 @@ function PrinterCard({
                   <Wrench className="w-[var(--pc-i3,0.75rem)] h-[var(--pc-i3,0.75rem)]" />
                   {t('printers.maintenance.pillLabel')}
                 </span>
-              ) : (
+              ) : compactCard(single) && status?.connected ? null : ( // custom(compact-card)
                 <span
                   className={`flex items-center gap-1.5 px-2 py-1 rounded-full text-xs ${
                     status?.connected
@@ -4143,6 +4144,7 @@ function PrinterCard({
               {/* HMS Status Indicator */}
               {status?.connected && (() => {
                 const knownErrors = status.hms_errors ? filterKnownHMSErrors(status.hms_errors) : [];
+                if (compactCard(single) && knownErrors.length === 0) return null; // custom(compact-card)
                 return (
                   <button
                     onClick={() => setShowHMSModal(true)}
@@ -4165,6 +4167,7 @@ function PrinterCard({
                   "Idle" outside a monitored print, class-colored during one. */}
               {aiDetectionEnabled && (() => {
                 const cls = aiDetectionClass(aiDetection);
+                if (compactCard(single) && ['idle', 'safe', 'unknown'].includes(cls)) return null; // custom(compact-card)
                 const colorClass =
                   cls === 'failure'
                     ? 'bg-status-error/20 text-status-error'
@@ -4213,7 +4216,7 @@ function PrinterCard({
                 );
               })()}
               {/* Maintenance Status Indicator */}
-              {maintenanceInfo && (
+              {maintenanceInfo && !(compactCard(single) && !maintenanceInfo.due_count && !maintenanceInfo.warning_count) && ( // custom(compact-card)
                 <button
                   onClick={() => navigate('/maintenance')}
                   className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs cursor-pointer hover:opacity-80 transition-opacity ${
@@ -4247,7 +4250,7 @@ function PrinterCard({
                 </button>
               )}
               {/* Firmware Version Badge */}
-              {checkPrinterFirmware && firmwareInfo?.current_version && firmwareInfo?.latest_version ? (
+              {checkPrinterFirmware && firmwareInfo?.current_version && firmwareInfo?.latest_version && !(compactCard(single) && !firmwareInfo.update_available) ? ( // custom(compact-card)
                 <button
                   onClick={() => setShowFirmwareModal(true)}
                   className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs hover:opacity-80 transition-opacity ${
@@ -4284,7 +4287,7 @@ function PrinterCard({
                   {status.door_open ? <DoorOpen className="w-[var(--pc-i3,0.75rem)] h-[var(--pc-i3,0.75rem)]" /> : <DoorClosed className="w-[var(--pc-i3,0.75rem)] h-[var(--pc-i3,0.75rem)]" />}
                 </span>
               )}
-              {single && <NozzleSizeBadge diameters={installedNozzleDiameters(status)} type={status?.nozzles?.[0]?.nozzle_type} />}
+              {single && !compactCard(single) && <NozzleSizeBadge diameters={installedNozzleDiameters(status)} type={status?.nozzles?.[0]?.nozzle_type} />}
               </div>
             </div>
           )}
@@ -4770,6 +4773,7 @@ function PrinterCard({
                           <div className="cursor-default">
                             <p data-testid="nozzle-temp-label" className="text-[length:var(--pc-t9,9px)] text-bambu-gray">
                               {mountedHotend !== null ? t('printers.temperatures.mounted', { n: mountedHotend }) : t('printers.temperatures.nozzle')}
+                              {compactCard(single) && installedNozzleDiameters(status).length > 0 && ` · ${installedNozzleDiameters(status).join(' / ')}`}
                             </p>
                             <p className="text-[length:var(--pc-t11,11px)] text-white">
                               {Math.round(status.temperatures.nozzle || 0)}°C
@@ -4962,6 +4966,7 @@ function PrinterCard({
                     )}
                     {single && <PrintHoursTile hours={maintenanceInfo?.total_print_hours} />}
                   </div>
+                  {!(compactCard(single) && !isPrintingState(status.state) && fanItems.every((f) => !f.value)) && ( // custom(compact-card)
                   <div className="mt-2 flex items-center gap-1.5">
                     {fanItems.map(({ key, label, value, Icon, activeClass }) => {
                       const active = value > 0;
@@ -4994,6 +4999,7 @@ function PrinterCard({
                       );
                     })}
                   </div>
+                  )}
                 </>
               );
             })()}
@@ -5014,7 +5020,7 @@ function PrinterCard({
               return (
                 <div className="mt-3">
                   {/* Section Header */}
-                  <div className="flex items-center gap-2 mb-2">
+                  <div className={compactCard(single) ? 'hidden' : 'flex items-center gap-2 mb-2'}>
                     <span className="text-[length:var(--pc-t10,10px)] uppercase tracking-wider text-bambu-gray font-medium">
                       {t('printers.controls')}
                     </span>
@@ -5024,6 +5030,7 @@ function PrinterCard({
                   <div className="flex flex-wrap items-start justify-between gap-x-2 gap-y-2">
                     {/* Left: Secondary controls */}
                     <div className="flex flex-wrap items-center gap-2 min-w-0">
+                      {!compactCard(single) && ( // custom(compact-card): a luz fica na barra da câmera
                       <button
                         onClick={() => chamberLightMutation.mutate(!status.chamber_light)}
                         disabled={!status.connected || chamberLightMutation.isPending || !hasPermission('printers:control')}
@@ -5036,6 +5043,7 @@ function PrinterCard({
                       >
                         <ChamberLight on={status.chamber_light ?? false} className="w-[var(--pc-i4,1rem)] h-[var(--pc-i4,1rem)]" />
                       </button>
+                      )}
 
                       {/* Airduct Mode (P2S / X2D / H2* / H3C, an H2D Pro stored as "H2D Pro", #3335) */}
                       {(['P2S', 'X2D', 'H2D', 'H2D Pro', 'H2C', 'H2S', 'H3C'].includes(printer.model ?? '')) && (() => {
@@ -5088,6 +5096,7 @@ function PrinterCard({
                       {(() => {
                         const canControl = hasPermission('printers:control');
                         const disabled = isPrinting || !canControl;
+                        if (compactCard(single) && isPrinting) return null; // custom(compact-card)
                         const jogButtonClass = 'flex h-8 w-8 items-center justify-center rounded bg-indigo-100 dark:bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 transition-colors hover:bg-indigo-200 dark:hover:bg-indigo-500/30 disabled:cursor-not-allowed disabled:opacity-50';
                         // Which part the Z axis moves (#1334). The endpoint takes a signed
                         // nozzle-bed gap that means the same thing on every printer, so the
@@ -5263,7 +5272,7 @@ function PrinterCard({
                         );
                       })()}
 
-                      <div className={`inline-flex rounded-lg ${printer.plate_detection_enabled ? 'ring-1 ring-green-500' : ''}`}>
+                      <div className={`inline-flex rounded-lg ${printer.plate_detection_enabled ? 'ring-1 ring-green-500' : ''} ${compactCard(single) && isPrinting ? 'hidden' : ''}`}>
                         <button
                           onClick={handleTogglePlateDetection}
                           disabled={!status.connected || plateDetectionMutation.isPending || !hasPermission('printers:update')}
@@ -5299,7 +5308,7 @@ function PrinterCard({
                       </div>
 
                       {/* Print Speed */}
-                      {(() => (
+                      {!(compactCard(single) && !isPrinting) && (() => (
                         <div className="relative">
                           <button
                             data-testid="speed-control"
@@ -5348,7 +5357,7 @@ function PrinterCard({
                     </div>
 
                     {/* Right: Print Control Buttons */}
-                    <div className="ml-auto flex items-center justify-end gap-2 flex-shrink-0">
+                    <div className={compactCard(single) && !isPrinting ? 'hidden' : 'ml-auto flex items-center justify-end gap-2 flex-shrink-0'}>
                       {/* Pause/Resume button */}
                       {(() => {
                         const pauseUnavailable = !isPrinting || isControlBusy || !hasPermission('printers:control');

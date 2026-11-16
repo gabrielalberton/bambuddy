@@ -35,3 +35,11 @@
 [data-custom-inline-camera]:has(.custom-camera-pair[data-layout='split']) {
   height: var(--camera-split-height) !important;
 }
+/* Card compacto: a barra da câmera fica com luz, ignorar objetos (só imprimindo), tela cheia e fechar.
+   Recarregar e diagnóstico continuam no aviso de erro do próprio vídeo; abrir em janela não faz sentido no PWA. */
+[data-custom-inline-camera] .cursor-grab button:has(> svg.lucide-refresh-cw),
+[data-custom-inline-camera] .cursor-grab button:has(> svg.lucide-stethoscope),
+[data-custom-inline-camera] .cursor-grab button:has(> svg.lucide-external-link),
+[data-custom-inline-camera] .cursor-grab button:disabled {
+  display: none !important;
+}
