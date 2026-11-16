@@ -32,6 +32,7 @@ from backend.app.api.routes.makerworld import _map_service_error, import_instanc
 from backend.app.core.auth import (
     ApiKeyActor,
     RequestActor,
+    is_auth_enabled,
     require_actor_still_exists,
     require_auth_if_enabled,
     require_ownership_permission,
@@ -44,11 +45,13 @@ from backend.app.core.row_visibility import owned_row_clauses
 from backend.app.models.library import LibraryFile
 from backend.app.models.user import User
 from backend.app.schemas.makerworld import MakerWorldImportRequest
+from backend.app.services.bambu_cloud_credentials import get_stored_token
 from backend.app.services.library_folder_access import default_import_folder, get_writable_folder
 from backend.app.services.model_providers.base import ProviderError
 
 from .base import BrowseRequest, CatalogSource, ReviewsRequest
 from .makerworld import MakerWorldSource
+from .mine import MineKind, my_designs
 from .printables import PrintablesSource
 from .printer_models import display_name, makerworld_codes, printables_ids, resolve_models
 from .thingiverse import ThingiverseSource
@@ -135,6 +138,29 @@ async def list_sources(printer_models: list[str] | None = Query(default=None)):
         "makerworld_codes": makerworld_codes(models),
         "printables_printer_ids": printables_ids(models),
     }
+
+
+@router.get("/makerworld/mine/{kind}", dependencies=[Depends(require_auth_if_enabled)])
+async def my_makerworld(
+    kind: MineKind,
+    offset: int = Query(default=0, ge=0, le=5000),
+    limit: int = Query(default=24, ge=1, le=60),
+    db: AsyncSession = Depends(get_db, scope="function"),
+    credentials: HTTPAuthorizationCredentials | None = Depends(security),
+    x_api_key: str | None = Header(default=None, alias="X-API-Key"),
+    api_key_cloud_owner: User | None = Depends(resolve_api_key_cloud_owner),
+):
+    """Curtidos/salvos do próprio usuário no MakerWorld (credencial Bambu Cloud salva; sem cache compartilhado)."""
+    get_source("makerworld")
+    user = await require_permission_if_auth_enabled(Permission.MAKERWORLD_VIEW)(
+        credentials=credentials, x_api_key=x_api_key
+    )
+    identity = user if user is not None else api_key_cloud_owner
+    token = None
+    if identity is not None or not await is_auth_enabled(db):
+        token, _email, _region = await get_stored_token(db, identity)
+    async with httpx.AsyncClient(timeout=30) as client:
+        return await my_designs(client, token, kind, offset, limit)
 
 
 @router.get("/{source_id}/browse", dependencies=[Depends(require_auth_if_enabled)])
@@ -393,7 +419,12 @@ def _push_save_result(actor, source_id: str, saved: SavedFile | None, error: str
 
         user_ids = [actor.id] if isinstance(actor, User) else None
         if saved is not None:
-            title, body, url, tag = "Modelo salvo na biblioteca", saved.filename, "/files", f"catalog-save-{saved.library_file_id}"
+            title, body, url, tag = (
+                "Modelo salvo na biblioteca",
+                saved.filename,
+                "/files",
+                f"catalog-save-{saved.library_file_id}",
+            )
         else:
             title, body, url, tag = f"Catálogo ({source_id})", error or "", "/model-sources", "catalog-save-error"
         task = asyncio.get_running_loop().create_task(notify(user_ids, title, body, url, tag))

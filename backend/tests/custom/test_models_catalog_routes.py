@@ -20,7 +20,7 @@ def test_routes_sit_before_spa_catch_all():
 
     paths = [getattr(r, "path", "") for r in app.router.routes]
     custom = [i for i, p in enumerate(paths) if p.startswith(BASE)]
-    assert len(custom) == 9
+    assert len(custom) == 10
     assert max(custom) < paths.index("/{full_path:path}")
 
 

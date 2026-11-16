@@ -1,6 +1,7 @@
 import { ApiError, getAuthToken } from '../../api/client';
 import type {
   CatalogAuthorResponse,
+  CatalogMineKind,
   CatalogBrowseParams,
   CatalogBrowseResponse,
   CatalogDetail,
@@ -59,6 +60,8 @@ export const catalogApi = {
       `/${source}/author/${encodeURIComponent(authorId)}?${new URLSearchParams({ offset: String(offset), limit: String(limit) })}`,
       { signal },
     ),
+  mine: (kind: CatalogMineKind, offset: number, limit: number, signal?: AbortSignal) =>
+    call<CatalogAuthorResponse>(`/makerworld/mine/${kind}?${new URLSearchParams({ offset: String(offset), limit: String(limit) })}`, { signal }),
   reviews: (source: CatalogSourceId, id: string, kind: CatalogReviewKind, sort: CatalogReviewSort, page: number, signal?: AbortSignal) =>
     call<CatalogReviewsResponse>(
       `/${source}/${encodeURIComponent(id)}/reviews?${new URLSearchParams({ kind, sort, page: String(page) })}`,

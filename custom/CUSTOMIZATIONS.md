@@ -338,3 +338,29 @@ material, `KValueLine` (opcional) e trilha da barra por último.
 - `frontend/src/pages/PrintersPage.tsx` (~13 ganchos de 1 linha, todos com `compactCard(single)`, comentário `custom(compact-card)`): selos de conexão/HMS/IA/manutenção/firmware só com problema; diâmetro do bico no rótulo do tile Bico (no lugar do selo); ventiladores só imprimindo ou girando; sem título "Controles" e sem a luz duplicada; parada mostra mover + verificação de placa, imprimindo mostra velocidade + Pausar + Parar.
   Acima do limite de ~10 linhas: são pontos distintos do mesmo card, cada um uma condição de uma linha; juntar tudo exigiria copiar o card.
 - `frontend/src/custom/camera/inlineCamera.css`: barra da câmera sem recarregar, diagnóstico, abrir em janela e botões desativados.
+
+## Meu MakerWorld: curtidos e salvos no catálogo (2026-11-16)
+
+- O que faz: o botão ♥ "Meu MakerWorld" na barra do catálogo abre a lista de modelos que o usuário curtiu ou salvou no MakerWorld, com abas **Curtidos** e **Salvos**. O estado fica na URL (`?mine=likes|saved`), então o voltar do celular fecha a lista.
+- Backend: `backend/app/custom/models_catalog/mine.py` e a rota `GET /api/v1/custom/models/makerworld/mine/{likes|saved}`, em `router.py`.
+  - Usa a credencial Bambu Cloud salva do próprio usuário (`get_stored_token`), contra `api.bambulab.com`:
+    - `design-service/my/design/like`;
+    - `design-service/favorites/designs/{uid}`, com o uid de `user-service/my/profile`.
+  - Não passa pelo cache compartilhado do catálogo.
+  - Sem login ou com a sessão expirada, responde 409 com uma mensagem, nunca 401.
+- Frontend: `AuthorView` aceita `mine`/`onMine`. O `ModelCatalog` tem o botão e o parâmetro `mine`. Os textos estão em `i18n.ts`, e `catalogApi.mine` em `api.ts`.
+- Nenhum arquivo do upstream foi alterado.
+- Testes:
+  - `backend/tests/custom/test_models_catalog_mine.py`;
+  - o teste de contagem de rotas em `test_models_catalog_routes.py`, de 9 para 10;
+  - em `modelCatalog.test.tsx`, o teste "Meu MakerWorld".
+
+### Dados importados da Bambu Cloud (2026-11-16, uma vez, sem código no repo)
+
+- **Histórico**: 32 impressões de `user-service/my/tasks`, de 2026-10-21 a 11-10.
+  - Viraram `print_archives` no formato do upstream para impressão sem 3MF: `file_path=''` e `extra_data.no_3mf_available`, mais `source=bambu_cloud_history` e `cloud_task_id` (também em `subtask_id`).
+  - Cada uma tem a miniatura da nuvem, a `print_log_entries` correspondente (estatísticas) e uma linha em `spool_usage_history` por cor.
+  - Nas 10 que falharam, o gasto é estimado pela fração do tempo decorrido.
+  - Scripts em `/tmp/bbui/import_cloud.py`, `import_log.py` e `fix_failed.py`.
+  - Backup prévio: `/app/data/bambuddy.db.bak-20261116-antes-import-nuvem`.
+- **Carretéis**: pesados em 2026-11-16 (`weight_locked`). Os carretéis 5 (laranja) e 6 (preto) foram criados a partir do histórico da nuvem.

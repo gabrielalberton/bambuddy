@@ -126,6 +126,27 @@ describe('aba Catálogo', () => {
     );
   });
 
+  it('Meu MakerWorld: abre curtidos e troca para salvos', async () => {
+    mockCatalog();
+    mockPrinterList([printerA1]);
+    const kinds: string[] = [];
+    server.use(
+      http.get('*/api/v1/custom/models/makerworld/mine/:kind', ({ params }) => {
+        kinds.push(String(params.kind));
+        const title = params.kind === 'likes' ? 'Liked model' : 'Saved model';
+        return HttpResponse.json({ items: [card('makerworld', '42', title)], total: 1, has_more: false, author: { id: params.kind, name: null } });
+      }),
+    );
+    render(<ModelSourcesPage />);
+    await screen.findByText('makerworld model');
+    fireEvent.click(screen.getByRole('button', { name: 'My MakerWorld' }));
+    expect(await screen.findByText('Liked model')).not.toBeNull();
+    expect(screen.getByRole('tab', { name: 'Liked' }).getAttribute('aria-selected')).toBe('true');
+    fireEvent.click(screen.getByRole('tab', { name: 'Saved' }));
+    expect(await screen.findByText('Saved model')).not.toBeNull();
+    expect(kinds).toEqual(['likes', 'saved']);
+  });
+
   it('é a primeira aba e a padrão; a aba do importador MakerWorld continua', async () => {
     store.set('custom.catalogSourcesHeader', 'on');
     mockCatalog();

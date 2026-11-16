@@ -142,6 +142,9 @@ export interface CatalogBrowseParams {
   authorPrinter: boolean;
 }
 
+/** Curtidos / salvos do próprio usuário no MakerWorld. */
+export type CatalogMineKind = 'likes' | 'saved';
+
 export interface CatalogAuthorResponse {
   items: CatalogCard[];
   total: number | null;

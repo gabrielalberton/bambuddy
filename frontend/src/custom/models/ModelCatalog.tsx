@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, Search } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Heart, Search } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { catalogApi } from './api';
 import { useCatalogT } from './i18n';
@@ -11,7 +11,7 @@ import { controlClass, sourceName } from './constants';
 import { CatalogError, Switch } from './shared';
 import { ModelCard } from './ModelCard';
 import { AuthorView } from './AuthorView';
-import type { CatalogCard, CatalogSort, CatalogSourceId, CatalogSourceInfo } from './types';
+import type { CatalogCard, CatalogMineKind, CatalogSort, CatalogSourceId, CatalogSourceInfo } from './types';
 import { usePrinterModels } from './usePrinterModels';
 import { AUTHOR_PRINTER_KEY, PRINTER_FILTER_KEY, readBool, writeBool } from './utils';
 
@@ -65,6 +65,8 @@ export function ModelCatalog() {
   const modelSource = params.get('msrc') as CatalogSourceId | null;
   const author = params.get('author');
   const authorSource = params.get('asrc') as CatalogSourceId | null;
+  const mineParam = params.get('mine');
+  const mine: CatalogMineKind | null = mineParam === 'likes' || mineParam === 'saved' ? mineParam : null;
   const [input, setInput] = useState(query);
 
   useEffect(() => {
@@ -127,6 +129,18 @@ export function ModelCatalog() {
       next.delete('aname');
       return next;
     });
+  // "Meu MakerWorld": abrir empilha (o voltar fecha); trocar curtidos/salvos só substitui.
+  const setMine = (kind: CatalogMineKind | null, push: boolean) =>
+    setParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.set('tab', 'catalog');
+        if (kind) next.set('mine', kind);
+        else next.delete('mine');
+        return next;
+      },
+      { replace: !push },
+    );
   const closeModel = () =>
     setParams((prev) => {
       const next = new URLSearchParams(prev);
@@ -156,6 +170,20 @@ export function ModelCatalog() {
         authorId={author}
         name={params.get('aname')}
         onBack={() => goBack(closeAuthor)}
+        onOpen={openModel}
+      />
+    );
+  }
+
+  if (mine && enabled.some((s) => s.id === 'makerworld') && hasPermission('makerworld:view')) {
+    return (
+      <AuthorView
+        source="makerworld"
+        authorId={mine}
+        name={null}
+        mine={mine}
+        onMine={(kind) => setMine(kind, false)}
+        onBack={() => goBack(() => setMine(null, false))}
         onOpen={openModel}
       />
     );
@@ -224,6 +252,12 @@ export function ModelCatalog() {
             </select>
           </label>
           {current !== 'all' && <Categories source={current} value={category} onChange={(v) => change('cat', v)} />}
+          {enabled.some((s) => s.id === 'makerworld') && hasPermission('makerworld:view') && (
+            <button type="button" className={controlClass} onClick={() => setMine('likes', true)} aria-label={t('mine')} title={t('mine')}>
+              <Heart className="h-4 w-4" aria-hidden="true" />
+              <span className="hidden sm:inline">{t('mine')}</span>
+            </button>
+          )}
           <MakerworldImportButton />
         </div>
       </div>
