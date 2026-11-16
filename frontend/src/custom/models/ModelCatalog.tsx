@@ -177,7 +177,7 @@ export function ModelCatalog() {
             value={current}
             onChange={(e) => change('src', e.target.value === 'all' ? '' : e.target.value)}
             aria-label={t('sources')}
-            className={`${controlClass} w-28 shrink-0 truncate bg-bambu-dark-secondary px-2 md:w-40`}
+            className={`${controlClass} w-36 shrink-0 truncate bg-bambu-dark-secondary px-2 md:w-40`}
           >
             {enabled.length > 1 && <option value="all">{t('allSources')}</option>}
             {enabled.map((s) => (
