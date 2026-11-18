@@ -45,6 +45,7 @@ import { formatFileSize } from '../utils/file';
 import { invalidateArchiveAndProjectViews } from '../utils/projectQueries';
 import { isSlicedFile, openInSlicerWithToken, resolveDesktopSlicer } from '../utils/slicer';
 import { verdictSourceKey } from '../utils/verdictSource';
+import { MakerworldSourceLink } from '../custom/archives/SourceLink';
 
 const RUN_STATUS_CLASSES: Record<string, string> = {
   completed: 'bg-bambu-green/20 text-bambu-green',
@@ -472,9 +473,7 @@ export function ArchiveDetailModal({ archiveId, onClose }: { archiveId: number; 
                 <div className="min-w-0">
                   <dt className="text-bambu-gray">{t('archivePage.source')}</dt>
                   <dd>
-                    <a href={archive.makerworld_url} target="_blank" rel="noopener noreferrer" className="text-bambu-green hover:underline">
-                      MakerWorld
-                    </a>
+                    <MakerworldSourceLink url={archive.makerworld_url} />{/* custom(archive-source) */}
                   </dd>
                 </div>
               )}

@@ -364,3 +364,8 @@ material, `KValueLine` (opcional) e trilha da barra por último.
   - Scripts em `/tmp/bbui/import_cloud.py`, `import_log.py` e `fix_failed.py`.
   - Backup prévio: `/app/data/bambuddy.db.bak-20261116-antes-import-nuvem`.
 - **Carretéis**: pesados em 2026-11-16 (`weight_locked`). `last_scale_weight` é **inteiro** no schema: gravar com decimal dá 500 em `GET /inventory/spools`. Os carretéis 5 (laranja) e 6 (preto) foram criados a partir do histórico da nuvem.
+
+## Origem MakerWorld abre no catálogo interno (`custom(archive-source)`, 2026-11-18)
+
+- `frontend/src/components/ArchiveDetailModal.tsx`: import após `verdictSourceKey`; o `<a href={archive.makerworld_url} target="_blank">MakerWorld</a>` do campo "Origem" vira `<MakerworldSourceLink url=... />` (+2/−3).
+- `frontend/src/custom/archives/SourceLink.tsx`: link de modelo do MakerWorld → `/model-sources?tab=catalog&model=<id>&msrc=makerworld` (mesmo detalhe interno do catálogo; "voltar" retorna ao arquivo). Outros links continuam externos. Teste: `custom/__tests__/archiveSourceLink.test.tsx`.
