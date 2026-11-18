@@ -1,4 +1,6 @@
-import { Clock } from 'lucide-react';
+import { Clock, Layers } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 
 /**
  * Modo impressora única: pedaços que saem da linha "0.4mm · 🕒 10h" do cabeçalho do card.
@@ -25,5 +27,23 @@ export function NozzleSizeBadge({ diameters, type }: { diameters: Array<number |
     >
       {diameters.join(' / ')}mm
     </span>
+  );
+}
+
+/** Itens na fila: no card compacto sai da linha de selos e vai para a linha de controles, ao lado da verificação de placa. */
+export function QueueChip({ count }: { count: number }) {
+  const { t } = useTranslation();
+  const navigate = useNavigate();
+  if (!count || count <= 0) return null;
+  return (
+    <button
+      onClick={() => navigate('/queue')}
+      className="flex h-8 items-center gap-1 px-2.5 rounded-lg text-xs bg-indigo-100 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-400 hover:opacity-80 transition-opacity"
+      title={t('printers.queue.inQueue', { count })}
+      data-testid="custom-queue-chip"
+    >
+      <Layers className="w-[var(--pc-i4,1rem)] h-[var(--pc-i4,1rem)]" />
+      {count}
+    </button>
   );
 }

@@ -2,3 +2,30 @@
 .mt-2:has(> .flex.flex-wrap.items-center.gap-2:empty) {
   display: none;
 }
+
+/* Modo impressora única (o card tem a câmera embutida): menos margem lateral, câmera + 3D ficam maiores. */
+[id^='printer-card-']:has([data-custom-inline-camera]) > .p-4,
+[id^='printer-card-']:has([data-custom-inline-camera]) > .p-5,
+[id^='printer-card-']:has([data-custom-inline-camera]) > .p-6 {
+  padding-left: 0.5rem;
+  padding-right: 0.5rem;
+}
+
+/* Controles de movimento: em vez de popover, abre/fecha dentro do card, logo abaixo da linha de botões. */
+[data-custom-jog]:has(> .fixed) {
+  display: contents;
+}
+[data-custom-jog] > .fixed {
+  display: none;
+}
+[data-custom-jog] > .absolute {
+  position: static !important;
+  order: 99;
+  flex-basis: 100%;
+  width: 100% !important;
+  margin: 0.25rem 0 0 !important;
+  box-shadow: none !important;
+}
+.flex-wrap:has(> [data-custom-jog] > .absolute) {
+  flex-basis: 100%;
+}

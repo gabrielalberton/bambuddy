@@ -89,7 +89,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { useSinglePrinter } from '../custom/useSinglePrinter';
 import { InlineCamera } from '../custom/camera/InlineCamera';
-import { NozzleSizeBadge, PrintHoursTile } from '../custom/printer/CardExtras';
+import { NozzleSizeBadge, PrintHoursTile, QueueChip } from '../custom/printer/CardExtras';
 import { compactCard, isPrintingState } from '../custom/printer/compactCard';
 import { InHeader } from '../custom/layout/HeaderSlot';
 import { headerStatusEnabled } from '../custom/layout/headerFlags';
@@ -4239,7 +4239,7 @@ function PrinterCard({
                 </button>
               )}
               {/* Queue Count Badge */}
-              {queueCount > 0 && (
+              {queueCount > 0 && !compactCard(single) && ( // custom(compact-card): vai para a linha de controles
                 <button
                   onClick={() => navigate('/queue')}
                   className="flex items-center gap-1 px-2 py-1 rounded-full text-xs bg-indigo-100 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-400 hover:opacity-80 transition-opacity"
@@ -5119,7 +5119,7 @@ function PrinterCard({
                           extruderJogMutation.mutate(distance);
                         };
                         return (
-                          <div className="relative">
+                          <div className="relative" data-custom-jog={compactCard(single) ? '' : undefined}>
                             <button
                               onClick={() => setShowBedJogMenu(showBedJogMenu === printer.id ? null : printer.id)}
                               disabled={disabled}
@@ -5306,6 +5306,7 @@ function PrinterCard({
                           )}
                         </button>
                       </div>
+                      {compactCard(single) && <QueueChip count={queueCount} />}
 
                       {/* Print Speed */}
                       {!(compactCard(single) && !isPrinting) && (() => (
