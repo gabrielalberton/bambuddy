@@ -38,6 +38,19 @@ const en = {
     bannerDismiss: 'Not now',
     error: 'Error: {{error}}',
   },
+  custom: {
+    prefs: {
+      nozzleTitle: 'Configured nozzle (tap to change)',
+      nozzleHint: 'Which nozzle is installed?',
+      nozzleBusy: 'The nozzle cannot be changed while printing',
+      nozzleSet: 'Nozzle set: {{d}} mm',
+      speedDefaultTitle: 'Speed for the next print',
+      speedNowHint: 'Changes now',
+      speedNextHint: 'Applies to the next print, from layer {{layer}}',
+      speedNow: 'Speed: {{mode}}',
+      speedNext: 'Next print at {{mode}}',
+    },
+  },
 };
 
 export default en;

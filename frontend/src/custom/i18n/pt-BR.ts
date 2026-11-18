@@ -38,6 +38,19 @@ const ptBR = {
     bannerDismiss: 'Agora não',
     error: 'Erro: {{error}}',
   },
+  custom: {
+    prefs: {
+      nozzleTitle: 'Bico configurado (toque para trocar)',
+      nozzleHint: 'Qual bico está montado?',
+      nozzleBusy: 'Não dá para trocar o bico durante a impressão',
+      nozzleSet: 'Bico configurado: {{d}} mm',
+      speedDefaultTitle: 'Velocidade da próxima impressão',
+      speedNowHint: 'Muda agora',
+      speedNextHint: 'Vale para a próxima impressão, a partir da camada {{layer}}',
+      speedNow: 'Velocidade: {{mode}}',
+      speedNext: 'Próxima impressão em {{mode}}',
+    },
+  },
 };
 
 export default ptBR;

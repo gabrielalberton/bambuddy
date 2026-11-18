@@ -90,6 +90,7 @@ import { useTranslation } from 'react-i18next';
 import { useSinglePrinter } from '../custom/useSinglePrinter';
 import { InlineCamera } from '../custom/camera/InlineCamera';
 import { NozzleSizeBadge, PrintHoursTile, QueueChip } from '../custom/printer/CardExtras';
+import { PrinterPrefsChips } from '../custom/printer/PrinterPrefsChips'; // custom(printer-prefs)
 import { compactCard, isPrintingState } from '../custom/printer/compactCard';
 import { InHeader } from '../custom/layout/HeaderSlot';
 import { headerStatusEnabled } from '../custom/layout/headerFlags';
@@ -5307,9 +5308,10 @@ function PrinterCard({
                         </button>
                       </div>
                       {compactCard(single) && <QueueChip count={queueCount} />}
+                      {compactCard(single) && <PrinterPrefsChips printerId={printer.id} isPrinting={isPrinting} speedLevel={status?.speed_level} nozzleDiameter={status?.nozzles?.[0]?.nozzle_diameter} canControl={hasPermission('printers:control')} onToast={showToast} />}
 
                       {/* Print Speed */}
-                      {!(compactCard(single) && !isPrinting) && (() => (
+                      {!compactCard(single) && (() => (
                         <div className="relative">
                           <button
                             data-testid="speed-control"

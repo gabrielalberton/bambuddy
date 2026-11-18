@@ -15,6 +15,7 @@ import { SpoolBuddyLayout } from './components/spoolbuddy/SpoolBuddyLayout';
 import { PageLoading } from './components/PageLoading';
 import { AuthRetrying } from './components/AuthRetrying';
 import { lazyPage } from './utils/lazyPage';
+import { ChunkErrorFallback, isChunkLoadError } from './custom/app/chunkRecovery'; // custom(chunk-recovery)
 
 // Every page loads as its own file when first opened (#3175).
 const PrintersPage = lazyPage(() => import('./pages/PrintersPage'), 'PrintersPage');
@@ -62,6 +63,7 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | 
   }
 
   render() {
+    if (this.state.error && isChunkLoadError(this.state.error)) return <ChunkErrorFallback />; // custom(chunk-recovery)
     if (this.state.error) {
       return (
         <div style={{ padding: 24, color: '#ef4444', backgroundColor: '#18181b', minHeight: '100vh', fontFamily: 'monospace' }}>
@@ -71,7 +73,7 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | 
             {this.state.error.stack}
           </pre>
           <button
-            onClick={() => { this.setState({ error: null, errorInfo: null }); }}
+            onClick={() => { window.location.reload(); }} /* custom(chunk-recovery): lazy guarda a promessa que falhou */
             style={{ marginTop: 16, padding: '8px 16px', backgroundColor: '#3b82f6', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer' }}
           >
             Retry

@@ -38,6 +38,15 @@ def install(app: FastAPI) -> list[str]:
 
     app.include_router(camera_preview_router, prefix=app_settings.api_prefix)
     add_public_prefix(app_settings.api_prefix)
+    # Bico e velocidade no card (custom/CUSTOMIZATIONS.md, printer-prefs)
+    from .printer_prefs.router import StartApplierMiddleware, router as printer_prefs_router
+
+    app.include_router(printer_prefs_router, prefix=app_settings.api_prefix)
+    if not any(m.cls is StartApplierMiddleware for m in app.user_middleware):
+        try:
+            app.add_middleware(StartApplierMiddleware)
+        except RuntimeError:  # app já iniciado (testes): o vigia sobe no 1º GET /prefs
+            pass
     from .draco_worker_csp import allow_draco_worker
 
     allow_draco_worker()

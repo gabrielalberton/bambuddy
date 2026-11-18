@@ -369,3 +369,30 @@ material, `KValueLine` (opcional) e trilha da barra por último.
 
 - `frontend/src/components/ArchiveDetailModal.tsx`: import após `verdictSourceKey`; o `<a href={archive.makerworld_url} target="_blank">MakerWorld</a>` do campo "Origem" vira `<MakerworldSourceLink url=... />` (+2/−3).
 - `frontend/src/custom/archives/SourceLink.tsx`: link de modelo do MakerWorld → `/model-sources?tab=catalog&model=<id>&msrc=makerworld` (mesmo detalhe interno do catálogo; "voltar" retorna ao arquivo). Outros links continuam externos. Teste: `custom/__tests__/archiveSourceLink.test.tsx`.
+
+## Recuperação de telas que não carregam (`custom(chunk-recovery)`, 2026-11-18)
+
+- `frontend/src/App.tsx`:
+  - import após o `lazyPage`;
+  - no `ErrorBoundary`, uma linha antes do "UI Crash": se o erro é de carregamento de arquivo, mostra `<ChunkErrorFallback />`;
+  - o botão "Retry" passa a recarregar a página (+3/−1). O `React.lazy` guarda a promessa que falhou, então limpar o estado nunca recuperava.
+- `frontend/src/custom/app/chunkRecovery.tsx`:
+  - `isChunkLoadError`;
+  - a tela "Atualizando o Bambuddy…", que usa o `recoverFromMissingChunk` do upstream e, se não der certo, mostra o botão "Recarregar";
+  - listeners de `vite:preloadError` e `unhandledrejection` para os imports dinâmicos fora do `lazyPage`.
+- Teste: `custom/__tests__/chunkRecovery.test.tsx`.
+
+## Bico e velocidade no card (`custom(printer-prefs)`, 2026-11-18)
+
+- Backend `backend/app/custom/printer_prefs/router.py`, registrado em `api.py`:
+  - `GET /custom/printers/{id}/prefs`;
+  - `PUT /custom/printers/{id}/speed?mode=1..4`: troca já se estiver imprimindo e sempre grava como padrão em `data/custom/printer_prefs.json`;
+  - `POST /custom/printers/{id}/nozzle?diameter=0.2|0.4`: MQTT `set_accessories`; responde 409 durante a impressão.
+  - Um vigia (iniciado pelo `StartApplierMiddleware` no lifespan, ou no 1º GET) aplica a velocidade padrão uma vez por impressão, a partir da camada 2.
+- Frontend `custom/printer/PrinterPrefsChips.tsx`, com chips "⌀ 0.4 mm" e "Velocidade" na linha de controles do card compacto.
+- `PrintersPage.tsx`:
+  - import;
+  - 1 linha depois do `QueueChip`;
+  - o botão de velocidade do upstream fica só fora do modo compacto (`!compactCard(single)`).
+- Textos em `custom/i18n` (`custom.prefs.*`).
+- Testes: `backend/tests/custom/test_printer_prefs.py` e `custom/__tests__/printerPrefsChips.test.tsx`.
