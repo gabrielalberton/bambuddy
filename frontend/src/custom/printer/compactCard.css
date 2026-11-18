@@ -7,6 +7,14 @@
 [id^='printer-card-']:has([data-custom-inline-camera]) > .p-4,
 [id^='printer-card-']:has([data-custom-inline-camera]) > .p-5,
 [id^='printer-card-']:has([data-custom-inline-camera]) > .p-6 {
+  padding: 0.5rem;
+}
+/* cabeçalho do card fica vazio quando está tudo normal (sem nome/imagem e sem selos): sem margem até a câmera */
+[id^='printer-card-']:has([data-custom-inline-camera]) > div > .mb-4 {
+  margin-bottom: 0.25rem;
+}
+/* margem da página (p-4 do upstream) menor na tela de impressoras */
+main > .p-4:has([data-custom-inline-camera]) {
   padding-left: 0.5rem;
   padding-right: 0.5rem;
 }
