@@ -45,6 +45,13 @@ def install(app: FastAPI) -> list[str]:
     from .library_org.router import router as library_org_router
 
     app.include_router(library_org_router, prefix=app_settings.api_prefix)
+    from .asset_404 import Asset404NoStoreMiddleware
+
+    if not any(m.cls is Asset404NoStoreMiddleware for m in app.user_middleware):
+        try:
+            app.add_middleware(Asset404NoStoreMiddleware)
+        except RuntimeError:  # app já iniciado (testes)
+            pass
     if not any(m.cls is StartApplierMiddleware for m in app.user_middleware):
         try:
             app.add_middleware(StartApplierMiddleware)

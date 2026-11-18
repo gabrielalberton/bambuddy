@@ -20,15 +20,53 @@ export function isChunkLoadError(error: unknown): boolean {
   return CHUNK_ERROR_RE.test(message);
 }
 
-const pt = () => (document.documentElement.lang || navigator.language || '').toLowerCase().startsWith('pt');
+const pt = () =>
+  [document.documentElement.lang, (() => { try { return localStorage.getItem('i18nextLng'); } catch { return null; } })(), navigator.language]
+    .some((l) => (l || '').toLowerCase().startsWith('pt'));
+
+const HARD_KEY = 'custom_chunk_hard_reload_at';
+const HARD_WINDOW_MS = 60_000;
+
+/** Limpa o cache do service worker e recarrega. O SW guarda /assets para sempre (cache-first): um arquivo que
+ *  ficou guardado corrompido (download cortado no celular) quebra a mesma tela em toda recarga comum. */
+export async function hardReload(): Promise<void> {
+  try {
+    sessionStorage.setItem(HARD_KEY, String(Date.now()));
+  } catch {
+    /* sem sessionStorage: segue */
+  }
+  try {
+    if ('caches' in window) {
+      const keys = await caches.keys();
+      await Promise.all(keys.map((k) => caches.delete(k)));
+    }
+    const regs = (await navigator.serviceWorker?.getRegistrations?.()) ?? [];
+    await Promise.all(regs.map((r) => r.unregister()));
+  } catch {
+    /* melhor esforço */
+  }
+  window.location.reload();
+}
+
+function hardReloadedRecently(): boolean {
+  try {
+    const last = Number(sessionStorage.getItem(HARD_KEY));
+    return Boolean(last) && Date.now() - last < HARD_WINDOW_MS;
+  } catch {
+    return true;
+  }
+}
 
 /** Tela mostrada no lugar do "UI Crash" quando o erro é de carregamento de arquivo. */
-export function ChunkErrorFallback() {
+export function ChunkErrorFallback({ error }: { error?: Error | null }) {
   const [failed, setFailed] = useState(false);
   useEffect(() => {
     let alive = true;
     recoverFromMissingChunk().then((reloading) => {
-      if (alive && !reloading) setFailed(true);
+      if (!alive || reloading) return;
+      // A recarga comum não resolveu: limpa o cache do SW e tenta mais uma vez antes de desistir.
+      if (!hardReloadedRecently()) void hardReload();
+      else setFailed(true);
     });
     return () => {
       alive = false;
@@ -56,11 +94,14 @@ export function ChunkErrorFallback() {
       </p>
       {failed && (
         <button
-          onClick={() => window.location.reload()}
+          onClick={() => void hardReload()}
           style={{ padding: '10px 18px', backgroundColor: '#3b82f6', color: '#fff', border: 'none', borderRadius: 8, fontSize: 15 }}
         >
           {isPt ? 'Recarregar' : 'Reload'}
         </button>
+      )}
+      {failed && error?.message && (
+        <pre style={{ marginTop: 16, fontSize: 11, color: '#71717a', whiteSpace: 'pre-wrap' }}>{error.message}</pre>
       )}
     </div>
   );

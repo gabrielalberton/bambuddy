@@ -418,3 +418,6 @@ material, `KValueLine` (opcional) e trilha da barra por último.
   - em projeto, o extrusor mais usado (`model_settings`) mapeado em `filament_colour`;
   - cores muito escuras sobem para `#4A4A4A`.
 - O `conftest` dos testes do fork desinstala o patch, para não afetar os testes do upstream.
+- (2026-11-18, 2ª rodada) Quando a recarga comum não resolve, `hardReload()` limpa o CacheStorage, desregistra o SW e recarrega. Isso cobre o caso de um arquivo de `/assets` guardado corrompido pelo SW, que usa cache-first, e quebrava sempre a mesma tela. A tela de falha agora mostra a mensagem do erro.
+  - `backend/app/custom/asset_404.py`: um 404 em `/assets/*` sai com `Cache-Control: no-store`. O upstream manda `max-age=14400`, então o navegador e o Cloudflare guardavam o 404.
+  - Teste: `test_asset_404.py`.

@@ -15,7 +15,8 @@ describe('custom chunk recovery', () => {
   });
 
   it('mostra botão de recarregar quando a recuperação automática não resolve', async () => {
-    render(<ChunkErrorFallback />);
+    sessionStorage.setItem('custom_chunk_hard_reload_at', String(Date.now())); // limpeza de cache já tentada
+    render(<ChunkErrorFallback error={new TypeError('Failed to fetch dynamically imported module: x.js')} />);
     expect(await screen.findByRole('button')).toBeTruthy();
   });
 });
@@ -27,5 +28,24 @@ describe('vite:preloadError', () => {
     const ev = new Event('vite:preloadError', { cancelable: true });
     window.dispatchEvent(ev);
     expect(ev.defaultPrevented).toBe(false);
+  });
+});
+
+describe('hardReload', () => {
+  it('limpa caches e desregistra o service worker antes de recarregar', async () => {
+    const del = vi.fn(() => Promise.resolve(true));
+    vi.stubGlobal('caches', { keys: () => Promise.resolve(['a', 'b']), delete: del });
+    const unregister = vi.fn(() => Promise.resolve(true));
+    Object.defineProperty(navigator, 'serviceWorker', {
+      configurable: true,
+      value: { getRegistrations: () => Promise.resolve([{ unregister }]) },
+    });
+    const reload = vi.fn();
+    Object.defineProperty(window, 'location', { configurable: true, value: { ...window.location, reload } });
+    const { hardReload } = await import('../app/chunkRecovery');
+    await hardReload();
+    expect(del).toHaveBeenCalledTimes(2);
+    expect(unregister).toHaveBeenCalled();
+    expect(reload).toHaveBeenCalled();
   });
 });

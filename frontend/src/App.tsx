@@ -63,7 +63,7 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | 
   }
 
   render() {
-    if (this.state.error && isChunkLoadError(this.state.error)) return <ChunkErrorFallback />; // custom(chunk-recovery)
+    if (this.state.error && isChunkLoadError(this.state.error)) return <ChunkErrorFallback error={this.state.error} />; // custom(chunk-recovery)
     if (this.state.error) {
       return (
         <div style={{ padding: 24, color: '#ef4444', backgroundColor: '#18181b', minHeight: '100vh', fontFamily: 'monospace' }}>
