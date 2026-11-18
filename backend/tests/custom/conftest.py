@@ -17,6 +17,9 @@ def _install_custom_routes():
     clear_cache()
     # Desinstala: as suítes do upstream que rodam no mesmo processo (ex.: test_route_auth_coverage) veem o app puro.
     app.router.routes[:] = routes_before
+    from backend.app.custom.thumb_color import uninstall as uninstall_thumb_color
+
+    uninstall_thumb_color()
     for flag in ("_bambuddy_custom_installed", "custom_twin_included"):
         if hasattr(app.state, flag):
             delattr(app.state, flag)

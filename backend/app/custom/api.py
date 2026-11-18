@@ -42,11 +42,18 @@ def install(app: FastAPI) -> list[str]:
     from .printer_prefs.router import StartApplierMiddleware, router as printer_prefs_router
 
     app.include_router(printer_prefs_router, prefix=app_settings.api_prefix)
+    from .library_org.router import router as library_org_router
+
+    app.include_router(library_org_router, prefix=app_settings.api_prefix)
     if not any(m.cls is StartApplierMiddleware for m in app.user_middleware):
         try:
             app.add_middleware(StartApplierMiddleware)
         except RuntimeError:  # app já iniciado (testes): o vigia sobe no 1º GET /prefs
             pass
+    # Miniaturas com a cor do filamento (custom/CUSTOMIZATIONS.md, thumb-color)
+    from .thumb_color import install as install_thumb_color
+
+    install_thumb_color()
     from .draco_worker_csp import allow_draco_worker
 
     allow_draco_worker()

@@ -396,3 +396,25 @@ material, `KValueLine` (opcional) e trilha da barra por último.
   - o botão de velocidade do upstream fica só fora do modo compacto (`!compactCard(single)`).
 - Textos em `custom/i18n` (`custom.prefs.*`).
 - Testes: `backend/tests/custom/test_printer_prefs.py` e `custom/__tests__/printerPrefsChips.test.tsx`.
+
+## Biblioteca organizada por modelo (`custom(library-org)`, 2026-11-18)
+
+- Só código do fork: `backend/app/custom/library_org/` (`organizer.py` monta o plano, `service.py` aplica e `router.py` expõe), registrado em `api.py`. Nenhum arquivo do upstream foi tocado.
+- API:
+  - `GET /custom/library/organize`: mostra o plano, sem mudar nada;
+  - `POST`: aplica o plano;
+  - `PUT /auto?enabled=`: liga ou desliga a rodada automática, a cada 120 s.
+- Regras: ver `custom/docs/biblioteca-organizacao.md`.
+  - Só mexe em arquivos soltos (na raiz ou direto em "MakerWorld" ou "Printables"), e só muda `folder_id` e `filename`.
+  - A pasta de cada modelo fica gravada em `data/custom/library_org.json`.
+- Testes: `backend/tests/custom/test_library_org.py`.
+
+## Miniaturas com a cor do filamento (`custom(thumb-color)`, 2026-11-18)
+
+- `backend/app/custom/thumb_color.py`, instalado em `api.py`. Envolve `plate_thumbnail._render_model_thumbnails` e `_render_at_size`, que recebe a classe do polígono, para passar a cor. Troca o `stl_thumbnail.BAMBU_GREEN` por um cinza neutro. Nenhuma linha do upstream foi editada.
+  - **Atenção em updates:** se o upstream renomear essas funções, as miniaturas voltam a ficar verdes, e o teste `test_thumb_color.py::test_install_troca_a_cor_do_renderizador` acusa.
+- Cor usada:
+  - em fatiado, o filamento com mais gramas (`slice_info.config`);
+  - em projeto, o extrusor mais usado (`model_settings`) mapeado em `filament_colour`;
+  - cores muito escuras sobem para `#4A4A4A`.
+- O `conftest` dos testes do fork desinstala o patch, para não afetar os testes do upstream.

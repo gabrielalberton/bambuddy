@@ -202,6 +202,9 @@ class StartApplierMiddleware:
         if scope.get("type") == "lifespan":
             try:
                 ensure_applier()
+                from backend.app.custom.library_org.service import ensure_auto
+
+                ensure_auto()
             except RuntimeError:
                 pass
         await self.app(scope, receive, send)
