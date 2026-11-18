@@ -15,7 +15,7 @@ import { SpoolBuddyLayout } from './components/spoolbuddy/SpoolBuddyLayout';
 import { PageLoading } from './components/PageLoading';
 import { AuthRetrying } from './components/AuthRetrying';
 import { lazyPage } from './utils/lazyPage';
-import { ChunkErrorFallback, isChunkLoadError } from './custom/app/chunkRecovery'; // custom(chunk-recovery)
+import { ChunkErrorFallback, hardReload, isChunkLoadError } from './custom/app/chunkRecovery'; // custom(chunk-recovery)
 
 // Every page loads as its own file when first opened (#3175).
 const PrintersPage = lazyPage(() => import('./pages/PrintersPage'), 'PrintersPage');
@@ -73,7 +73,7 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | 
             {this.state.error.stack}
           </pre>
           <button
-            onClick={() => { window.location.reload(); }} /* custom(chunk-recovery): lazy guarda a promessa que falhou */
+            onClick={() => { void hardReload(); }} /* custom(chunk-recovery): limpa o cache do SW e recarrega */
             style={{ marginTop: 16, padding: '8px 16px', backgroundColor: '#3b82f6', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer' }}
           >
             Retry

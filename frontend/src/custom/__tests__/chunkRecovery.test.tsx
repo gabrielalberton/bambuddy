@@ -49,3 +49,11 @@ describe('hardReload', () => {
     expect(reload).toHaveBeenCalled();
   });
 });
+
+describe('SyntaxError de arquivo corrompido', () => {
+  it('conta como falha de carregamento, menos JSON', () => {
+    expect(isChunkLoadError(new SyntaxError("Unexpected token ';'"))).toBe(true);
+    expect(isChunkLoadError(new SyntaxError('Unexpected end of input'))).toBe(true);
+    expect(isChunkLoadError(new SyntaxError('Unexpected token < in JSON at position 0'))).toBe(false);
+  });
+});

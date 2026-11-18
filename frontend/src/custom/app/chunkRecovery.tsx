@@ -17,7 +17,9 @@ const CHUNK_ERROR_RE =
 export function isChunkLoadError(error: unknown): boolean {
   if (!error) return false;
   const message = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
-  return CHUNK_ERROR_RE.test(message);
+  if (CHUNK_ERROR_RE.test(message)) return true;
+  // Arquivo de /assets cortado ou corrompido no cache do SW: o módulo nem compila. Erro de JSON fica de fora.
+  return error instanceof Error && error.name === 'SyntaxError' && !/JSON/i.test(error.message);
 }
 
 const pt = () =>
