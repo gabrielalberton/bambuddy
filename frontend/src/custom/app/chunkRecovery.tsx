@@ -72,8 +72,9 @@ let installed = false;
 export function installChunkRecovery(): void {
   if (installed || typeof window === 'undefined') return;
   installed = true;
-  window.addEventListener('vite:preloadError', (event) => {
-    event.preventDefault();
+  // Sem preventDefault: com ele o __vitePreload engole o erro e o import() resolve `undefined`
+  // ("Cannot read properties of undefined (reading 'SettingsPage')"). O erro tem que seguir para o lazyPage.
+  window.addEventListener('vite:preloadError', () => {
     void recoverFromMissingChunk();
   });
   window.addEventListener('unhandledrejection', (event) => {

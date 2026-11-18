@@ -19,3 +19,13 @@ describe('custom chunk recovery', () => {
     expect(await screen.findByRole('button')).toBeTruthy();
   });
 });
+
+describe('vite:preloadError', () => {
+  it('não cancela o evento (senão o import resolve undefined)', async () => {
+    const { installChunkRecovery } = await import('../app/chunkRecovery');
+    installChunkRecovery();
+    const ev = new Event('vite:preloadError', { cancelable: true });
+    window.dispatchEvent(ev);
+    expect(ev.defaultPrevented).toBe(false);
+  });
+});
