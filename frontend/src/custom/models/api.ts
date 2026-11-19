@@ -5,6 +5,7 @@ import type {
   CatalogBrowseParams,
   CatalogBrowseResponse,
   CatalogDetail,
+  CatalogFilterSchema,
   CatalogReviewKind,
   CatalogReviewSort,
   CatalogReviewsResponse,
@@ -47,8 +48,10 @@ export const catalogApi = {
       author_printer: String(p.authorPrinter),
     });
     if (p.category) params.set('category', p.category);
+    if (p.filters && Object.keys(p.filters).length) params.set('filters', JSON.stringify(p.filters));
     return call<CatalogBrowseResponse>(`/${source}/browse?${modelsQuery(params, p.printerModels)}`, { signal });
   },
+  filters: (source: CatalogSourceId, signal?: AbortSignal) => call<CatalogFilterSchema>(`/${source}/filters`, { signal }),
   categories: (source: CatalogSourceId, signal?: AbortSignal) =>
     call<{ id: string; name: string }[]>(`/${source}/categories`, { signal }),
   detail: (source: CatalogSourceId, id: string, printerModels: string[], signal?: AbortSignal) =>

@@ -139,3 +139,36 @@ export function isTempBarsEnabled(): boolean {
   }
   return TEMP_BARS === 'on';
 }
+
+/**
+ * CATALOG_FILTERS ("filtro avançado" do catálogo de modelos: botão Filtros com o modal por fonte, chips dos filtros
+ * ativos, chave CyberBrick do MakerWorld e selo CyberBrick no card):
+ *  - 'on':  ligado;
+ *  - 'off': catálogo como antes (só busca, ordem, categoria e filtro da impressora).
+ * Nos testes o efetivo é 'off'; testes nossos usam setCatalogFiltersOverride(). No navegador:
+ *   localStorage.setItem('custom.catalogFilters', 'off')
+ */
+export type CatalogFiltersMode = 'on' | 'off';
+
+export const CATALOG_FILTERS: CatalogFiltersMode = 'on';
+
+export const CATALOG_FILTERS_STORAGE_KEY = 'custom.catalogFilters';
+
+let catalogFiltersOverride: CatalogFiltersMode | null = null;
+
+/** Só para testes. */
+export function setCatalogFiltersOverride(mode: CatalogFiltersMode | null): void {
+  catalogFiltersOverride = mode;
+}
+
+export function isCatalogFiltersEnabled(): boolean {
+  if (catalogFiltersOverride) return catalogFiltersOverride === 'on';
+  if (import.meta.env.MODE === 'test') return false;
+  try {
+    const stored = localStorage.getItem(CATALOG_FILTERS_STORAGE_KEY);
+    if (stored === 'on' || stored === 'off') return stored === 'on';
+  } catch {
+    /* localStorage indisponível */
+  }
+  return CATALOG_FILTERS === 'on';
+}

@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, Heart, Search } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { catalogApi } from './api';
-import { useCatalogT } from './i18n';
+import { useCatalogT, type CatalogKey } from './i18n';
 import { ModelDetail } from './ModelDetail';
 import { MakerworldImportButton } from './ImportModal';
 import { controlClass, sourceName } from './constants';
@@ -14,9 +14,27 @@ import { AuthorView } from './AuthorView';
 import type { CatalogCard, CatalogMineKind, CatalogSort, CatalogSourceId, CatalogSourceInfo } from './types';
 import { usePrinterModels } from './usePrinterModels';
 import { AUTHOR_PRINTER_KEY, PRINTER_FILTER_KEY, readBool, writeBool } from './utils';
+import { isCatalogFiltersEnabled } from '../flags';
+import { ActiveFilterChips, CyberBrickToggle, FiltersButton, FiltersModal } from './FiltersModal';
+import { CYBERBRICK_FILTER, CYBERBRICK_VALUE, compact, countActive, readFilters, sanitize, writeFilters } from './filters';
+import type { CatalogFilters } from './types';
 
 const PAGE_SIZE = 24;
+/** Ordens comuns a todas as fontes (visão "Todas"); com uma fonte só, a lista é a dela (``source.sorts``). */
 const SORTS: CatalogSort[] = ['trending', 'popular', 'newest', 'relevance'];
+const ALL_SORTS: CatalogSort[] = [...SORTS, 'likes', 'boosts', 'prints', 'collections', 'random', 'rating', 'makes', 'text'];
+const SORT_LABEL: Partial<Record<CatalogSort, CatalogKey>> = {
+  likes: 'sortLikes',
+  boosts: 'sortBoosts',
+  prints: 'sortPrints',
+  collections: 'sortCollections',
+  random: 'sortRandom',
+  rating: 'sortRating',
+  makes: 'sortMakes',
+  text: 'sortText',
+};
+const sortKey = (s: CatalogSort): CatalogKey => SORT_LABEL[s] ?? (s as CatalogKey);
+const SOURCE_IDS: CatalogSourceId[] = ['makerworld', 'printables', 'thingiverse'];
 
 /**
  * Catálogo de modelos (estilo "MakerWorld" do Bambu Handy), pensado primeiro
@@ -59,8 +77,29 @@ export function ModelCatalog() {
   const current = enabled.find((s) => s.id === requested)?.id ?? 'all';
   const visible = current === 'all' ? enabled : enabled.filter((s) => s.id === current);
   const query = params.get('q') ?? '';
-  const sort = SORTS.find((s) => s === params.get('sort')) ?? (query ? 'relevance' : 'trending');
+  const sort = ALL_SORTS.find((s) => s === params.get('sort')) ?? (query ? 'relevance' : 'trending');
   const category = current === 'all' ? '' : params.get('cat') ?? '';
+  const currentInfo = enabled.find((s) => s.id === current);
+  const sortOptions = currentInfo ? currentInfo.sorts : SORTS;
+  const shownSort = sortOptions.includes(sort) ? sort : sortOptions[0];
+
+  // Filtro avançado: por fonte, lembrado no navegador; só vale com uma fonte selecionada.
+  const filtersOn = isCatalogFiltersEnabled();
+  const [filtersBySource, setFiltersBySource] = useState<Record<string, CatalogFilters>>(() =>
+    Object.fromEntries(SOURCE_IDS.map((id) => [id, readFilters(id)])),
+  );
+  const filterSource = filtersOn && current !== 'all' ? current : null;
+  const schemaQuery = useQuery({
+    queryKey: ['custom-models', filterSource, 'filters'],
+    queryFn: ({ signal }) => catalogApi.filters(filterSource as CatalogSourceId, signal),
+    enabled: !!filterSource,
+    staleTime: 3_600_000,
+    retry: false,
+  });
+  const storedFilters = filterSource ? filtersBySource[filterSource] ?? {} : {};
+  const activeFilters = schemaQuery.data ? sanitize(storedFilters, schemaQuery.data) : compact(storedFilters);
+  const filtersReady = !Object.keys(activeFilters).length || !!schemaQuery.data || schemaQuery.isError;
+  const filtersOpen = !!filterSource && params.get('filters') === '1';
   const model = params.get('model');
   const modelSource = params.get('msrc') as CatalogSourceId | null;
   const author = params.get('author');
@@ -141,6 +180,50 @@ export function ModelCatalog() {
       },
       { replace: !push },
     );
+  const setFilters = (src: CatalogSourceId, next: CatalogFilters) => {
+    const clean = compact(next);
+    setFiltersBySource((prev) => ({ ...prev, [src]: clean }));
+    writeFilters(src, clean);
+    // filtro novo = volta para a primeira página
+    setParams(
+      (prev) => {
+        const p = new URLSearchParams(prev);
+        p.delete(`${src}Off`);
+        return p;
+      },
+      { replace: true },
+    );
+  };
+  const cyberbrickOn = filtersBySource.makerworld?.[CYBERBRICK_FILTER] === CYBERBRICK_VALUE;
+  const toggleCyberbrick = (on: boolean) => {
+    const next = { ...(filtersBySource.makerworld ?? {}) };
+    if (on) next[CYBERBRICK_FILTER] = CYBERBRICK_VALUE;
+    else delete next[CYBERBRICK_FILTER];
+    setFilters('makerworld', next);
+    // na visão "Todas" a chave leva para o MakerWorld (o filtro é dele)
+    if (on && current !== 'makerworld') change('src', 'makerworld');
+  };
+  // push (não replace): o voltar do celular fecha o modal.
+  const openFilters = () =>
+    setParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.set('filters', '1');
+      return next;
+    });
+  const closeFilters = useCallback(
+    () =>
+      ((window.history.state as { idx?: number } | null)?.idx ?? 0) > 0
+        ? window.history.back()
+        : setParams(
+            (prev) => {
+              const next = new URLSearchParams(prev);
+              next.delete('filters');
+              return next;
+            },
+            { replace: true },
+          ),
+    [setParams],
+  );
   const closeModel = () =>
     setParams((prev) => {
       const next = new URLSearchParams(prev);
@@ -243,15 +326,19 @@ export function ModelCatalog() {
           <Switch id="catalog-printer-filter" checked={printerFilter} onChange={setPrinterFilter} label={t('printerFilter', { printer: printer.label })} />
           <label className="flex min-w-0 items-center gap-2 text-sm text-bambu-gray">
             <span className="sr-only md:not-sr-only">{t('sort')}</span>
-            <select value={sort} onChange={(e) => change('sort', e.target.value)} className={`${controlClass} bg-bambu-dark-secondary`} aria-label={t('sort')}>
-              {SORTS.map((s) => (
+            <select value={shownSort} onChange={(e) => change('sort', e.target.value)} className={`${controlClass} bg-bambu-dark-secondary`} aria-label={t('sort')}>
+              {sortOptions.map((s) => (
                 <option key={s} value={s}>
-                  {t(s === 'newest' && current === 'makerworld' ? 'recentMakerworld' : s)}
+                  {t(sortKey(s))}
                 </option>
               ))}
             </select>
           </label>
           {current !== 'all' && <Categories source={current} value={category} onChange={(v) => change('cat', v)} />}
+          {filterSource && <FiltersButton count={countActive(activeFilters)} onClick={openFilters} />}
+          {filtersOn && (current === 'all' || current === 'makerworld') && enabled.some((s) => s.id === 'makerworld') && (
+            <CyberBrickToggle on={cyberbrickOn && current === 'makerworld'} onChange={(on) => toggleCyberbrick(current === 'makerworld' ? on : true)} />
+          )}
           {enabled.some((s) => s.id === 'makerworld') && hasPermission('makerworld:view') && (
             <button type="button" className={controlClass} onClick={() => setMine('likes', true)} aria-label={t('mine')} title={t('mine')}>
               <Heart className="h-4 w-4" aria-hidden="true" />
@@ -262,12 +349,31 @@ export function ModelCatalog() {
         </div>
       </div>
 
+      {filterSource && (
+        <ActiveFilterChips filters={activeFilters} schema={schemaQuery.data} onChange={(next) => setFilters(filterSource, next)} />
+      )}
+      {filtersOpen && filterSource && (
+        <FiltersModal
+          key={filterSource}
+          title={t('filtersTitle', { source: sourceName[filterSource] })}
+          schema={schemaQuery.data}
+          loading={schemaQuery.isPending}
+          error={schemaQuery.error}
+          value={activeFilters}
+          onApply={(next) => {
+            setFilters(filterSource, next);
+            closeFilters();
+          }}
+          onClose={closeFilters}
+        />
+      )}
+
       {sourcesQuery.isError && <CatalogError error={sourcesQuery.error} onRetry={() => void sourcesQuery.refetch()} />}
       {sourcesQuery.isPending && <p role="status" className="text-sm text-bambu-gray">{t('loading')}</p>}
 
       {visible.map((s) => (
         <SourceResults
-          key={`${s.id}:${query}:${sort}:${category}:${printerFilter}:${authorPrinter}:${printer.label}`}
+          key={`${s.id}:${query}:${sort}:${category}:${printerFilter}:${authorPrinter}:${printer.label}:${filterSource === s.id ? JSON.stringify(activeFilters) : ''}`}
           source={s}
           single={visible.length === 1}
           query={query}
@@ -279,6 +385,8 @@ export function ModelCatalog() {
           authorPrinter={authorPrinter}
           onAuthorPrinter={setAuthorPrinter}
           onOpen={openModel}
+          filters={filterSource === s.id ? activeFilters : undefined}
+          ready={filterSource !== s.id || filtersReady}
         />
       ))}
     </div>
@@ -338,7 +446,7 @@ function FilterNote({ source, printerLabel, printerFilter, applied, authorPrinte
   return <p className="text-xs text-yellow-400/90">{t('filterNaThingiverse', { printer: printerLabel })}</p>;
 }
 
-function SourceResults({ source, single, query, sort, category, printerModels, printerLabel, printerFilter, authorPrinter, onAuthorPrinter, onOpen }: {
+function SourceResults({ source, single, query, sort, category, printerModels, printerLabel, printerFilter, authorPrinter, onAuthorPrinter, onOpen, filters, ready = true }: {
   source: CatalogSourceInfo;
   /** só uma fonte na tela: sem título (a fonte já está no seletor ao lado da busca) */
   single: boolean;
@@ -351,6 +459,10 @@ function SourceResults({ source, single, query, sort, category, printerModels, p
   authorPrinter: boolean;
   onAuthorPrinter: (v: boolean) => void;
   onOpen: (card: CatalogCard) => void;
+  /** filtro avançado (só da fonte selecionada) */
+  filters?: CatalogFilters;
+  /** false enquanto o esquema dos filtros salvos ainda não chegou (evita mandar filtro velho) */
+  ready?: boolean;
 }) {
   const t = useCatalogT();
   const [params, setParams] = useSearchParams();
@@ -358,13 +470,14 @@ function SourceResults({ source, single, query, sort, category, printerModels, p
   const offset = Number.isSafeInteger(raw) && raw >= 0 ? raw : 0;
   const effectiveSort = source.sorts.includes(sort) ? sort : source.sorts[0];
   const results = useQuery({
-    queryKey: ['custom-models', source.id, 'browse', query, effectiveSort, category, offset, printerModels, printerFilter, authorPrinter],
+    queryKey: ['custom-models', source.id, 'browse', query, effectiveSort, category, offset, printerModels, printerFilter, authorPrinter, filters ?? null],
     queryFn: ({ signal }) =>
       catalogApi.browse(
         source.id,
-        { query, sort: effectiveSort, category, offset, limit: PAGE_SIZE, printerModels, printerFilter, authorPrinter: source.id === 'printables' && authorPrinter },
+        { query, sort: effectiveSort, category, offset, limit: PAGE_SIZE, printerModels, printerFilter, authorPrinter: source.id === 'printables' && authorPrinter, filters },
         signal,
       ),
+    enabled: ready,
     staleTime: 60_000,
     gcTime: 120_000,
     retry: false,
@@ -385,7 +498,7 @@ function SourceResults({ source, single, query, sort, category, printerModels, p
         <h2 id={heading} className={single ? 'sr-only' : 'text-lg font-semibold text-white'}>
           {source.name}
           <span className="ml-2 text-sm font-normal text-bambu-gray">
-            {t(effectiveSort === 'newest' && source.id === 'makerworld' ? 'recentMakerworld' : effectiveSort)}
+            {t(sortKey(effectiveSort))}
           </span>
         </h2>
         {total != null && <span className="text-sm text-bambu-gray">{total >= 10000 ? t('resultsMany') : t('results', { count: compact.format(total) })}</span>}

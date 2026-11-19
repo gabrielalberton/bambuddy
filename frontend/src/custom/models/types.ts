@@ -1,5 +1,17 @@
 export type CatalogSourceId = 'makerworld' | 'printables' | 'thingiverse';
-export type CatalogSort = 'trending' | 'popular' | 'newest' | 'relevance';
+export type CatalogSort =
+  | 'trending'
+  | 'popular'
+  | 'newest'
+  | 'relevance'
+  | 'likes'
+  | 'boosts'
+  | 'prints'
+  | 'collections'
+  | 'random'
+  | 'rating'
+  | 'makes'
+  | 'text';
 export type PrinterMatch = 'native' | 'compatible' | 'unknown' | 'other';
 export type PrinterFilterMode = 'server' | 'author_printer' | 'none';
 
@@ -31,6 +43,8 @@ export interface CatalogCard {
   thumbnail: string | null;
   downloads: number | null;
   likes: number | null;
+  /** MakerWorld: modelo CyberBrick (selo no card). */
+  cyberbrick?: boolean;
 }
 
 export interface CatalogBrowseResponse {
@@ -40,7 +54,42 @@ export interface CatalogBrowseResponse {
   sort: CatalogSort;
   printer_models: string[];
   printer_filter: { mode: PrinterFilterMode; applied: boolean; codes?: string[]; printer_ids?: number[] };
+  /** Filtros avançados aplicados (já validados pelo backend). */
+  filters?: CatalogFilters;
 }
+
+/** Filtro avançado (esquema servido por GET /custom/models/{fonte}/filters). */
+export type CatalogFilterType = 'enum' | 'multi' | 'bool' | 'range' | 'days';
+export interface CatalogLabel {
+  pt: string;
+  en: string;
+}
+export interface CatalogFilterOption {
+  value: string;
+  label: CatalogLabel;
+}
+export interface CatalogFilterDef {
+  id: string;
+  type: CatalogFilterType;
+  label: CatalogLabel;
+  options: CatalogFilterOption[];
+  hint?: CatalogLabel;
+  /** range: o fim só vale com o início (Thingiverse). */
+  requires_min?: boolean;
+}
+export interface CatalogFilterGroup {
+  id: string;
+  label: CatalogLabel;
+  filters: CatalogFilterDef[];
+}
+export interface CatalogFilterSchema {
+  source: CatalogSourceId;
+  origin: string;
+  groups: CatalogFilterGroup[];
+  sorts: CatalogSort[];
+}
+export type CatalogFilterValue = string | string[] | boolean | [string | null, string | null];
+export type CatalogFilters = Record<string, CatalogFilterValue>;
 
 export interface CatalogFile {
   id: string;
@@ -140,6 +189,7 @@ export interface CatalogBrowseParams {
   printerModels: string[];
   printerFilter: boolean;
   authorPrinter: boolean;
+  filters?: CatalogFilters;
 }
 
 /** Curtidos / salvos do próprio usuário no MakerWorld. */
