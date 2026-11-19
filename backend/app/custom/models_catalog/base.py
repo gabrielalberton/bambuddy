@@ -9,7 +9,11 @@ from typing import Any, Literal
 import httpx
 
 PrinterFilterMode = Literal["server", "author_printer", "none"]
-Sort = Literal["trending", "popular", "newest", "relevance"]
+# As 4 primeiras valem em todas as fontes; as demais só onde a fonte ordena por elas (``CatalogSource.sorts``).
+Sort = Literal[
+    "trending", "popular", "newest", "relevance", "likes", "boosts", "prints", "collections", "random", "rating",
+    "makes", "text",
+]
 # Avaliações/comentários: "ratings" (estrelas), "comments" (sem nota) ou "all" (a fonte mistura os dois).
 ReviewKind = Literal["ratings", "comments", "all"]
 ReviewSort = Literal["top", "newest"]
@@ -33,6 +37,8 @@ class BrowseRequest:
     printer_filter: bool = True
     # Printables: exigir "impressora usada pelo autor" = modelo do usuário (opcional, raro).
     author_printer: bool = False
+    # Filtro avançado já validado contra o esquema da fonte (``filters.validate``).
+    filters: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -80,6 +86,10 @@ class CatalogSource(ABC):
 
     async def categories(self, client: httpx.AsyncClient) -> list[dict[str, str]]:
         return []
+
+    async def filter_schema(self, client: httpx.AsyncClient) -> dict[str, Any]:
+        """Esquema do filtro avançado (``filters.schema``); vazio = a fonte não tem filtros extras."""
+        return {"source": self.id, "origin": "static", "groups": []}
 
     @abstractmethod
     async def detail(self, client: httpx.AsyncClient, model_id: str, models: list[str]) -> dict[str, Any]: ...

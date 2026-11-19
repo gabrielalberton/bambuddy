@@ -26,6 +26,7 @@ from backend.app.services.model_providers.base import (
 from backend.app.services.model_providers.makerworld.http import MAKERWORLD_CDN_HOSTS
 from backend.app.services.model_providers.makerworld.service import MakerWorldService
 
+from . import filters as F
 from .base import BrowseRequest, CatalogSource, ReviewsRequest, order_files, review_item
 from .printer_models import makerworld_codes
 from .transport import HEADERS, fetch_asset
@@ -61,6 +62,8 @@ def card(design: dict[str, Any]) -> dict[str, Any]:
         "thumbnail": sized(design.get("coverUrl") or design.get("cover") or None, 400),
         "downloads": design.get("downloadCount"),
         "likes": design.get("likeCount"),
+        # Selo "CyberBrick" no card (o hit traz os dois campos; o filtro é ``model_tag=cb``).
+        "cyberbrick": design.get("cyberBrickNeeded") is True or design.get("isFeaturedCyberBrick") is True,
     }
 
 
@@ -335,6 +338,132 @@ def extract_plates(data: bytes) -> list[bytes]:
     return plates
 
 
+CFG_URL = f"{SEARCH_BASE}/cfg2"
+# orderBy do search-service (todos listados no cfg2 ou medidos mudando a ordem em 2026-11-19).
+ORDER_BY = {
+    "popular": "downloadCount",
+    "newest": "newUploads",
+    "likes": "likeCount",
+    "boosts": "boosts",
+    "prints": "printCount",
+    "collections": "collectionCount",
+    "random": "random",
+}
+# Rótulos pt-BR das opções do cfg2 (o cfg2 só vem em inglês).
+_PT = {
+    "featured": "Destaque",
+    "exclusive": "Exclusivo",
+    "cb": "CyberBrick",
+    "ms": "Maker's Supply",
+    "custom": "Customizável",
+    "param": "Paramétrico",
+    "Standard": "Padrão",
+    "High Flow": "Alto fluxo",
+    "TPU285": "TPU 285",
+    "false": "Só uma cor",
+    "true": "Só multicor",
+    "CC0": "Domínio público (CC0)",
+    "Standard Digital File License": "Licença padrão de arquivo digital",
+}
+# Filtros do cfg2 que funcionam (medido: o total muda). Fora daqui de propósito: ``devModelNames`` (é o filtro
+# "Só para minha impressora"), ``total_weight`` e ``my_filament`` (o servidor ignora/precisa de login).
+# id do cfg2 -> (parâmetro do design2, tipo, rótulo pt, rótulo en, grupo)
+CFG_FILTERS: dict[str, tuple[str, F.FilterType, str, str, str]] = {
+    "model_tag": ("model_tag", "enum", "Tipo de modelo", "Model tag", "model"),
+    "volumeTypes": ("volumeTypes", "multi", "Tipo de bico", "Nozzle type", "profile"),
+    "nozzleDiameters": ("nozzleDiameters", "multi", "Diâmetro do bico", "Nozzle diameter", "profile"),
+    "multiColor": ("multiColor", "enum", "Cores", "Colors", "profile"),
+    "print_duration": ("printDuration", "range", "Tempo de impressão", "Print time", "profile"),
+    "licenses": ("licenses", "multi", "Licença", "License", "license"),
+}
+STATIC_CFG = {
+    "model_tag": [("featured", "Featured"), ("exclusive", "Exclusive"), ("cb", "CyberBrick"),
+                  ("ms", "Maker's Supply"), ("custom", "Customizable"), ("param", "Parametric")],
+    "volumeTypes": [("Standard", "Std"), ("High Flow", "HF"), ("TPU285", "TPU 285")],
+    "nozzleDiameters": [("0.2", "0.2mm"), ("0.4", "0.4mm"), ("0.6", "0.6mm"), ("0.8", "0.8mm")],
+    "multiColor": [("false", "Single Color Only"), ("true", "Multi-Color Only")],
+    "print_duration": [("1", "1 min"), ("5", "5 min"), ("15", "15 min"), ("30", "30 min"), ("60", "1 hr"),
+                       ("120", "2 hrs"), ("300", "5 hrs"), ("600", "10 hrs"), ("1440", "1 day"), ("2880", "2 days"),
+                       ("4320", "3 days")],
+    "licenses": [("CC0", "Public Domain"), ("BY", "BY"), ("BY-SA", "BY-SA"), ("BY-ND", "BY-ND"), ("BY-NC", "BY-NC"),
+                 ("BY-NC-SA", "BY-NC-SA"), ("BY-NC-ND", "BY-NC-ND"),
+                 ("Standard Digital File License", "Standard Digital File License")],
+}
+
+
+def _duration_pt(value: str, en: str) -> str:
+    return en.replace("hrs", "h").replace("hr", "h").replace("days", "dias").replace("day", "dia")
+
+
+def _cfg_options(cfg: dict[str, Any]) -> dict[str, list[tuple[str, str]]]:
+    """``filter.design`` do cfg2 → {id: [(valor, rótulo en)]} só dos filtros que usamos."""
+    found: dict[str, list[tuple[str, str]]] = {}
+
+    def walk(nodes: Any) -> None:
+        for node in nodes if isinstance(nodes, list) else []:
+            if not isinstance(node, dict):
+                continue
+            name = node.get("name")
+            if name in CFG_FILTERS and isinstance(node.get("option"), list):
+                opts = [
+                    (str(o["value"])[:60], str(o.get("displayName") or o["value"])[:60])
+                    for o in node["option"]
+                    if isinstance(o, dict) and isinstance(o.get("value"), (str, int, float)) and str(o["value"]) != "-"
+                ]
+                if opts:
+                    found[name] = opts
+            walk(node.get("children"))
+
+    walk(((cfg.get("filter") or {}) if isinstance(cfg, dict) else {}).get("design"))
+    return found
+
+
+def build_schema(cfg_opts: dict[str, list[tuple[str, str]]], origin: str) -> dict[str, Any]:
+    defs: dict[str, list[dict[str, Any]]] = {"model": [], "profile": [], "license": []}
+    for cfg_id, (param, ftype, pt, en, grp) in CFG_FILTERS.items():
+        options = cfg_opts.get(cfg_id) or STATIC_CFG[cfg_id]
+        opts = [
+            F.opt(v, _duration_pt(v, e) if cfg_id == "print_duration" else _PT.get(v, e), e) for v, e in options
+        ]
+        hint = None
+        if cfg_id == "model_tag":
+            hint = ("Um tipo por vez (o MakerWorld combina tipos com E).", "One tag at a time (MakerWorld ANDs tags).")
+        elif cfg_id == "multiColor":
+            hint = ("Pela placa do perfil de impressão.", "From the print profile plate.")
+        defs[grp].append(F.fdef(param, ftype, pt, en, opts, hint=hint))
+    defs["model"].append(F.fdef("designCreateSince", "days", "Publicado", "Published", F.DAYS_OPTIONS))
+    defs["model"].append(
+        F.fdef(
+            "isPrintable", "bool", "Com perfil de impressão", "Has a print profile",
+            hint=("Só modelos com perfil pronto para fatiar.", "Only models with a ready print profile."),
+        )
+    )
+    return F.schema(
+        "makerworld",
+        [
+            F.group("model", "Modelo", "Model", defs["model"]),
+            F.group("profile", "Perfil de impressão", "Print profile", defs["profile"]),
+            F.group("license", "Licença", "License", defs["license"]),
+        ],
+        origin,
+    )
+
+
+def apply_filters(params: dict[str, Any], filters: dict[str, Any]) -> None:
+    for fid, value in filters.items():
+        if fid == "printDuration":
+            lo, hi = value
+            params[fid] = f"{lo or 0}-{hi or ''}"
+        elif fid == "isPrintable":
+            params[fid] = "true"
+        elif fid == "designCreateSince":
+            params[fid] = int(value)
+        elif isinstance(value, list):
+            params[fid] = ",".join(value)
+        else:
+            params[fid] = value
+
+
 class MakerWorldSource(CatalogSource):
     id = "makerworld"
     name = "MakerWorld"
@@ -343,7 +472,7 @@ class MakerWorldSource(CatalogSource):
     supports_author = True
     permission_kind = "makerworld"
     printer_filter = "server"
-    sorts = ("trending", "popular", "newest", "relevance")
+    sorts = ("trending", "popular", "newest", "relevance", "likes", "boosts", "prints", "collections", "random")
     review_kinds = ("ratings", "comments")
     review_sorts = ("top", "newest")
 
@@ -355,18 +484,16 @@ class MakerWorldSource(CatalogSource):
         params: dict[str, Any] = {"keyword": req.query, "offset": req.offset, "limit": req.limit}
         if req.category:
             params["categories"] = req.category
-        if req.sort == "popular":
-            params["orderBy"] = "downloadCount"
-        elif req.sort == "newest":
-            # O search-service ignora chaves de "mais novo"; o filtro real é
-            # "criados nas últimas 24 h" (rótulo "Recentes · 24 h" na UI).
-            params["designCreateSince"] = 1
+        if req.sort in ORDER_BY:
+            # "newest" = ``newUploads`` (ordenação real do cfg2; antes era o filtro "últimas 24 h",
+            # que agora é ``designCreateSince`` no filtro avançado).
+            params["orderBy"] = ORDER_BY[req.sort]
         if codes:
             params["devModelNames"] = ",".join(codes)
-        # O feed Trending (nav) ignora devModelNames (conferido ao vivo); com o
-        # filtro ligado usamos o ranking padrão do design2, que é o mesmo feed
-        # de "em alta" sem palavra-chave.
-        if not req.query and not req.category and req.sort == "trending" and not codes:
+        apply_filters(params, req.filters)
+        # O feed Trending (nav) ignora devModelNames e os filtros (conferido ao vivo); com filtro
+        # usamos o ranking padrão do design2, que é o mesmo feed de "em alta" sem palavra-chave.
+        if not req.query and not req.category and req.sort == "trending" and not codes and not req.filters:
             params["navKey"] = "Trending"
             return "/select/design/nav", params, codes
         return "/select/design2", params, codes
@@ -408,6 +535,14 @@ class MakerWorldSource(CatalogSource):
                     data, _ = await fetch_asset(client, url, MAKERWORLD_CDN_HOSTS)
                     return extract_plates(data)
         raise ProviderNotFoundError("This profile has no 3D preview")
+
+    async def filter_schema(self, client: httpx.AsyncClient) -> dict[str, Any]:
+        """Do ``cfg2`` oficial (o mesmo que monta os filtros do site); sem ele, a lista estática medida."""
+        try:
+            opts = _cfg_options(await _api_json(client, CFG_URL, {}))
+        except Exception:  # noqa: BLE001 - qualquer falha do cfg2 cai na lista estática
+            opts = {}
+        return build_schema(opts, "cfg2" if opts else "static")
 
     async def categories(self, client: httpx.AsyncClient) -> list[dict[str, str]]:
         service = MakerWorldService(client=client)

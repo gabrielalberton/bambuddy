@@ -73,7 +73,7 @@ def test_makerworld_filter_goes_to_server_and_trending_switches_feed():
     _, params, _ = mw.build_params(BrowseRequest(sort="popular", query="vase", models=["A1", "P1S"]))
     assert params["orderBy"] == "downloadCount" and params["devModelNames"] == "N2S,C12"
     _, params, _ = mw.build_params(BrowseRequest(sort="newest", models=["A1"]))
-    assert params["designCreateSince"] == 1
+    assert params["orderBy"] == "newUploads" and "designCreateSince" not in params
 
 
 async def test_makerworld_browse_uses_search_service_and_hides_nsfw():

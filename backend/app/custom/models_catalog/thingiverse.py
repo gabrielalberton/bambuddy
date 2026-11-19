@@ -11,6 +11,7 @@ Não há conceito de impressora nem dimensões nos "things": o filtro A1 é
 
 from __future__ import annotations
 
+import asyncio
 import os
 from pathlib import PurePosixPath
 from typing import Any
@@ -25,6 +26,7 @@ from backend.app.services.model_providers.base import (
     ProviderUnavailableError,
 )
 
+from . import filters as F
 from .base import BrowseRequest, CatalogSource, DownloadedFile, ReviewsRequest, order_files, review_item, safe_count
 from .transport import HEADERS, fetch_asset, safe_filename
 
@@ -32,7 +34,56 @@ API = "https://api.thingiverse.com"
 CDN_HOSTS = ("cdn.thingiverse.com",)
 API_HOSTS = ("api.thingiverse.com",)
 ENV_KEY = "BAMBUDDY_CUSTOM_THINGIVERSE_API_KEY"
-SORTS = {"trending": "popular", "popular": "popular", "newest": "newest", "relevance": "relevant"}
+SORTS = {
+    "trending": "popular",
+    "popular": "popular",
+    "newest": "newest",
+    "relevance": "relevant",
+    "makes": "makes",
+    "text": "text",
+}
+LICENSES = [
+    ("cc", "CC BY"), ("cc-sa", "CC BY-SA"), ("cc-nd", "CC BY-ND"), ("cc-nc", "CC BY-NC"), ("cc-nc-sa", "CC BY-NC-SA"),
+    ("cc-nc-nd", "CC BY-NC-ND"), ("pd0", "CC0"), ("gpl", "GPL"), ("lgpl", "LGPL"), ("bsd", "BSD"),
+]
+# Período: ``posted_after``/``posted_before`` (o "antes" só funciona junto com o "depois", medido em 2026-11-19).
+POSTED = [
+    F.opt("now-365d", "1 ano atrás", "1 year ago"),
+    F.opt("now-30d", "30 dias atrás", "30 days ago"),
+    F.opt("now-7d", "7 dias atrás", "7 days ago"),
+]
+FILTER_SCHEMA = F.schema(
+    "thingiverse",
+    [
+        F.group("model", "Modelo", "Model", [
+            F.fdef("posted", "range", "Publicado entre", "Posted between", POSTED, requires_min=True,
+                   hint=("O Thingiverse só aceita o fim junto com o início.", "Thingiverse needs a start to use an end.")),
+            F.fdef("has_makes", "bool", "Com makes (impressões postadas)", "Has makes"),
+            F.fdef("is_featured", "bool", "Destaque", "Featured"),
+            F.fdef("customizable", "bool", "Customizável (Customizer/OpenSCAD)", "Customizable"),
+            F.fdef("is_derivative", "bool", "Só remixes", "Remixes only"),
+            F.fdef("is_wip", "bool", "Só em andamento (WIP)", "Work in progress only"),
+        ]),
+        F.group("license", "Licença", "License", [
+            F.fdef("license", "enum", "Licença", "License",
+                   [F.opt(v, "Domínio público (CC0)" if v == "pd0" else n, n) for v, n in LICENSES]),
+        ]),
+    ],
+    "static",
+)
+
+
+def apply_filters(params: dict[str, Any], filters: dict[str, Any]) -> None:
+    for fid, value in filters.items():
+        if fid == "posted":
+            lo, hi = value
+            params["posted_after"] = lo
+            if hi:
+                params["posted_before"] = hi
+        elif value is True:
+            params[fid] = 1
+        else:
+            params[fid] = value
 
 
 def api_key() -> str | None:
@@ -60,7 +111,7 @@ class ThingiverseSource(CatalogSource):
     thumbnail_hosts = CDN_HOSTS
     permission_kind = "library"
     printer_filter = "none"
-    sorts = ("popular", "newest", "relevance")
+    sorts = ("popular", "newest", "relevance", "makes", "text")
     # Thingiverse não tem estrelas; só comentários (``/things/{id}/comments``, NÃO verificado ao vivo: sem token).
     review_kinds = ("comments",)
     review_sorts = ("newest",)
@@ -107,7 +158,12 @@ class ThingiverseSource(CatalogSource):
 
     async def browse(self, client: httpx.AsyncClient, req: BrowseRequest) -> dict[str, Any]:
         page = req.offset // req.limit + 1
-        params = {"type": "things", "page": page, "per_page": req.limit, "sort": SORTS.get(req.sort, "popular")}
+        params: dict[str, Any] = {
+            "type": "things", "page": page, "per_page": req.limit, "sort": SORTS.get(req.sort, "popular"),
+        }
+        if req.category:
+            params["category_id"] = req.category
+        apply_filters(params, req.filters)
         data = await self._get(client, f"/search/{quote(req.query.strip(), safe='')}", params)
         if isinstance(data, dict):
             hits, total = data.get("hits"), data.get("total")
@@ -121,6 +177,32 @@ class ThingiverseSource(CatalogSource):
             "has_more": req.offset + len(hits) < total if isinstance(total, int) else len(hits) == req.limit,
             "printer_filter": {"mode": "none", "applied": False},
         }
+
+    async def filter_schema(self, client: httpx.AsyncClient) -> dict[str, Any]:
+        return FILTER_SCHEMA
+
+    async def categories(self, client: httpx.AsyncClient) -> list[dict[str, str]]:
+        """Subcategorias (``/categories/{slug}`` → ``children``; o ``category_id`` da busca aceita só elas com id)."""
+        top = await self._get(client, "/categories")
+        slugs = [
+            (str(c["name"])[:60], str(c["url"]).rstrip("/").rsplit("/", 1)[-1])
+            for c in top if isinstance(c, dict) and c.get("name") and isinstance(c.get("url"), str)
+        ] if isinstance(top, list) else []
+        slots = asyncio.Semaphore(3)
+
+        async def children(name: str, slug: str) -> list[dict[str, str]]:
+            if not slug.replace("-", "").isalnum():
+                return []
+            async with slots:
+                data = await self._get(client, f"/categories/{slug}")
+            kids = data.get("children") if isinstance(data, dict) else None
+            return [
+                {"id": str(k["id"]), "name": f"{name} / {str(k['name'])[:60]}"}
+                for k in kids or [] if isinstance(k, dict) and isinstance(k.get("id"), int) and k.get("name")
+            ]
+
+        groups = await asyncio.gather(*(children(n, s) for n, s in slugs))
+        return [c for g in groups for c in g]
 
     async def _files(self, client: httpx.AsyncClient, model_id: str) -> list[dict[str, Any]]:
         raw = await self._get(client, f"/things/{model_id}/files")

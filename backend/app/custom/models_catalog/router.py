@@ -49,7 +49,8 @@ from backend.app.services.bambu_cloud_credentials import get_stored_token
 from backend.app.services.library_folder_access import default_import_folder, get_writable_folder
 from backend.app.services.model_providers.base import ProviderError
 
-from .base import BrowseRequest, CatalogSource, ReviewsRequest
+from . import filters as filter_schema
+from .base import BrowseRequest, CatalogSource, ReviewsRequest, Sort
 from .makerworld import MakerWorldSource
 from .mine import MineKind, my_designs
 from .printables import PrintablesSource
@@ -167,13 +168,14 @@ async def my_makerworld(
 async def browse(
     source_id: str,
     query: str = Query(default="", max_length=200),
-    sort: Literal["trending", "popular", "newest", "relevance"] = "trending",
+    sort: Sort = "trending",
     category: str | None = Query(default=None, max_length=12, pattern=r"^[0-9]*$"),
     offset: int = Query(default=0, ge=0, le=9984),
     limit: int = Query(default=24, ge=1, le=48),
     printer_models: list[str] | None = Query(default=None),
     printer_filter: bool = True,
     author_printer: bool = False,
+    filters: str | None = Query(default=None, max_length=filter_schema.MAX_FILTERS_JSON),
     credentials: HTTPAuthorizationCredentials | None = Depends(security),
     x_api_key: str | None = Header(default=None, alias="X-API-Key"),
 ):
@@ -181,6 +183,12 @@ async def browse(
     await authorize_view(source, credentials, x_api_key)
     if sort not in source.sorts:
         sort = source.sorts[0]
+    try:
+        raw_filters = filter_schema.parse_filters(filters)
+        # Só busca o esquema (cache 1 h) quando há filtro: a busca simples não depende da API de configuração.
+        valid_filters = filter_schema.validate(await _filter_schema(source), raw_filters) if raw_filters else {}
+    except filter_schema.FilterError as exc:
+        raise HTTPException(400, f"Invalid filters: {exc}") from exc
     req = BrowseRequest(
         query=query.strip(),
         sort=sort,
@@ -190,6 +198,7 @@ async def browse(
         models=parse_models(printer_models),
         printer_filter=printer_filter,
         author_printer=author_printer,
+        filters=valid_filters,
     )
     key = (
         source_id,
@@ -202,12 +211,14 @@ async def browse(
         tuple(req.models),
         printer_filter,
         author_printer,
+        filter_schema.cache_token(valid_filters),
     )
 
     async def load():
         async with httpx.AsyncClient(timeout=30) as client:
             result = await source.browse(client, req)
         result["sort"] = req.sort
+        result["filters"] = valid_filters
         result["printer_models"] = [display_name(m) for m in req.models]
         return result
 
@@ -234,6 +245,29 @@ async def categories(
         return await cached((source_id, "categories"), load, ttl=3600)
     except ProviderError as exc:
         raise _map_service_error(exc) from exc
+
+
+async def _filter_schema(source: CatalogSource) -> dict:
+    async def load():
+        async with httpx.AsyncClient(timeout=30) as client:
+            return await source.filter_schema(client)
+
+    try:
+        return await cached((source.id, "filters"), load, ttl=3600)
+    except ProviderError as exc:
+        raise _map_service_error(exc) from exc
+
+
+@router.get("/{source_id}/filters", dependencies=[Depends(require_auth_if_enabled)])
+async def filters_schema(
+    source_id: str,
+    credentials: HTTPAuthorizationCredentials | None = Depends(security),
+    x_api_key: str | None = Header(default=None, alias="X-API-Key"),
+):
+    """Esquema do filtro avançado da fonte (grupos, tipos e opções), cache de 1 h."""
+    source = get_source(source_id)
+    await authorize_view(source, credentials, x_api_key)
+    return {**await _filter_schema(source), "sorts": list(source.sorts)}
 
 
 @router.get("/{source_id}/thumbnail")

@@ -27,6 +27,7 @@ from backend.app.services.model_providers.base import (
     ProviderUrlError,
 )
 
+from . import filters as F
 from .base import BrowseRequest, CatalogSource, DownloadedFile, ReviewsRequest, order_files, review_item, safe_count
 from .printer_models import printables_ids
 from .transport import HEADERS, fetch_asset, safe_filename
@@ -43,7 +44,172 @@ DETAIL_FIELDS = (
  gcodes { id name fileSize printer { id name } } slas { id name fileSize }
 """
 )
-ORDERING = {"trending": "popular", "popular": "popular", "newest": "latest", "relevance": "best_match"}
+ORDERING = {
+    "trending": "popular",
+    "popular": "popular",
+    "newest": "latest",
+    "relevance": "best_match",
+    "rating": "rating",
+    "makes": "makes_count",
+}
+NOZZLES = ["0.2", "0.25", "0.3", "0.4", "0.5", "0.6", "0.8", "1.0"]
+_LICENSE_PT = {
+    "7": "Domínio público (CC0)",
+    "13": "Licença padrão de arquivo digital",
+    "15": "Uso comercial",
+    "14": "Uso comercial, sem derivados",
+}
+_MATERIAL_PT = {
+    "Flex": "Flexível",
+    "Special": "Especial",
+    "Carbon filled": "Com fibra de carbono",
+    "Metal filled": "Com metal",
+    "Wood filled": "Com madeira",
+}
+
+
+def build_schema(licenses: list[tuple[str, str]], materials: list[tuple[str, str]], origin: str) -> dict[str, Any]:
+    """Argumentos do ``searchPrints2`` achados e medidos em 2026-11-19 (introspecção desligada no Printables)."""
+    return F.schema(
+        "printables",
+        [
+            F.group(
+                "model",
+                "Modelo",
+                "Model",
+                [
+                    F.fdef("publishedDateLimitDays", "days", "Publicado", "Published", F.DAYS_OPTIONS),
+                    F.fdef("hasMake", "bool", "Com makes (impressões postadas)", "Has makes"),
+                    F.fdef("featured", "bool", "Destaque", "Featured"),
+                    F.fdef("competitionAwarded", "bool", "Premiado em concurso", "Competition winner"),
+                    F.fdef(
+                        "aiGenerated",
+                        "bool",
+                        "Só gerados por IA",
+                        "AI-generated only",
+                        hint=(
+                            "O Printables não deixa excluir os de IA, só mostrar apenas eles.",
+                            "Printables can only show AI models, not hide them.",
+                        ),
+                    ),
+                ],
+            ),
+            F.group(
+                "files",
+                "Arquivos e impressão",
+                "Files and printing",
+                [
+                    F.fdef(
+                        "filesType",
+                        "enum",
+                        "G-code",
+                        "G-code",
+                        [
+                            F.opt("GCODE", "Com G-code", "Has G-code"),
+                            F.opt("NONE", "Sem G-code", "No G-code"),
+                        ],
+                    ),
+                    F.fdef(
+                        "nozzleDiameters",
+                        "multi",
+                        "Diâmetro do bico (G-code)",
+                        "Nozzle diameter (G-code)",
+                        [F.opt(n, f"{n} mm") for n in NOZZLES],
+                        hint=("Do G-code enviado pelo autor.", "From the author's G-code."),
+                    ),
+                    F.fdef(
+                        "materialIds",
+                        "multi",
+                        "Material declarado",
+                        "Declared material",
+                        [F.opt(i, _MATERIAL_PT.get(n, n), n) for i, n in materials],
+                    ),
+                ],
+            ),
+            F.group(
+                "price",
+                "Preço",
+                "Price",
+                [
+                    F.fdef(
+                        "paid",
+                        "enum",
+                        "Preço",
+                        "Price",
+                        [
+                            F.opt("free", "Grátis", "Free"),
+                            F.opt("paid", "Pagos", "Paid"),
+                            F.opt("club", "Clube (assinatura)", "Club"),
+                            F.opt("all", "Todos (grátis, pagos e clube)", "All"),
+                        ],
+                    ),
+                    F.fdef("sale", "bool", "Em promoção", "On sale"),
+                ],
+            ),
+            F.group(
+                "license",
+                "Licença",
+                "License",
+                [
+                    F.fdef(
+                        "licenses",
+                        "multi",
+                        "Licença",
+                        "License",
+                        [F.opt(i, _LICENSE_PT.get(i, n), n) for i, n in licenses],
+                    ),
+                ],
+            ),
+        ],
+        origin,
+    )
+
+
+STATIC_LICENSES = [
+    ("7", "CC0"),
+    ("1", "CC-BY"),
+    ("2", "CC-BY-SA"),
+    ("8", "CC-BY-ND"),
+    ("3", "CC-BY-NC"),
+    ("4", "CC-BY-NC-SA"),
+    ("6", "CC-BY-NC-ND"),
+    ("9", "GPL 2.0"),
+    ("12", "GPL 3.0"),
+    ("10", "LGPL"),
+    ("11", "BSD"),
+    ("13", "Standard Digital File"),
+    ("15", "Commercial Use"),
+]
+STATIC_MATERIALS = [
+    ("1", "PLA"),
+    ("8", "PET"),
+    ("3", "ASA"),
+    ("4", "Flex"),
+    ("2", "ABS"),
+    ("7", "PC"),
+    ("16", "PA"),
+    ("6", "Nylon"),
+    ("11", "Carbon filled"),
+]
+
+
+def _gql_literal(fid: str, value: Any) -> str:
+    """Valor já validado contra o esquema → literal GraphQL (enums sem aspas, IDs como string)."""
+    if value is True:
+        return "true"
+    if fid in ("filesType", "paid"):
+        return str(value)
+    if fid == "publishedDateLimitDays":
+        return str(int(value))
+    if fid == "nozzleDiameters":
+        return "[" + ",".join(str(float(v)) for v in value) + "]"
+    if fid == "materialIds":  # [Int] (licenses é [ID]); medido: "1" dá erro de tipo
+        return "[" + ",".join(str(int(v)) for v in value) + "]"
+    return "[" + ",".join(f'"{int(v)}"' for v in value) + "]"
+
+
+def filter_args(filters: dict[str, Any]) -> str:
+    return "".join(f",{fid}:{_gql_literal(fid, v)}" for fid, v in sorted(filters.items()))
 
 
 _IMAGE_PATH = re.compile(
@@ -131,7 +297,7 @@ class PrintablesSource(CatalogSource):
     thumbnail_hosts = CDN_HOSTS
     permission_kind = "library"
     printer_filter = "author_printer"
-    sorts = ("popular", "newest", "relevance")
+    sorts = ("popular", "newest", "relevance", "rating", "makes")
     review_kinds = ("all",)
     review_sorts = ("top",)
 
@@ -157,7 +323,9 @@ class PrintablesSource(CatalogSource):
         data = await graphql(
             client,
             """query Browse($q:String!,$limit:Int,$offset:Int,$order:SearchChoicesEnum,$category:ID,$printers:[Int]) {
-          searchPrints2(query:$q,printType:print,limit:$limit,offset:$offset,ordering:$order,categoryId:$category,printerIds:$printers) {
+          searchPrints2(query:$q,printType:print,limit:$limit,offset:$offset,ordering:$order,categoryId:$category,printerIds:$printers"""
+            + filter_args(req.filters)
+            + """) {
             totalCount items { """
             + CARD_FIELDS
             + " } } }",
@@ -175,11 +343,37 @@ class PrintablesSource(CatalogSource):
             "printer_filter": {"mode": "author_printer", "applied": bool(ids), "printer_ids": ids},
         }
 
+    async def filter_schema(self, client: httpx.AsyncClient) -> dict[str, Any]:
+        try:
+            data = await graphql(client, "{ licenses { id name abbreviation } materials { id name } }")
+            lic = [
+                (str(x["id"]), str(x.get("abbreviation") or x["name"])[:60])
+                for x in data.get("licenses") or []
+                if isinstance(x, dict) and str(x.get("id", "")).isdigit() and x.get("name")
+            ]
+            mat = [
+                (str(x["id"]), str(x["name"])[:60])
+                for x in data.get("materials") or []
+                if isinstance(x, dict) and str(x.get("id", "")).isdigit() and x.get("name")
+            ]
+        except Exception:  # noqa: BLE001 - sem a API, a lista estática medida
+            lic, mat = [], []
+        if lic and mat:
+            return build_schema(lic, mat, "graphql")
+        return build_schema(STATIC_LICENSES, STATIC_MATERIALS, "static")
+
     async def categories(self, client: httpx.AsyncClient) -> list[dict[str, str]]:
-        data = await graphql(client, "{ categories { id name } }")
+        data = await graphql(client, "{ categories { id name path { name } } }")
         if not isinstance(data.get("categories"), list):
             raise ProviderUnavailableError("Printables returned invalid categories")
-        return [{"id": str(c["id"]), "name": c["name"]} for c in data["categories"] if c.get("id") and c.get("name")]
+
+        def full(c: dict[str, Any]) -> str:
+            path = [
+                p.get("name") for p in c.get("path") or [] if isinstance(p, dict) and isinstance(p.get("name"), str)
+            ]
+            return " / ".join(path) if len(path) > 1 else c["name"]
+
+        return [{"id": str(c["id"]), "name": full(c)} for c in data["categories"] if c.get("id") and c.get("name")]
 
     async def _model(self, client: httpx.AsyncClient, model_id: str) -> dict[str, Any]:
         data = await graphql(
