@@ -114,8 +114,24 @@ fallback quando o usuário não enxerga impressora nenhuma.
 | Thingiverse | API oficial, **App Token** | sim (com token) | sim (com token) | não aplicável |
 | Thangs, Cults3D, MyMiniFactory, Crealty Cloud | — | não implementadas (ver docs) | — | — |
 
+### Filtro avançado e CyberBrick (2026-11-19)
+
+Botão **Filtros** na barra (só com uma fonte selecionada) abre um modal com os filtros que a API da fonte aceita na
+requisição (folha de baixo no celular; `?filters=1` na URL, então o voltar do Android fecha), agrupados, com contador no
+botão, **Limpar** e **Aplicar**. Filtros ativos viram chips removíveis acima da grade; ficam lembrados por fonte em
+`localStorage['custom.models.filters.<fonte>']`. A chave **CyberBrick** (MakerWorld, `model_tag=cb`) fica sempre na
+barra, fora do modal, e o card mostra o selo CyberBrick. Ordenações extras por fonte (MakerWorld: curtidas, impulsos,
+impressões, coleções, aleatório; Printables: avaliação, makes; Thingiverse: makes, texto) e "Mais novos" do MakerWorld
+virou `orderBy=newUploads`. Esquema, parâmetros e evidência por fonte: `custom/docs/fontes-de-modelos.md` (seção
+"Filtro avançado"). Backend: `GET /custom/models/<fonte>/filters` (cache 1 h) e `filters=<JSON>` no `/browse`
+(fora do esquema → 400; entra na chave de cache). Thingiverse ganhou categorias (`/categories/{slug}` → `children`).
+Screenshots (390x844): `~/.cache/bambuddy-qa/catalog-filters/`. **Nenhum arquivo do upstream tocado.**
+
 ### Interruptores
 
+- Filtro avançado: `frontend/src/custom/flags.ts` → `CATALOG_FILTERS = 'on'`; no navegador
+  `localStorage.setItem('custom.catalogFilters','off')` (some o botão, a chave CyberBrick e os chips; a busca volta a
+  não mandar `filters`). Testes: `setCatalogFiltersOverride('on')`.
 - Frontend: `frontend/src/custom/flags.ts` → `MODEL_CATALOG = 'on'`; no navegador `localStorage.setItem('custom.modelCatalog','off')`.
   Nos testes (vitest) o efetivo é `'off'` (suíte do upstream intacta); testes nossos usam `setModelCatalogOverride('on')`.
 - Backend: `BAMBUDDY_CUSTOM_MODELS_CATALOG=0` não registra as rotas.
@@ -127,11 +143,13 @@ fallback quando o usuário não enxerga impressora nenhuma.
 |---|---|
 | `backend/app/custom/asgi.py` | ponto de entrada da imagem: importa `backend.app.main.app` e chama `install()` |
 | `backend/app/custom/api.py` | `install(app)`: inclui os routers do fork e os move para **antes** da rota pega-tudo do SPA (`GET /{full_path:path}`) |
-| `backend/app/custom/models_catalog/` | `router.py` (`/api/v1/custom/models/{sources, <fonte>/browse, categories, thumbnail, <id>, <id>/reviews, <id>/save, author/<uid>}`), `makerworld.py`, `printables.py`, `thingiverse.py`, `transport.py` (cache, allowlist de CDN, validação STL/3MF), `printer_models.py` (modelo → `devModelName`/id do Printables) |
+| `backend/app/custom/models_catalog/` | `filters.py` (esquema/validação do filtro avançado), `router.py` (`/api/v1/custom/models/{sources, <fonte>/browse, filters, categories, thumbnail, <id>, <id>/reviews, <id>/save, author/<uid>}`), `makerworld.py`, `printables.py`, `thingiverse.py`, `transport.py` (cache, allowlist de CDN, validação STL/3MF), `printer_models.py` (modelo → `devModelName`/id do Printables) |
 | `backend/tests/custom/` | transporte, fontes (transporte simulado), rotas com a biblioteca real e permissões |
 | `custom/scripts/smoke_models_catalog.py` | smoke ao vivo (poucas requisições, sem download) |
-| `frontend/src/custom/models/` | `ModelCatalog.tsx`, `ModelDetail.tsx`, `catalogTab.ts` (gancho), `usePrinterModels.ts`, `api.ts`, `i18n.ts` (pt-BR/en próprio), `shared.tsx`, `constants.ts`, `utils.ts`, `types.ts` |
+| `frontend/src/custom/models/` | `FiltersModal.tsx` (modal, chips, chave CyberBrick), `filters.ts` (persistência/sanitize/rótulos), `ModelCatalog.tsx`, `ModelDetail.tsx`, `catalogTab.ts` (gancho), `usePrinterModels.ts`, `api.ts`, `i18n.ts` (pt-BR/en próprio), `shared.tsx`, `constants.ts`, `utils.ts`, `types.ts` |
 | `frontend/src/custom/__tests__/modelCatalog.test.tsx` | aba/flag, filtro padrão e persistência, modelo da impressora, Printables N/A, fonte sem chave, detalhe/salvar/fatiar |
+| `frontend/src/custom/__tests__/modelCatalogFilters.test.tsx` | filtro avançado: flag desligada, modal/aplicar/limpar, contador, chips, persistência por fonte, CyberBrick e selo, ordens por fonte |
+| `backend/tests/custom/test_models_catalog_filters.py` | esquema por fonte (cfg2/GraphQL/estático), validação, parâmetros de cada fonte, rota e chave de cache |
 
 ### Pontos de contato no upstream
 

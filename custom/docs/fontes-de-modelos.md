@@ -44,7 +44,8 @@ Código: `backend/app/custom/models_catalog/` e `frontend/src/custom/models/`. O
   "Em alta" usa o ranking padrão do `design2` sem palavra (733 modelos com `N2S` no teste, mesmo feed de "quentes");
   com o filtro desligado usa o `nav` Trending (471). Os totais do ranking sem palavra oscilam alguns itens entre
   chamadas.
-- "Mais novos" = `designCreateSince=1` (criados nas últimas 24 h); rótulo "Recentes · 24 h".
+- "Mais novos" = `orderBy=newUploads` (ordenação real listada no `cfg2`; até 2026-11-19 era o filtro
+  `designCreateSince=1`, "Recentes · 24 h", que agora é o filtro "Publicado" do filtro avançado).
 - Detalhe: perfis ordenados `nativo` (perfil feito para A1) → `compatível` (A1 em `otherCompatibility`) → `sem info`
   (perfis da comunidade que só vêm em `/instances`, sem dados de compatibilidade) → `outra impressora`; o primeiro
   fatiável nativo/compatível vem pré-selecionado. Ex.: modelo 1685835 → 3 perfis "Feito para A1" primeiro.
@@ -80,6 +81,78 @@ Código: `backend/app/custom/models_catalog/` e `frontend/src/custom/models/`. O
 - Para ligar: criar um app em https://www.thingiverse.com/apps/create (conta Thingiverse/MakerBot), copiar o
   **App Token** e pôr no container `BAMBUDDY_CUSTOM_THINGIVERSE_API_KEY=<token>` (env do stack, fora do git); reiniciar.
   Respeitar os termos da API do Thingiverse (uso pessoal/não comercial, atribuição).
+
+## Filtro avançado por fonte (2026-11-19)
+
+Botão **Filtros** (modal; folha de baixo no celular) com tudo o que cada API filtra **na requisição**, medido ao vivo
+mudando o `total` da mesma busca com e sem o parâmetro (valor inválido → 0 ou erro). Esquema servido por
+`GET /api/v1/custom/models/<fonte>/filters` (cache 1 h); o `/browse` recebe `filters=<JSON>` e devolve **400** para id ou
+valor fora do esquema; os filtros entram na chave de cache. Só aparece o que funcionou; o que o servidor ignora ficou
+de fora (lista abaixo). Ordenações extras entram no seletor de ordem quando a fonte está selecionada.
+
+### MakerWorld (`select/design2`; opções do `GET search-service/cfg2` oficial, fallback estático)
+
+Medido com `keyword=box` (base 5621-5644):
+
+| Filtro (UI) | Parâmetro | Tipo | Evidência |
+|---|---|---|---|
+| Tipo de modelo (Destaque, Exclusivo, **CyberBrick**, Maker's Supply, Customizável, Paramétrico) | `model_tag` | um valor (vírgula = E: `cb,featured` → 0) | cb 8, featured 199, param 2081, custom 2324, ms 2597; sem palavra `cb` → 626 |
+| Publicado (24 h, 7, 30, 90 dias, 1 ano) | `designCreateSince` (dias) | período | 7 → 1602 |
+| Com perfil de impressão | `isPrintable=true` | sim/não | 5225 |
+| Tipo de bico (Padrão, Alto fluxo, TPU 285) | `volumeTypes` | vários (vírgula = OU) | High Flow 120; + TPU285 → 123 |
+| Diâmetro do bico (0.2/0.4/0.6/0.8) | `nozzleDiameters` | vários (OU) | 0.2 → 1334; 0.6 → 1281; 0.2,0.6 → 1956 |
+| Cores (só uma cor / só multicor) | `multiColor` | um valor | false 4780 / true 3765 |
+| Tempo de impressão (faixa, opções do cfg2 em minutos) | `printDuration=MIN-MAX` (∞ = vazio) | faixa | 0-15 → 1493; o nome `print_duration` do cfg2 é ignorado (5641) |
+| Licença (CC0, BY, …, Standard Digital File License) | `licenses` | vários (OU) | BY 2222; BY,CC0 → 2576 |
+| Ordem: Em alta, Downloads, **Mais novos**, Relevância, Curtidas, Impulsos, Impressões, Coleções, Aleatório | `orderBy` = `hotScore`/`downloadCount`/`newUploads`/`score`/`likeCount`/`boosts`/`printCount`/`collectionCount`/`random` | — | todos mudam a ordem; `newUploads` sem palavra traz o modelo publicado minutos antes |
+
+Fora de propósito: `devModelNames` (é a chave "Só para minha A1"), `total_weight`/`weight` (ignorados), `my_filament`
+e `materialTypes` (0 sempre/precisa de login), `designType` (reduz, mas sem significado confirmado), `withStep`.
+Com qualquer filtro, "Em alta" usa o `design2` (o feed `nav` Trending ignora filtros).
+
+**CyberBrick fixo na barra**: chave **CyberBrick** fora do modal = `model_tag=cb` (na visão "Todas" leva para o
+MakerWorld). Cada hit traz `cyberBrickNeeded`/`isFeaturedCyberBrick`; o card ganha o selo **CyberBrick**
+(`card.cyberbrick`). Ao vivo: `box` + CyberBrick + perfil → 9 (9/9 com selo); sem palavra + A1 → 590 (24/24 com selo).
+
+### Printables (`searchPrints2`; licenças e materiais por `{ licenses { id name abbreviation } materials { id name } }`)
+
+Medido com `query:"esp32"` (base 4469):
+
+| Filtro (UI) | Argumento | Tipo | Evidência |
+|---|---|---|---|
+| Publicado (24 h … 1 ano) | `publishedDateLimitDays: Int` | período | 30 → 195 |
+| Com makes | `hasMake: true` | sim/não | 1133 |
+| Destaque | `featured: true` | sim/não | 2 |
+| Premiado em concurso | `competitionAwarded: true` | sim/não | 8 |
+| Só gerados por IA | `aiGenerated: true` | sim/não (false não exclui) | 128 |
+| G-code (com / sem) | `filesType: GCODE / NONE` | um valor (`SLA` fora: a busca é só `printType:print`) | 297 / 4172 |
+| Diâmetro do bico (G-code do autor) | `nozzleDiameters: [Float]` | vários | [0.4] → 283 |
+| Material declarado | `materialIds: [Int]` (string dá erro de tipo) | vários | [1] PLA → 178; PLA + makes → 70 |
+| Preço (grátis, pagos, clube, todos) | `paid: PaidEnum` | um valor | 4363 / 63 / 7 / 4537 |
+| Em promoção | `sale: true` | sim/não | 0 no teste (argumento válido) |
+| Licença | `licenses: [ID]` | vários | [1] CC-BY → 856 |
+| Ordem: Populares, Mais novos, Relevância, **Melhor avaliados**, **Mais makes** | `ordering` = `popular`/`latest`/`best_match`/`rating`/`makes_count` | — | mudam a ordem |
+
+Categoria continua no seletor de categorias, agora com o caminho ("Hobby & Makers / Electronics"). Não existem:
+tags, autor, coleção, nota mínima, customizável, multicor, tempo de impressão.
+
+### Thingiverse (`/search/{termo}?type=things`, com User-Agent)
+
+Medido com `esp32` (base 4863):
+
+| Filtro (UI) | Parâmetro | Tipo | Evidência |
+|---|---|---|---|
+| Categoria (seletor de categorias) | `category_id` (subcategorias de `/categories/{slug}` → `children`; 73 no total) | um valor | 92 Electronics → 1681 |
+| Publicado entre (1 ano / 30 / 7 dias atrás) | `posted_after` + `posted_before` (fim só com início) | faixa | now-30d → 90; now-365d…now-30d → 820 |
+| Com makes | `has_makes=1` | sim/não | 515; + licença cc → 212 |
+| Destaque | `is_featured=1` | sim/não | 86 |
+| Customizável | `customizable=1` | sim/não | 50 |
+| Só remixes | `is_derivative=1` | sim/não | 944 |
+| Só em andamento (WIP) | `is_wip=1` | sim/não | 578 |
+| Licença | `license` (cc, cc-sa, cc-nd, cc-nc, cc-nc-sa, cc-nc-nd, pd0, gpl, lgpl, bsd) | um valor | cc → 1763 |
+| Ordem: Populares, Mais novos, Relevância, **Mais makes**, **Texto** | `sort` = `popular`/`newest`/`relevant`/`makes`/`text` | — | mudam a ordem (likes/downloads/collections são ignorados) |
+
+Ignorados pelo servidor: `is_customizable`, `has_remixes`, `file_types`, `is_nsfw`, `has_files`.
 
 ## Segurança
 
