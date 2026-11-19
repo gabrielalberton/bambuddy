@@ -421,3 +421,21 @@ material, `KValueLine` (opcional) e trilha da barra por último.
 - (2026-11-18, 2ª rodada) Quando a recarga comum não resolve, `hardReload()` limpa o CacheStorage, desregistra o SW e recarrega. Isso cobre o caso de um arquivo de `/assets` guardado corrompido pelo SW, que usa cache-first, e quebrava sempre a mesma tela. A tela de falha agora mostra a mensagem do erro.
   - `backend/app/custom/asset_404.py`: um 404 em `/assets/*` sai com `Cache-Control: no-store`. O upstream manda `max-age=14400`, então o navegador e o Cloudflare guardavam o 404.
   - Teste: `test_asset_404.py`.
+
+## Barras de temperatura no card (`custom(temp-bars)`, 2026-11-19)
+
+- Pedido do Gabriel: bico e mesa com uma barrinha igual à de nível de filamento.
+  - Escala: mesa 20 → 67 °C e bico 25 → 250 °C = 0 → 100%, com clamp.
+  - Opacidade 0,6 com a mesa < 30 °C ou o bico < 40 °C; cada barra decide pela própria temperatura.
+  - Cor sólida da posição atual, de azul claro `#7cc4ff` a vermelho vivo `#ff1a1a`, interpolada em HSL pelo violeta/magenta. Em RGB linear o meio vira um lilás cinza que parece "desligado". Não usa gradiente até a ponta: numa barra de ~100 px no celular, a ponta fica pequena demais para ler.
+  - Tracinho branco no alvo, quando o alvo for > 0. O número da temperatura do upstream continua igual.
+  - Bico duplo (`nozzle_2`, "L / R") não ganha barra no bico.
+- Interruptor: `TEMP_BARS` em `custom/flags.ts`, ligado. Desliga com `localStorage.setItem('custom.tempBars', 'off')`. Nos testes o efetivo é `off`.
+- Código:
+  - `frontend/src/custom/printer/tempBarScale.ts`: escala, opacidade e cor, funções puras;
+  - `frontend/src/custom/printer/TempBar.tsx`: componente.
+- `PrintersPage.tsx`, +3 linhas:
+  - import abaixo de `useFilamentListClass`;
+  - `<TempBar kind="nozzle" .../>` antes de `{statusControlMenu === 'nozzle-temp' && (`;
+  - `<TempBar kind="bed" .../>` depois do `<p>` de `{Math.round(status.temperatures.bed || 0)}°C`.
+- Testes: `custom/__tests__/tempBars.test.tsx`, que cobre escala/clamp, os limiares 29,9/30 e 39,9/40, as cores nos extremos e no meio, o card real com a flag ligada e desligada, e o bico duplo.

@@ -95,6 +95,7 @@ import { compactCard, isPrintingState } from '../custom/printer/compactCard';
 import { InHeader } from '../custom/layout/HeaderSlot';
 import { headerStatusEnabled } from '../custom/layout/headerFlags';
 import { useFilamentListClass } from '../custom/printer/filamentList';
+import { TempBar } from '../custom/printer/TempBar'; // custom(temp-bars)
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import {
@@ -4789,6 +4790,7 @@ function PrinterCard({
                           </p>
                         </>
                       )}
+                      <TempBar kind="nozzle" temps={status.temperatures} />
                       {statusControlMenu === 'nozzle-temp' && (
                         isDualNozzle ? (
                           <IndicatorControlPopover
@@ -4855,6 +4857,7 @@ function PrinterCard({
                       <p className="text-[length:var(--pc-t11,11px)] text-white">
                         {Math.round(status.temperatures.bed || 0)}°C
                       </p>
+                      <TempBar kind="bed" temps={status.temperatures} />
                       {statusControlMenu === 'bed-temp' && (
                         <IndicatorControlPopover
                           title="Set Bed Temperature"

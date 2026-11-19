@@ -107,3 +107,35 @@ export function isFilamentListEnabled(): boolean {
   }
   return FILAMENT_LIST === 'on';
 }
+
+/**
+ * TEMP_BARS ("barras de temperatura" no card da impressora, bico e mesa):
+ *  - 'on':  barrinha no estilo da de filamento embaixo da temperatura;
+ *  - 'off': cartões de temperatura do upstream intactos.
+ * Nos testes o efetivo é 'off'; testes nossos usam setTempBarsOverride(). No navegador:
+ *   localStorage.setItem('custom.tempBars', 'off')
+ */
+export type TempBarsMode = 'on' | 'off';
+
+export const TEMP_BARS: TempBarsMode = 'on';
+
+export const TEMP_BARS_STORAGE_KEY = 'custom.tempBars';
+
+let tempBarsOverride: TempBarsMode | null = null;
+
+/** Só para testes. */
+export function setTempBarsOverride(mode: TempBarsMode | null): void {
+  tempBarsOverride = mode;
+}
+
+export function isTempBarsEnabled(): boolean {
+  if (tempBarsOverride) return tempBarsOverride === 'on';
+  if (import.meta.env.MODE === 'test') return false;
+  try {
+    const stored = localStorage.getItem(TEMP_BARS_STORAGE_KEY);
+    if (stored === 'on' || stored === 'off') return stored === 'on';
+  } catch {
+    /* localStorage indisponível */
+  }
+  return TEMP_BARS === 'on';
+}
