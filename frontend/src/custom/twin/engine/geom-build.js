@@ -6,6 +6,8 @@
 
 const PROFILE6 = [[-0.5, 0.0, -1, 0], [-0.5, 0.5, -0.92, 0.38], [-0.3, 1.0, -0.38, 0.92], [0.3, 1.0, 0.38, 0.92], [0.5, 0.5, 0.92, 0.38], [0.5, 0.0, 1, 0]];
 const PROFILE4 = [[-0.5, 0.0, -1, 0.1], [-0.34, 1.0, -0.6, 0.8], [0.34, 1.0, 0.6, 0.8], [0.5, 0.0, 1, 0.1]];
+// recheio barato: só a face de cima do filete (2 triângulos por segmento); visto de cima/lado basta para ver o preenchimento
+const PROFILE2 = [[-0.5, 1.0, 0, 1], [0.5, 1.0, 0, 1]];
 const INFILL = new Set(['Sparse infill', 'Internal solid infill', 'Gap infill']);
 const INNER = new Set(['Inner wall']);
 
@@ -16,8 +18,12 @@ export function build(m) {
   // 1) quais registros entram: extrusão, a partir da camada 1
   const featName = (a) => features[attrs[a][0]];
   const passes = [
+    // o recheio é o ÚLTIMO a sair: antes, perfil mais simples (4 pontos) e simplificação mais grossa na peça inteira
     { name: 'full', drop: new Set(), prof: PROFILE6, tol: 0.05 },
-    { name: 'sem-recheio', drop: INFILL, prof: PROFILE6, tol: 0.06 },
+    { name: 'recheio-plano', drop: new Set(), prof: PROFILE6, infillProf: PROFILE2, tol: 0.05 },
+    { name: 'full-4', drop: new Set(), prof: PROFILE4, infillProf: PROFILE2, tol: 0.08 },
+    { name: 'full-4-grosso', drop: new Set(), prof: PROFILE4, infillProf: PROFILE2, tol: 0.2 },
+    { name: 'sem-recheio-esparso', drop: new Set(['Sparse infill']), prof: PROFILE4, infillProf: PROFILE2, tol: 0.2 },
     { name: 'sem-recheio-4', drop: INFILL, prof: PROFILE4, tol: 0.08 },
     { name: 'sem-recheio-parede-int', drop: new Set([...INFILL, ...INNER]), prof: PROFILE4, tol: 0.12 },
   ];
@@ -38,26 +44,28 @@ function collect(p, m, featName) {
   let tris = 0;
   let cur = null;
   const flush = () => {
-    if (cur && cur.pts.length >= 2) { tris += (cur.pts.length - 1) * 2 * (p.prof.length - 1); out.push(cur); }
+    if (cur && cur.pts.length >= 2) { tris += (cur.pts.length - 1) * 2 * (cur.prof.length - 1); out.push(cur); }
     cur = null;
   };
   for (let i = 0; i < n; i++) {
     const a = attrs[attr[i]];
     const layer = a[4];
-    if (kind[i] !== 1 || layer < 1 || p.drop.has(featName(attr[i]))) { flush(); continue; }
+    const feat = featName(attr[i]);
+    if (kind[i] !== 1 || layer < 1 || p.drop.has(feat)) { flush(); continue; }
     const fil = a[3];
+    const prof = p.infillProf && INFILL.has(feat) ? p.infillProf : p.prof;
     const x1 = xyz[i * 3] * 0.01, y1 = xyz[i * 3 + 1] * 0.01, z1 = xyz[i * 3 + 2] * 0.01;
     const px = i > 0 ? xyz[(i - 1) * 3] * 0.01 : x1, py = i > 0 ? xyz[(i - 1) * 3 + 1] * 0.01 : y1, pz = i > 0 ? xyz[(i - 1) * 3 + 2] * 0.01 : z1;
     const t0 = i > 0 ? t[i - 1] : 0;
-    if (cur && (cur.fil !== fil || cur.layer !== layer)) flush();
+    if (cur && (cur.fil !== fil || cur.layer !== layer || cur.prof !== prof)) flush();
     if (!cur) {
-      cur = { fil, layer, pts: [], i0: i };
+      cur = { fil, layer, prof, pts: [], i0: i };
       cur.pts.push({ x: px, y: py, z: pz, t: t0, w: a[1], h: a[2] });
     } else {
       const lp = cur.pts[cur.pts.length - 1];
       if (Math.abs(lp.x - px) > 0.02 || Math.abs(lp.y - py) > 0.02) {   // descontinuidade (salto): novo strand
         flush();
-        cur = { fil, layer, pts: [], i0: i };
+        cur = { fil, layer, prof, pts: [], i0: i };
         cur.pts.push({ x: px, y: py, z: pz, t: t0, w: a[1], h: a[2] });
       }
     }
@@ -93,10 +101,8 @@ function collinear(A, B, N, tol) {
 
 function emit(strands, p, m) {
   const list = strands.list;
-  const prof = p.prof;
-  const NP = prof.length;
   let nv = 0, nt = 0;
-  for (const s of list) { nv += s.pts.length * NP; nt += (s.pts.length - 1) * 2 * (NP - 1); }
+  for (const s of list) { const NP = s.prof.length; nv += s.pts.length * NP; nt += (s.pts.length - 1) * 2 * (NP - 1); }
   const pos = new Float32Array(nv * 3);
   const nor = new Int8Array(nv * 3);
   const aT = new Float32Array(nv);
@@ -110,6 +116,7 @@ function emit(strands, p, m) {
   for (let si = 0; si < list.length; si++) {
     const s = list[si];
     const pts = s.pts;
+    const prof = s.prof, NP = prof.length;   // perfil por strand (recheio pode ser plano)
     sIdx[si] = io;
     sT0[si] = pts[0].t; sT1[si] = pts[pts.length - 1].t;
     const base = vo;

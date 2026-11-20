@@ -175,6 +175,7 @@ Chave **"Câmera | 3D"** onde o Bambuddy mostra a câmera da A1: em "3D", o quad
   do vitest fica desligado (override `setTwinOverride()`). Escolha do usuário: `localStorage['custom.twin.view']`.
 - GLB opcional da A1 em `<data>/custom/twin/a1.glb` (licença desconhecida: **nunca** versionar; sem ele, modelo procedural).
 - Placa liberada (2026-11-19): o snapshot do SSE traz `plate_wait` (= `printer_manager.is_awaiting_plate_clear`). Com `false` fora de RUNNING/PREPARE/PAUSE ("Marcar placa como liberada" depois do fim), o twin esconde a peça. A próxima impressão volta a mostrar.
+- Recheio (2026-11-20): no orçamento de triângulos (celular 900 mil, desktop 2,2 mi) o recheio passa a ser o último a sair. Antes vira faixa plana (`PROFILE2`, 2 triângulos/segmento) e o perfil das paredes cai de 6 para 4 pontos (`engine/geom-build.js`, teste `twinGeom.test.ts`).
 - Linha sendo depositada (2026-11-19): durante a impressão, os últimos 3 s de programa da peça brilham em laranja e esfriam para a cor do filamento (`HOT_S` em `engine/object.js`), para ver o filete saindo do bico.
 
 ### Código nosso
