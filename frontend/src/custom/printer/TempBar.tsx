@@ -1,6 +1,7 @@
 /** Barra de temperatura (componente); escala/cor/opacidade em ./tempBarScale.ts. */
 import { isTempBarsEnabled } from '../flags';
 import { TEMP_BAR_SCALE, tempBarColor, tempBarOpacity, tempFraction, type TempBarKind } from './tempBarScale';
+import './tempBars.css';
 
 interface Temps {
   nozzle?: number;
@@ -8,6 +9,16 @@ interface Temps {
   nozzle_2?: number;
   bed?: number;
   bed_target?: number;
+}
+
+/**
+ * Atributo do bloco de temperatura do upstream: com ele, o bloco vira uma linha horizontal de largura inteira
+ * (ícone · rótulo · número · barra), como as barras de filamento (layout em ./tempBars.css).
+ * Bico duplo fica com os blocos do upstream (os dois, para não misturar linha e bloco).
+ */
+export function tempRowAttr(kind: TempBarKind, temps: Temps | null | undefined): { 'data-temp-row'?: TempBarKind } {
+  if (!temps || !isTempBarsEnabled() || temps.nozzle_2 !== undefined) return {};
+  return { 'data-temp-row': kind };
 }
 
 /** Gancho no cartão de temperatura do PrinterCard: `<TempBar kind="bed" temps={status.temperatures} />`. */

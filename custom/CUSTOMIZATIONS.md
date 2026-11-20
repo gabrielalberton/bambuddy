@@ -174,6 +174,8 @@ Chave **"Câmera | 3D"** onde o Bambuddy mostra a câmera da A1: em "3D", o quad
 - Frontend: `frontend/src/custom/twin/twinFlags.ts` (`TWIN_VIEW`), ou `localStorage['custom.twin'] = 'off'|'on'`. Nos testes
   do vitest fica desligado (override `setTwinOverride()`). Escolha do usuário: `localStorage['custom.twin.view']`.
 - GLB opcional da A1 em `<data>/custom/twin/a1.glb` (licença desconhecida: **nunca** versionar; sem ele, modelo procedural).
+- Placa liberada (2026-11-19): o snapshot do SSE traz `plate_wait` (= `printer_manager.is_awaiting_plate_clear`). Com `false` fora de RUNNING/PREPARE/PAUSE ("Marcar placa como liberada" depois do fim), o twin esconde a peça. A próxima impressão volta a mostrar.
+- Linha sendo depositada (2026-11-19): durante a impressão, os últimos 3 s de programa da peça brilham em laranja e esfriam para a cor do filamento (`HOT_S` em `engine/object.js`), para ver o filete saindo do bico.
 
 ### Código nosso
 
@@ -443,17 +445,19 @@ material, `KValueLine` (opcional) e trilha da barra por último.
 ## Barras de temperatura no card (`custom(temp-bars)`, 2026-11-19)
 
 - Pedido do Gabriel: bico e mesa com uma barrinha igual à de nível de filamento.
-  - Escala: mesa 20 → 67 °C e bico 25 → 250 °C = 0 → 100%, com clamp.
+  - Escala: mesa 27 → 67 °C (mínimo era 20; 27 a pedido em 2026-11-19) e bico 25 → 250 °C = 0 → 100%, com clamp.
   - Opacidade 0,6 com a mesa < 30 °C ou o bico < 40 °C; cada barra decide pela própria temperatura.
   - Cor sólida da posição atual, de azul claro `#7cc4ff` a vermelho vivo `#ff1a1a`, interpolada em HSL pelo violeta/magenta. Em RGB linear o meio vira um lilás cinza que parece "desligado". Não usa gradiente até a ponta: numa barra de ~100 px no celular, a ponta fica pequena demais para ler.
   - Tracinho branco no alvo, quando o alvo for > 0. O número da temperatura do upstream continua igual.
   - Bico duplo (`nozzle_2`, "L / R") não ganha barra no bico.
+  - Layout (2026-11-19, 2ª rodada): os blocos de Bico e Mesa viram duas linhas de largura inteira (ícone · rótulo · número · barra), como as barras de filamento. `tempRowAttr()` põe `data-temp-row` no bloco do upstream e `printer/tempBars.css` faz o resto; bico duplo continua em blocos. O bloco "Impressão · Nh" (horas totais, `PrintHoursTile`) foi removido.
 - Interruptor: `TEMP_BARS` em `custom/flags.ts`, ligado. Desliga com `localStorage.setItem('custom.tempBars', 'off')`. Nos testes o efetivo é `off`.
 - Código:
   - `frontend/src/custom/printer/tempBarScale.ts`: escala, opacidade e cor, funções puras;
   - `frontend/src/custom/printer/TempBar.tsx`: componente.
-- `PrintersPage.tsx`, +3 linhas:
-  - import abaixo de `useFilamentListClass`;
+- `PrintersPage.tsx`, +5 linhas:
+  - import abaixo de `useFilamentListClass` (`TempBar, tempRowAttr`);
+  - `{...tempRowAttr('nozzle'|'bed', status.temperatures)}` nos dois blocos (logo após `title={statusControlTitle}`);
   - `<TempBar kind="nozzle" .../>` antes de `{statusControlMenu === 'nozzle-temp' && (`;
   - `<TempBar kind="bed" .../>` depois do `<p>` de `{Math.round(status.temperatures.bed || 0)}°C`.
 - Testes: `custom/__tests__/tempBars.test.tsx`, que cobre escala/clamp, os limiares 29,9/30 e 39,9/40, as cores nos extremos e no meio, o card real com a flag ligada e desligada, e o bico duplo.

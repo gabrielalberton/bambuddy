@@ -18,10 +18,11 @@ import {
 import { printerA1, idleStatus, installMemoryStorage } from './fixtures';
 
 describe('escala, clamp, opacidade e cor', () => {
-  it('mesa 20→67 e bico 25→250 viram 0→1, com clamp', () => {
+  it('mesa 27→67 e bico 25→250 viram 0→1, com clamp', () => {
+    expect(tempFraction('bed', 27)).toBe(0);
     expect(tempFraction('bed', 20)).toBe(0);
     expect(tempFraction('bed', 67)).toBe(1);
-    expect(tempFraction('bed', 43.5)).toBeCloseTo(0.5);
+    expect(tempFraction('bed', 47)).toBeCloseTo(0.5);
     expect(tempFraction('nozzle', 25)).toBe(0);
     expect(tempFraction('nozzle', 250)).toBe(1);
     expect(tempFraction('nozzle', 137.5)).toBeCloseTo(0.5);
@@ -76,22 +77,27 @@ describe('no card da impressora', () => {
 
   it('flag ligada: barra do bico e da mesa, número mantido, largura/cor/opacidade/alvo', async () => {
     setTempBarsOverride('on');
-    setup({ nozzle: 137.5, nozzle_target: 220, bed: 25, bed_target: 0, chamber: 28 });
+    setup({ nozzle: 137.5, nozzle_target: 220, bed: 29, bed_target: 0, chamber: 28 });
     const nozzleFill = await screen.findByTestId('temp-bar-nozzle-fill');
     const bedFill = screen.getByTestId('temp-bar-bed-fill');
     expect(nozzleFill.style.width).toBe('50%');
     expect(nozzleFill.style.opacity).toBe('1');
     expect(nozzleFill.style.backgroundColor).toBe('rgb(206, 75, 255)');
-    expect(bedFill.style.width).toBe('10.6%');
+    expect(bedFill.style.width).toBe('5%');
     expect(bedFill.style.opacity).toBe('0.6');
     // números do upstream continuam
     expect(screen.getByText('138°C')).toBeTruthy();
-    expect(screen.getByText('25°C')).toBeTruthy();
+    expect(screen.getByText('29°C')).toBeTruthy();
     // alvo: tracinho no bico (220), nenhum na mesa (alvo 0)
     expect(screen.getByTestId('temp-bar-nozzle-target').style.left).toBe('86.7%');
     expect(screen.queryByTestId('temp-bar-bed-target')).toBeNull();
     // a barra fica dentro do cartão da temperatura, logo após o número
-    expect(screen.getByTestId('temp-bar-bed').previousElementSibling?.textContent).toBe('25°C');
+    expect(screen.getByTestId('temp-bar-bed').previousElementSibling?.textContent).toBe('29°C');
+    // os dois blocos viram linhas horizontais (layout em tempBars.css)
+    expect(screen.getByTestId('temp-bar-bed').parentElement?.getAttribute('data-temp-row')).toBe('bed');
+    expect(screen.getByTestId('temp-bar-nozzle').parentElement?.getAttribute('data-temp-row')).toBe('nozzle');
+    // horas totais de impressão saíram do card
+    expect(screen.queryByText('Impressão')).toBeNull();
   });
 
   it('flag desligada: nenhuma barra (DOM do upstream)', async () => {
@@ -99,6 +105,7 @@ describe('no card da impressora', () => {
     setup({ nozzle: 200, bed: 60, chamber: 25 });
     await waitFor(() => expect(screen.getByText('200°C')).toBeTruthy());
     expect(document.querySelector('[data-testid^="temp-bar"]')).toBeNull();
+    expect(document.querySelector('[data-temp-row]')).toBeNull();
   });
 
   it('bico duplo (L / R) não ganha barra no bico, só na mesa', async () => {
@@ -106,5 +113,6 @@ describe('no card da impressora', () => {
     setup({ nozzle: 200, nozzle_2: 190, bed: 60, chamber: 25 });
     await screen.findByTestId('temp-bar-bed');
     expect(screen.queryByTestId('temp-bar-nozzle')).toBeNull();
+    expect(document.querySelector('[data-temp-row]')).toBeNull();
   });
 });

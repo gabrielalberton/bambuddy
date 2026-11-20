@@ -89,13 +89,13 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { useSinglePrinter } from '../custom/useSinglePrinter';
 import { InlineCamera } from '../custom/camera/InlineCamera';
-import { NozzleSizeBadge, PrintHoursTile, QueueChip } from '../custom/printer/CardExtras';
+import { NozzleSizeBadge, QueueChip } from '../custom/printer/CardExtras';
 import { PrinterPrefsChips } from '../custom/printer/PrinterPrefsChips'; // custom(printer-prefs)
 import { compactCard, isPrintingState } from '../custom/printer/compactCard';
 import { InHeader } from '../custom/layout/HeaderSlot';
 import { headerStatusEnabled } from '../custom/layout/headerFlags';
 import { useFilamentListClass } from '../custom/printer/filamentList';
-import { TempBar } from '../custom/printer/TempBar'; // custom(temp-bars)
+import { TempBar, tempRowAttr } from '../custom/printer/TempBar'; // custom(temp-bars)
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import {
@@ -4749,6 +4749,7 @@ function PrinterCard({
                     <div
                       className={statusControlClass}
                       title={statusControlTitle}
+                      {...tempRowAttr('nozzle', status.temperatures)} // custom(temp-bars)
                       onClick={() => canUseStatusControls && setStatusControlMenu(statusControlMenu === 'nozzle-temp' ? null : 'nozzle-temp')}
                     >
                       <button
@@ -4839,6 +4840,7 @@ function PrinterCard({
                     <div
                       className={statusControlClass}
                       title={statusControlTitle}
+                      {...tempRowAttr('bed', status.temperatures)} // custom(temp-bars)
                       onClick={() => canUseStatusControls && setStatusControlMenu(statusControlMenu === 'bed-temp' ? null : 'bed-temp')}
                     >
                       <button
@@ -4968,7 +4970,6 @@ function PrinterCard({
                         rackPrinter={trayLayout.rack}
                       />
                     )}
-                    {single && <PrintHoursTile hours={maintenanceInfo?.total_print_hours} />}
                   </div>
                   {!(compactCard(single) && !isPrintingState(status.state) && fanItems.every((f) => !f.value)) && ( // custom(compact-card)
                   <div className="mt-2 flex items-center gap-1.5">

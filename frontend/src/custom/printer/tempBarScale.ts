@@ -4,7 +4,7 @@
  * Mesmo desenho da barrinha de nível de filamento (trilho `h-1.5 bg-black/30
  * rounded-full`, preenchimento de cor sólida), embaixo do número que o upstream
  * já mostra (o número não muda). Escala, limiar de "frio" e cor:
- *  - mesa: 20 °C → 0%, 67 °C → 100%; abaixo de 30 °C a barra fica com opacidade 0,6;
+ *  - mesa: 27 °C → 0%, 67 °C → 100%; abaixo de 30 °C a barra fica com opacidade 0,6;
  *  - bico: 25 °C → 0%, 250 °C → 100%; abaixo de 40 °C, opacidade 0,6;
  *  - fora da faixa, clamp em 0/100%;
  *  - cor: de azul claro (#7cc4ff) a vermelho vivo (#ff1a1a) pela fração, interpolada
@@ -20,7 +20,7 @@
 export type TempBarKind = 'nozzle' | 'bed';
 
 export const TEMP_BAR_SCALE: Record<TempBarKind, { min: number; max: number; cold: number }> = {
-  bed: { min: 20, max: 67, cold: 30 },
+  bed: { min: 27, max: 67, cold: 30 },
   nozzle: { min: 25, max: 250, cold: 40 },
 };
 

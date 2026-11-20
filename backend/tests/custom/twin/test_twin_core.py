@@ -286,3 +286,21 @@ def test_spawned_parser_runs_out_of_process(tmp_path):
     jm = JobManager(tmp_path, None)
     gz, jid, info = asyncio.run(jm._run_parser(str(f), 1, {"name": "s"}, None))
     assert gzip.decompress(gz)[:4] == b"A1TW" and info["peak_rss_mb"] > 0
+
+
+def test_snapshot_reports_plate_wait(tmp_path):
+    """plate_wait: True com a placa aguardando liberação, False depois de "marcar placa como liberada"."""
+
+    class M:
+        awaiting = True
+
+        def is_awaiting_plate_clear(self, pid):
+            return self.awaiting
+
+    m = M()
+    hub = hubmod.TwinHub(7, cache_dir=tmp_path, manager=m, record=False)
+    assert hub.snapshot()["plate_wait"] is True
+    m.awaiting = False
+    assert hub.snapshot()["plate_wait"] is False
+    hub.sim = True
+    assert hub.snapshot()["plate_wait"] is None

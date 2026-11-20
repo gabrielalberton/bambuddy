@@ -322,13 +322,15 @@ export function createTwin(container, opts) {
         showObj = true;
       }
     } else if (tr) { T = tr.T; showObj = true; target = S.pose; }
+    // placa liberada no Bambuddy depois do fim (plate_wait false fora de RUNNING/PREPARE/PAUSE): a peça saiu da mesa
+    if (showObj && S.msg && S.msg.plate_wait === false && !['RUNNING', 'PREPARE', 'PAUSE'].includes(S.s.gcode_state)) showObj = false;
     // suavização curtíssima da pose (esconde correções do estimador)
     const k = 1 - Math.exp(-dt / (tr && tr.locked ? 0.035 : 0.6));
     S.pose.x += (target.x - S.pose.x) * k; S.pose.y += (target.y - S.pose.y) * k; S.pose.z += (target.z - S.pose.z) * k;
     model.setPose(S.pose.x, S.pose.y, S.pose.z);
     model.setLook({ nozzleTemp: S.s.nozzle_temper ?? 25, fan: (S.s.cooling_fan_speed ?? 0) / 15 + (kind === 1 ? 0.25 : 0), printing,
       unreliable: typeof S.s.home_flag === 'number' && (S.s.home_flag & 7) !== 7 }, dt);
-    object.update(T, dt, showObj && S.prog != null);
+    object.update(T, dt, showObj && S.prog != null, printing ? 1 : 0);
     updateCamera(nowS);
     renderer.render(scene, camera);
     // adaptação de qualidade: até 2x, desce em passos de 0,25 até PR_MIN (1,25x) só com FPS baixo de verdade

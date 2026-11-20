@@ -276,7 +276,18 @@ class TwinHub:
             "s": s,
             "job": self.jobs.public(),
             "since_pr": round(now - self.state.pr_at, 3) if self.state.pr_at else None,
+            "plate_wait": self.plate_wait(),
         }
+
+    def plate_wait(self) -> bool | None:
+        """Bambuddy ainda espera "placa liberada"? (True = peça na mesa). Liberada (False) com a impressão
+        terminada, o twin esconde a peça. None = sem informação (simulação/gerenciador ausente)."""
+        if self.sim:
+            return None
+        try:
+            return bool(self.manager.is_awaiting_plate_clear(self.printer_id))
+        except Exception:  # noqa: BLE001
+            return None
 
     def encode(self) -> str:
         return json.dumps(self.snapshot(), separators=(",", ":"))

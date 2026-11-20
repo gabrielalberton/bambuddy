@@ -4,6 +4,7 @@
 import * as THREE from 'three';
 
 const NPAL = 16;
+const HOT_S = 3.0; // s de programa com brilho na ponta da linha
 
 function patch(shader, mode, uniforms) {
   Object.assign(shader.uniforms, uniforms);
@@ -14,10 +15,15 @@ function patch(shader, mode, uniforms) {
 uniform float uNow;
 uniform vec3 uPal[${NPAL}];
 uniform float uGhostA;
+uniform float uHot;
 varying float vT;
 varying float vF;`);
   if (mode === 'printed') {
     frag = frag.replace('vec4 diffuseColor = vec4( diffuse, opacity );', 'if (vT > uNow) discard;\nvec4 diffuseColor = vec4( uPal[int(vF + 0.5)], opacity );');
+    // linha recém-extrudada (últimos HOT_S s de programa): brilho quente que esfria, para ver o filete sendo depositado
+    frag = frag.replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
+float hot = uHot * clamp(1.0 - (uNow - vT) / ${HOT_S.toFixed(1)}, 0.0, 1.0);
+totalEmissiveRadiance += vec3(1.0, 0.42, 0.12) * hot * hot * 1.6;`);
   } else if (mode === 'ghost') {
     frag = frag.replace('vec4 diffuseColor = vec4( diffuse, opacity );', 'if (vT <= uNow) discard;\nvec4 diffuseColor = vec4( mix(uPal[int(vF + 0.5)], vec3(0.55, 0.62, 0.72), 0.55), uGhostA );');
   }
@@ -30,6 +36,7 @@ export class PrintedObject {
     this.uNow = { value: 0 };
     this.uPal = { value: Array.from({ length: NPAL }, () => new THREE.Color(0xdddddd)) };
     this.uGhostA = { value: 0.045 };
+    this.uHot = { value: 0 };
     this.ready = false;
     this.fade = 0;
     this.setPalette(palette || []);
@@ -59,7 +66,7 @@ export class PrintedObject {
     this.r = r;
     this.gP = mk();
     this.gG = mk();
-    const u = { uNow: this.uNow, uPal: this.uPal, uGhostA: this.uGhostA };
+    const u = { uNow: this.uNow, uPal: this.uPal, uGhostA: this.uGhostA, uHot: this.uHot };
     const printedMat = new THREE.MeshStandardMaterial({ roughness: 0.55, metalness: 0.02, side: THREE.DoubleSide });
     printedMat.onBeforeCompile = (s) => patch(s, 'printed', u);
     printedMat.customProgramCacheKey = () => 'printed';
@@ -92,8 +99,10 @@ export class PrintedObject {
     return k;
   }
 
-  update(T, dt, show = true) {
+  // hot = 0..1: brilho da ponta (só imprimindo; parado/terminado a peça fica na cor do filamento)
+  update(T, dt, show = true, hot = 0) {
     if (!this.ready) return;
+    this.uHot.value += (hot - this.uHot.value) * Math.min(1, dt * 2);
     this.uNow.value = T;
     const r = this.r;
     const n = r.nStrands;

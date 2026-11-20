@@ -1,0 +1,45 @@
+/* custom(temp-bars): bloco de temperatura do upstream vira uma linha horizontal (ícone · rótulo · número · barra).
+   O atributo vem de tempRowAttr() (só com a flag ligada e bico único). */
+[data-temp-row] {
+  flex: 1 1 100% !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  gap: 0.5rem;
+  text-align: left !important;
+  padding: 0.375rem 1.75rem 0.375rem 0.625rem !important;
+}
+[data-temp-row] > svg {
+  margin-bottom: 0 !important;
+  flex-shrink: 0;
+}
+/* rótulo e número: no bico eles ficam dentro do hover card do bico (div.relative > div.cursor-default) */
+[data-temp-row] > .relative,
+[data-temp-row] .cursor-default {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+[data-temp-row] p:first-of-type {
+  min-width: 2.25rem;
+  white-space: nowrap;
+}
+[data-temp-row] p:last-of-type {
+  min-width: 2.75rem;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+[data-temp-row] > [data-testid^='temp-bar-'] {
+  flex: 1 1 auto;
+  width: auto !important;
+  min-width: 3rem;
+  margin-top: 0 !important;
+  align-self: center !important;
+}
+/* botão do histórico: centralizado na vertical, na ponta direita */
+[data-temp-row] > button:first-child {
+  top: 50% !important;
+  transform: translateY(-50%);
+}
