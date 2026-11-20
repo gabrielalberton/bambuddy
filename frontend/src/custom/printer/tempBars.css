@@ -21,8 +21,9 @@
   gap: 0.5rem;
   flex-shrink: 0;
 }
+/* rótulo com largura fixa: as duas barras começam na mesma coluna ("Bico · 0.4" x "Cama") */
 [data-temp-row] p:first-of-type {
-  min-width: 2.25rem;
+  min-width: 3.75rem;
   white-space: nowrap;
 }
 [data-temp-row] p:last-of-type {
