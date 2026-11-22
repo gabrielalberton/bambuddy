@@ -433,7 +433,7 @@ def _load_plate_geometry(zf: zipfile.ZipFile, trimesh, repair_winding):
     return np.vstack(all_vertices), np.vstack(all_faces)
 
 
-def _render_at_size(poly3d, size: int, Poly3DCollection, shade_kw: dict) -> bytes:
+def _render_at_size(poly3d, size: int, Poly3DCollection, shade_kw: dict, *, facecolors=None) -> bytes:
     """Render the prepared poly3d collection to an in-memory PNG.
 
     Matplotlib's object API, not pyplot. This runs in a worker thread (#3135)
@@ -460,11 +460,12 @@ def _render_at_size(poly3d, size: int, Poly3DCollection, shade_kw: dict) -> byte
     # ``shade=True`` needs a real ``edgecolors``: matplotlib shades the edge
     # colours alongside the face colours, and an empty array (``"none"``) makes
     # it raise on the broadcast. Keep the two in step if either moves.
+    facecolors = _BAMBU_GREEN if facecolors is None else facecolors
     ax.add_collection3d(
         Poly3DCollection(
             poly3d,
-            facecolors=_BAMBU_GREEN,
-            edgecolors=_BAMBU_GREEN,
+            facecolors=facecolors,
+            edgecolors=facecolors,
             linewidths=0.1,
             alpha=0.9,
             **shade_kw,

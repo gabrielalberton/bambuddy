@@ -17,6 +17,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.app.core.config import settings
+from backend.app.custom.model_preview.service import queue_model_thumbnail
 from backend.app.core.printer_scope import PrinterScope
 from backend.app.core.tasks import spawn_background_task
 from backend.app.models.archive import PrintArchive
@@ -1567,6 +1568,7 @@ class ArchiveService:
             refresh_plate_estimates(existing)
             await self.db.commit()
             await self.db.refresh(existing)
+            queue_model_thumbnail(existing, dest_file)
             return existing
 
         # Create archive record
@@ -1630,6 +1632,7 @@ class ArchiveService:
                 shutil.rmtree(archive_dir, ignore_errors=True)
             raise
         await self.db.refresh(archive)
+        queue_model_thumbnail(archive, dest_file)
 
         return archive
 

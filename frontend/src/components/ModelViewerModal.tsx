@@ -1,3 +1,4 @@
+import { modelPreviewUrl } from '../custom/modelPreview/preview';
 import { useState, useEffect, useRef, useMemo, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ExternalLink, Box, Cog, Loader2, Layers, Check, ChevronDown } from 'lucide-react';
@@ -753,6 +754,7 @@ export function ModelViewerModal({ archiveId, libraryFileId, title, fileType, on
                     : (capabilities.has_source
                       ? api.getSource3mfDownloadUrl(archiveId!)
                       : api.getArchiveDownload(archiveId!))}
+                  previewUrl={fileType === '3mf' && !hasMultiplePlates ? modelPreviewUrl(archiveId, libraryFileId) : undefined}
                   fileType={fileType}
                   buildVolume={capabilities.build_volume}
                   filamentColors={capabilities.filament_colors}

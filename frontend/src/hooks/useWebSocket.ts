@@ -437,6 +437,10 @@ export function useWebSocket() {
         debouncedInvalidate('archiveStats');
         break;
 
+      case 'library_thumbnails_changed':
+        debouncedInvalidate('library-files');
+        break;
+
       case 'archive_updated':
         debouncedInvalidate('archives');
         debouncedInvalidate('archive');

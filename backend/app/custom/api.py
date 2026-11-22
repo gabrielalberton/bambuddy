@@ -45,6 +45,9 @@ def install(app: FastAPI) -> list[str]:
     from .library_org.router import router as library_org_router
 
     app.include_router(library_org_router, prefix=app_settings.api_prefix)
+    from .model_preview.router import router as model_preview_router
+
+    app.include_router(model_preview_router, prefix=app_settings.api_prefix)
     from .asset_404 import Asset404NoStoreMiddleware
 
     if not any(m.cls is Asset404NoStoreMiddleware for m in app.user_middleware):

@@ -45,6 +45,7 @@ from backend.app.core.permissions import Permission
 from backend.app.core.printer_scope import PrinterScope, ensure_model_target_allowed
 from backend.app.core.row_visibility import visible_row_clauses
 from backend.app.core.tasks import spawn_background_task
+from backend.app.custom.model_preview.service import queue_model_thumbnail
 from backend.app.models.archive import PrintArchive
 from backend.app.models.library import LibraryFile, LibraryFileTag, LibraryFolder
 from backend.app.models.print_queue import PrintQueueItem
@@ -825,6 +826,7 @@ async def save_3mf_bytes_to_library(
     db.add(library_file)
     await db.commit()
     await db.refresh(library_file)
+    queue_model_thumbnail(library_file, file_path)
     return library_file, False
 
 
@@ -2667,6 +2669,7 @@ async def upload_file(
         db.add(library_file)
         await db.commit()
         await db.refresh(library_file)
+        queue_model_thumbnail(library_file, file_path)
 
         return FileUploadResponse(
             id=library_file.id,
@@ -2973,6 +2976,7 @@ async def extract_zip_file(
                     # Commit after each file to release database lock
                     # This prevents long-running transactions from blocking other requests
                     await db.commit()
+                    queue_model_thumbnail(library_file, file_path)
 
                 except Exception as e:
                     logger.error("Failed to extract %s: %s", zip_path, e)

@@ -1,3 +1,4 @@
+import { loadModelPreview } from '../custom/modelPreview/preview';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import * as THREE from 'three';
@@ -127,6 +128,7 @@ const DEFAULT_BUILD_VOLUME: BuildVolume = { x: 256, y: 256, z: 256 };
 
 interface ModelViewerProps {
   url: string;
+  previewUrl?: string;
   fileType?: string;
   buildVolume?: BuildVolume;
   filamentColors?: string[];
@@ -781,6 +783,7 @@ function buildStepGroup(meshes: StepMeshData[], filamentColors?: string[]): THRE
 
 export function ModelViewer({
   url,
+  previewUrl,
   fileType,
   buildVolume = DEFAULT_BUILD_VOLUME,
   filamentColors,
@@ -972,7 +975,27 @@ export function ModelViewer({
       headers['Authorization'] = `Bearer ${token}`;
     }
 
-    if (normalizedType === 'stl') {
+    const previewRequest = new AbortController();
+    if (previewUrl) {
+      loadModelPreview(previewUrl, headers, previewRequest.signal)
+        .then(async (meshes) => {
+          if (previewRequest.signal.aborted) return;
+          if (meshes?.length) {
+            setStepMeshes(meshes);
+            return;
+          }
+          const response = await fetch(url, { headers, signal: previewRequest.signal });
+          if (!response.ok) throw new Error(t('modelViewer.errors.failedToLoad'));
+          const parsed = await parse3MF(await response.arrayBuffer());
+          if (!parsed.objects.size) throw new Error(t('modelViewer.errors.noMeshes'));
+          if (!previewRequest.signal.aborted) setParsedData(parsed);
+        })
+        .catch(() => {
+          if (previewRequest.signal.aborted) return;
+          setError(t('modelViewer.errors.failedToLoad'));
+          setLoading(false);
+        });
+    } else if (normalizedType === 'stl') {
       fetch(url, { headers })
         .then((res) => {
           if (!res.ok) throw new Error(t('modelViewer.errors.failedToLoad'));
@@ -1053,6 +1076,7 @@ export function ModelViewer({
     resizeObserver.observe(container);
 
     return () => {
+      previewRequest.abort();
       window.removeEventListener('resize', handleResize);
       document.removeEventListener('fullscreenchange', handleResize);
       resizeObserver.disconnect();
@@ -1074,7 +1098,7 @@ export function ModelViewer({
       keyLightRef.current = null;
       shadowCatcherRef.current = null;
     };
-  }, [url, buildVolume, fileType, t]);
+  }, [url, previewUrl, buildVolume, fileType, t]);
 
   useEffect(() => {
     if (!sceneRef.current || !cameraRef.current || !controlsRef.current) return;

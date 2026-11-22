@@ -485,3 +485,11 @@ mesmo tratamento tanto no Gerenciador de Arquivos quanto na página Impressoras.
 | `backend/app/custom/camera_rtsp.py` | `BAMBUDDY_CUSTOM_LIGHT_RTSP=1` | Sondagem curta para o go2rtc e MJPEG de até 1280 px e 8 fps. |
 
 Ver [prévia e perfil leve](docs/camera-previa.md).
+
+## Prévia colorida de 3MF sem fatiamento
+
+- `backend/app/custom/model_preview/` gera miniatura e GLB leve do 3MF original em processo limitado, uma renderização por vez. Usa paleta e atribuição de filamentos Bambu/Orca, inclusive `paint_color`. Em triângulos com subdivisão de pintura, a prévia simplificada usa a cor dominante. O 3MF original fica intacto.
+- Ganchos em `api/routes/library.py` (upload, extração e importação) e `services/archive.py` (após commit) enfileiram a miniatura quando não veio embutida. `services/plate_thumbnail.py` aceita a paleta no renderizador existente.
+- As rotas de prévia têm as mesmas permissões da mídia de origem. O GLB é reutilizado pelo hash de conteúdo. `backend/app/custom/api.py` monta as rotas.
+- `frontend/src/custom/modelPreview/` e ganchos em `ArchivesPage`, `ModelViewerModal`, `ModelViewer`, `FileUploadModal` e `useWebSocket`: prévia geométrica de arquivos sem G-code, carregamento do GLB, preservação de pacotes 3MF enviados como ZIP e atualização da miniatura depois do render.
+- Ligado no servidor com `BAMBUDDY_CUSTOM_MODEL_PREVIEW=1`. Para desativar no navegador, use `localStorage.setItem('custom.modelPreview', 'off')` no navegador. Projetos com múltiplas placas mantêm a seleção de placas do visualizador original.

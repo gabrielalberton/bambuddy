@@ -1,3 +1,4 @@
+import { asModelPackage } from '../custom/modelPreview/packageUpload';
 import { ScrollableModalOverlay } from '../custom/dialogs/ScrollableModalOverlay';
 import { useState, useRef, useEffect, type DragEvent } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -87,7 +88,8 @@ export function FileUploadModal({ folderId, onClose, onUploadComplete, onFileUpl
       updateFileStatus(uf.file, { status: 'uploading' });
 
       try {
-        if (uf.isZip) {
+        const upload = uf.isZip ? await asModelPackage(uf.file) : uf.file;
+        if (uf.isZip && upload === uf.file) {
           const result = await api.extractZipFile(uf.file, folderId, preserveZipStructure, createFolderFromZip, generateStlThumbnails);
           updateFileStatus(uf.file, {
             status: result.errors.length > 0 && result.extracted === 0 ? 'error' : 'success',
@@ -95,7 +97,7 @@ export function FileUploadModal({ folderId, onClose, onUploadComplete, onFileUpl
             error: result.errors.length > 0 ? t('fileManager.zipFilesFailed', '{{count}} files failed', { count: result.errors.length }) : undefined,
           });
         } else {
-          const result = await api.uploadLibraryFile(uf.file, folderId, generateStlThumbnails);
+          const result = await api.uploadLibraryFile(upload, folderId, generateStlThumbnails);
           updateFileStatus(uf.file, { status: 'success' });
           const error = onFileUploaded?.(result);
           if (error) {

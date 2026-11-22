@@ -1,3 +1,5 @@
+import { ArchiveGeometryPreview } from '../custom/modelPreview/ArchiveGeometryPreview';
+import { modelPreviewEnabled } from '../custom/modelPreview/preview';
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -351,6 +353,7 @@ function ArchiveCard({
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
   const [currentPlateIndex, setCurrentPlateIndex] = useState<number | null>(null);
   const [showPlateNav, setShowPlateNav] = useState(false);
+  const [showGeometryPreview, setShowGeometryPreview] = useState(false);
   const [platePickerPlates, setPlatePickerPlates] = useState<PlateMetadata[] | null>(null);
   const source3mfInputRef = useRef<HTMLInputElement>(null);
   const f3dInputRef = useRef<HTMLInputElement>(null);
@@ -376,15 +379,14 @@ function ArchiveCard({
   const displayPlateIndex = currentPlateIndex ?? 0;
 
   // 3D Preview click handler. Multi-plate archives show the plate picker
-  // first; single-plate archives navigate straight into the viewer. Source-
-  // only archives (no sliced gcode, e.g. pure project 3MFs from BambuStudio
-  // that carry only plate PNG/JSON metadata) get a toast — there's nothing
-  // the gcode viewer can render for them.
+  // first; single-plate archives navigate straight into the viewer.
+  // Source-only archives open the model viewer when enabled.
   const openGcodeViewer = async () => {
     try {
       const resp = await api.getArchivePlates(archive.id);
       if (resp.has_gcode === false) {
-        showToast(t('archives.platePicker.noGcode'), 'info');
+        if (modelPreviewEnabled()) setShowGeometryPreview(true);
+        else showToast(t('archives.platePicker.noGcode'), 'info');
         return;
       }
       if (resp.is_multi_plate && resp.plates.length > 1) {
@@ -1565,6 +1567,10 @@ function ArchiveCard({
         />
       )}
 
+      {showGeometryPreview && (
+        <ArchiveGeometryPreview archiveId={archive.id} title={archive.print_name || archive.filename} onClose={() => setShowGeometryPreview(false)} />
+      )}
+
       {/* Plate picker — shown only for multi-plate archives on 3D Preview click */}
       {platePickerPlates && (
         <PlatePickerModal
@@ -1947,6 +1953,7 @@ function ArchiveListRow({
   const source3mfInputRef = useRef<HTMLInputElement>(null);
   const f3dInputRef = useRef<HTMLInputElement>(null);
   const timelapseInputRef = useRef<HTMLInputElement>(null);
+  const [showGeometryPreview, setShowGeometryPreview] = useState(false);
   const [platePickerPlates, setPlatePickerPlates] = useState<PlateMetadata[] | null>(null);
 
   // Use pre-computed duplicate sequence and original archive ID from list response
@@ -1961,6 +1968,10 @@ function ArchiveListRow({
   const openGcodeViewer = async () => {
     try {
       const resp = await api.getArchivePlates(archive.id);
+      if (resp.has_gcode === false && modelPreviewEnabled()) {
+        setShowGeometryPreview(true);
+        return;
+      }
       if (resp.is_multi_plate && resp.plates.length > 1) {
         setPlatePickerPlates(resp.plates);
         return;
@@ -2710,6 +2721,10 @@ function ArchiveListRow({
           archiveName={archive.print_name || archive.filename}
           onClose={() => setShowPrintLog(false)}
         />
+      )}
+
+      {showGeometryPreview && (
+        <ArchiveGeometryPreview archiveId={archive.id} title={archive.print_name || archive.filename} onClose={() => setShowGeometryPreview(false)} />
       )}
 
       {/* Plate picker — shown only for multi-plate archives on 3D Preview click */}
