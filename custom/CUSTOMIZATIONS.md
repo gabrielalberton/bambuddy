@@ -462,3 +462,16 @@ material, `KValueLine` (opcional) e trilha da barra por último.
   - `<TempBar kind="nozzle" .../>` antes de `{statusControlMenu === 'nozzle-temp' && (`;
   - `<TempBar kind="bed" .../>` depois do `<p>` de `{Math.round(status.temperatures.bed || 0)}°C`.
 - Testes: `custom/__tests__/tempBars.test.tsx`, que cobre escala/clamp, os limiares 29,9/30 e 39,9/40, as cores nos extremos e no meio, o card real com a flag ligada e desligada, e o bico duplo.
+
+## Rolagem de Editar usuário no PWA
+
+O modal em Configurações → Usuários acompanha a área visível do Chrome quando o teclado abre
+e tem rolagem própria, com espaço inferior para a barra de navegação do Android.
+A personalização entra ao abrir Editar usuário. A margem extra é aplicada apenas em telas
+estreitas ou com ponteiro de toque. Para desativar o ajuste, use
+`localStorage.setItem('custom.editUserOverlay', 'off')` e reabra o modal.
+
+| Arquivo | Âncora | Efeito |
+|---|---|---|
+| `frontend/src/pages/SettingsPage.tsx` | `{/* Edit User Modal */}` | Usa `EditUserOverlay` e marca o cartão do formulário. |
+| `frontend/src/custom/users/` | `EditUserOverlay.tsx`, `editUserOverlay.css` | Limita o modal à área visível, contém a rolagem e reserva a margem inferior. |

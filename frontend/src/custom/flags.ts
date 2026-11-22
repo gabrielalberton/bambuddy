@@ -172,3 +172,12 @@ export function isCatalogFiltersEnabled(): boolean {
   }
   return CATALOG_FILTERS === 'on';
 }
+
+/** No navegador, custom.editUserOverlay = 'off' restaura o layout anterior. */
+export function isEditUserOverlayEnabled(): boolean {
+  try {
+    return localStorage.getItem('custom.editUserOverlay') !== 'off';
+  } catch {
+    return true;
+  }
+}

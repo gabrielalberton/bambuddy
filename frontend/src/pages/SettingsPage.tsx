@@ -58,6 +58,7 @@ import { LDAPSettings } from '../components/LDAPSettings';
 import { PrinterAccessSettings } from '../components/PrinterAccessSettings';
 import { TwoFactorSettings } from '../components/TwoFactorSettings';
 import { AdminDisableTwoFactor } from '../components/AdminDisableTwoFactor';
+import { EditUserOverlay } from '../custom/users/EditUserOverlay';
 import { cameraTestSuccessMessage } from '../utils/cameraTestMessage';
 import { OIDCProviderSettings } from '../components/OIDCProviderSettings';
 import { SecurityStatusCard } from '../components/SecurityStatusCard';
@@ -7601,8 +7602,7 @@ export function SettingsPage() {
 
       {/* Edit User Modal */}
       {showEditUserModal && editingUserId !== null && (
-        <div
-          className="fixed inset-0 bg-black flex items-center justify-center z-50 p-4"
+        <EditUserOverlay
           onClick={() => {
             setShowEditUserModal(false);
             setEditingUserId(null);
@@ -7610,7 +7610,7 @@ export function SettingsPage() {
           }}
         >
           <Card
-            className="w-full max-w-md"
+            className="w-full max-w-md edit-user-card"
             onClick={(e: React.MouseEvent) => e.stopPropagation()}
           >
             <CardHeader>
@@ -7799,7 +7799,7 @@ export function SettingsPage() {
               </div>
             </CardContent>
           </Card>
-        </div>
+        </EditUserOverlay>
       )}
 
       {/* Delete User Confirmation Modal */}
