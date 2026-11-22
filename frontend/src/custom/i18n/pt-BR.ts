@@ -1,5 +1,12 @@
 // Textos do fork (pt-BR). Mesclados no i18n do upstream por ./index.ts.
 const ptBR = {
+  customPrintHistory: {
+    history: 'Histórico', files: 'Arquivos', calendar: 'Calendário', filters: 'Filtros', sort: 'Ordenar',
+    ascending: 'Ordem crescente', descending: 'Ordem decrescente',
+    untitled: 'Trabalho #{{id}}', beforeStart: 'Antes da impressão', queueRecord: 'Registro da fila',
+    loadFailed: 'Não foi possível carregar o histórico de impressão.',
+    removeQueueConfirm: 'Remover este trabalho do histórico da fila?',
+  },
   nav: { archives: 'Impressos' },
   archives: { page: { title: 'Impressos', allArchives: 'Todos os impressos' } },
   notifications: {

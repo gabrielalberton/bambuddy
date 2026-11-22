@@ -1,5 +1,12 @@
 // Textos do fork (inglês). Mesclados no i18n do upstream por ./index.ts.
 const en = {
+  customPrintHistory: {
+    history: 'History', files: 'Files', calendar: 'Calendar', filters: 'Filters', sort: 'Sort',
+    ascending: 'Sort ascending', descending: 'Sort descending',
+    untitled: 'Job #{{id}}', beforeStart: 'Before printing', queueRecord: 'Queue record',
+    loadFailed: 'Could not load print history.',
+    removeQueueConfirm: 'Remove this job from the queue history?',
+  },
   notifications: {
     providerTypes: { webpush: 'Web Push (PWA)' },
     providerDescriptions: {

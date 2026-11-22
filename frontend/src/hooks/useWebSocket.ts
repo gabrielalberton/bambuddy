@@ -405,6 +405,7 @@ export function useWebSocket() {
         debouncedInvalidate('archive');
         debouncedInvalidate('archive-runs');
         debouncedInvalidate('calendar-runs');
+        debouncedInvalidate('print-log');
         break;
 
       case 'print_confirm_request': {
@@ -445,6 +446,7 @@ export function useWebSocket() {
         debouncedInvalidate('archives');
         debouncedInvalidate('archive');
         debouncedInvalidate('archive-runs');
+        debouncedInvalidate('print-log');
         break;
 
       case 'pong':
@@ -664,6 +666,7 @@ export function useWebSocket() {
       case 'queue_item_upload_progress':
       case 'queue_item_acked':
       case 'queue_item_failed':
+        if (message.type === 'queue_item_failed') debouncedInvalidate('print-log');
         window.dispatchEvent(new CustomEvent('bambuddy:dispatch-toast', { detail: message }));
         break;
       // Slicer Pipeline runs (#1425 PR C). State transitions on the run

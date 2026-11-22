@@ -504,3 +504,20 @@ Ver [prévia e perfil leve](docs/camera-previa.md).
 - `frontend/src/custom/libraryFamilies/` reaproveita o vínculo para organizar grade, lista e colunas com os fatiamentos sob a origem na mesma pasta. Busca ou filtros que ocultam a origem mantêm os resultados fatiados acessíveis. Os arquivos conservam suas ações, pastas e IDs.
 - Ganchos em `FileManagerPage` nos mapas de renderização e nas listas ordenadas usadas pelo teclado. Desativar com `localStorage.setItem('custom.libraryFamilies', 'off')` e recarregar.
 - `ArchivesPage` usa a própria chave de título traduzível; o português do fork apresenta essa área como **Impressos**, inclusive no menu.
+
+## Histórico único em Impressos
+
+- **Impressos** abre no **Histórico**. Cada execução vem do registro de impressão. Um trabalho encerrado na fila também aparece quando não há registro visível da mesma execução. A relação usa `queue_item_id` ou o identificador de cobrança da execução quando o vínculo antigo está ausente. Várias execuções do mesmo arquivo continuam independentes e abrem no detalhe da execução correspondente.
+- `GET /api/v1/custom/print-history` consulta as duas fontes sem migração. Permissões de leitura, propriedade e impressoras seguem as regras de cada fonte. Busca, filtros, ordenação e paginação ocorrem sobre o resultado combinado. A data segue o encerramento do trabalho, com início e criação como alternativas.
+- **Arquivos** em Impressos oferece grade, lista, importação, exportação e operações sobre o 3MF. **Calendário** abre os registros reais de impressão. A fila mantém os trabalhos ativos, lotes, linha do tempo e pipelines. O endereço `/queue?tab=history` redireciona para Impressos quando o perfil pode ler o histórico de impressão. Perfis com acesso exclusivo à fila mantêm a aba legada.
+- O histórico oferece remoção individual. Excluir um registro de impressão altera as estatísticas desse registro. Se a solicitação de fila ainda existir, aparecerá com a indicação **Registro da fila** e terá sua própria ação de remoção. A ação de limpeza em massa fica fora do histórico combinado. O reenfileiramento e a reimpressão no detalhe utilizam os diálogos existentes.
+- Teste local e reversão no navegador com `localStorage.setItem('custom.printHistory', 'off')` seguido de recarga. O valor `on` permite habilitar o fluxo nos testes de interface.
+
+| Arquivo | Âncora | Efeito |
+|---|---|---|
+| `backend/app/custom/api.py` | `install` | Registra a consulta combinada. |
+| `frontend/src/App.tsx` | rota `queue` | Mantém o atalho antigo com redirecionamento. |
+| `frontend/src/pages/QueuePage.tsx` e `components/QueueStatsBar.tsx` | lista de abas, filtros e resumo | Retiram a aba, a consulta e os filtros de histórico da fila quando Impressos concentra a visualização. |
+| `frontend/src/pages/ArchivesPage.tsx` | inicialização da vista, consulta e bloco do registro de impressão | Usa a consulta combinada e os componentes em `custom/printHistory/`. Os ganchos também ligam a navegação, removem as ações de arquivo da vista de histórico e reutilizam paginação, colunas e edição de registro. São mais de dez linhas ao todo para manter essas operações no componente existente. |
+| `frontend/src/api/client.ts` | `getPrintLog`, `PrintLogEntry` | Reaproveita o cliente autenticado e os filtros do registro de impressão. |
+| `frontend/src/hooks/useWebSocket.ts` | fim de impressão, atualizações do arquivo e falha da fila | Atualiza a consulta de histórico após eventos de impressão. |

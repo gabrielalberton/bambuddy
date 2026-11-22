@@ -1004,6 +1004,12 @@ export interface ArchiveSlim {
 }
 
 export interface PrintLogEntry {
+  // custom(print-history): terminal jobs without a matching run and archive access for links.
+  queue_only?: boolean;
+  queue_item?: PrintQueueItem | null;
+  archive_available?: boolean;
+  archive_has_thumbnail?: boolean;
+  library_file_available?: boolean;
   id: number;
   archive_id: number | null;
   print_name: string | null;
@@ -6455,7 +6461,7 @@ export const api = {
     // client holds would sort one page, not the log (#2636).
     sortBy?: string;
     sortDir?: 'asc' | 'desc';
-  }) => {
+  }, unified = false) => {
     const searchParams = new URLSearchParams();
     if (params?.search) searchParams.set('search', params.search);
     if (params?.printerId) searchParams.set('printer_id', String(params.printerId));
@@ -6467,7 +6473,7 @@ export const api = {
     if (params?.offset !== undefined) searchParams.set('offset', String(params.offset));
     if (params?.sortBy) searchParams.set('sort_by', params.sortBy);
     if (params?.sortDir) searchParams.set('sort_dir', params.sortDir);
-    return request<PrintLogResponse>(`/print-log/?${searchParams}`);
+    return request<PrintLogResponse>(`${unified ? '/custom/print-history' : '/print-log/'}?${searchParams}`);
   },
   getPrintLogThumbnail: (id: number) => withMediaToken(`${API_BASE}/print-log/${id}/thumbnail`),
   clearPrintLog: () =>

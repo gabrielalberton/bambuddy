@@ -18,7 +18,7 @@ export function QueueStatsBar({
   pendingCount: number;
   totalTime: number;
   totalWeight: number;
-  historyCount: number;
+  historyCount?: number;
   t: (key: string) => string;
 }) {
   const stats = [
@@ -26,7 +26,7 @@ export function QueueStatsBar({
     { icon: Clock, value: pendingCount, label: t('queue.summary.queued'), color: 'text-yellow-600 dark:text-yellow-400' },
     { icon: Timer, value: formatDuration(totalTime), label: t('queue.summary.totalTime'), color: 'text-bambu-green' },
     { icon: Weight, value: formatWeight(totalWeight), label: t('queue.summary.totalWeight'), color: 'text-purple-600 dark:text-purple-400' },
-    { icon: CheckCircle, value: historyCount, label: t('queue.summary.history'), color: 'text-bambu-gray' },
+    ...(historyCount === undefined ? [] : [{ icon: CheckCircle, value: historyCount, label: t('queue.summary.history'), color: 'text-bambu-gray' }]),
   ];
 
   return (

@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect, useCallback } from 'react';
 import { bulkUpdateToast } from '../utils/queueBulkUpdate';
 import { useTranslation } from 'react-i18next';
 import { useSinglePrinter } from '../custom/useSinglePrinter';
+import { useUnifiedPrintHistory } from '../custom/printHistory/views';
 import { MultiPrinterOnly } from '../custom/MultiPrinterOnly';
 import { keepPreviousData, useQuery, useQueries, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
@@ -1747,6 +1748,7 @@ export function QueuePage() {
   const queryClient = useQueryClient();
   const { showToast } = useToast();
   const { hasPermission, hasAnyPermission, canModify } = useAuth();
+  const unifiedHistory = useUnifiedPrintHistory();
   const [filterPrinter, setFilterPrinter] = useState<number | null>(null);
   const [filterStatus, setFilterStatus] = useState<string>('');
   const [filterLocation, setFilterLocation] = useState<string>('');
@@ -1804,6 +1806,7 @@ export function QueuePage() {
     const url = search.get('tab');
     // A link to one batch (/queue?batch=<id>) opens the tab that shows it.
     if (search.get('batch')) return 'batches';
+    if (unifiedHistory && (url ?? localStorage.getItem('queue.activeTab')) === 'history') return 'queue';
     if (url === 'pipelines' || url === 'history' || url === 'timeline' || url === 'queue' || url === 'batches') {
       return url;
     }
@@ -1932,6 +1935,7 @@ export function QueuePage() {
     // stall the server) or when only the badge and stats need the total.
     refetchInterval: activeTab === 'history' && historyVisibleCount <= HISTORY_PAGE_SIZE ? 5000 : 30000,
     placeholderData: keepPreviousData,
+    enabled: !unifiedHistory,
   });
   const historyTotal = historyPage?.total ?? 0;
 
@@ -2733,7 +2737,7 @@ export function QueuePage() {
           // its own sidebar entry so the Print Queue page is the single
           // place an operator looks for "what's running / what ran".
           { id: 'pipelines' as const, label: t('queue.tabs.pipelines'), icon: Workflow, count: null as number | null },
-        ]).map(({ id, label, icon: Icon, count }) => (
+        ]).filter(({ id }) => !unifiedHistory || id !== 'history').map(({ id, label, icon: Icon, count }) => (
           <button
             key={id}
             onClick={() => setActiveTab(id)}
@@ -2762,7 +2766,7 @@ export function QueuePage() {
         pendingCount={pendingItems.length}
         totalTime={totalQueueTime}
         totalWeight={totalWeight}
-        historyCount={historyTotal}
+        historyCount={unifiedHistory ? undefined : historyTotal}
         t={t}
       />}
 
@@ -2863,10 +2867,12 @@ export function QueuePage() {
           <option value="">{t('queue.filter.allStatus')}</option>
           <option value="pending">{t('queue.status.pending')}</option>
           <option value="printing">{t('queue.status.printing')}</option>
+          {!unifiedHistory && <>
           <option value="completed">{t('queue.status.completed')}</option>
           <option value="failed">{t('queue.status.failed')}</option>
           <option value="skipped">{t('queue.status.skipped')}</option>
           <option value="cancelled">{t('queue.status.cancelled')}</option>
+          </>}
         </select>
 
         {!single && uniqueLocations.length > 0 && (

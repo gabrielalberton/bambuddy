@@ -5,6 +5,9 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { useSinglePrinter } from '../custom/useSinglePrinter';
+import { initialPrintHistoryView, PrintHistoryViews, savedFilesView, useUnifiedPrintHistory } from '../custom/printHistory/views';
+import { historyDateBoundary, PrintHistoryCards, printHistoryDate, PrintHistoryFilters, printHistoryKey, PrintHistoryName, printHistoryQueueLabel, PrintHistoryStatus } from '../custom/printHistory/PrintHistory';
+import { useHistoryActions } from '../custom/printHistory/actions';
 import { MultiPrinterOnly } from '../custom/MultiPrinterOnly';
 import {
   Download,
@@ -3140,9 +3143,10 @@ export function ArchivesPage() {
   const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
   const [showBatchTag, setShowBatchTag] = useState(false);
   const [showBatchProject, setShowBatchProject] = useState(false);
-  const [viewMode, setViewMode] = useState<ViewMode>(() =>
-    (localStorage.getItem('archiveViewMode') as ViewMode) || 'grid'
-  );
+  const unifiedHistory = useUnifiedPrintHistory();
+  const [viewMode, setViewMode] = useState<ViewMode>(() => initialPrintHistoryView(unifiedHistory));
+  const showUnifiedHistory = unifiedHistory && viewMode === 'log';
+  const historyActions = useHistoryActions();
   const [sortBy, setSortBy] = useState<SortOption>(() =>
     (localStorage.getItem('archiveSortBy') as SortOption) || 'date-desc'
   );
@@ -3212,6 +3216,7 @@ export function ArchivesPage() {
     localStorage.getItem('logFilterDateTo') || ''
   );
   const [logOffset, setLogOffset] = useState(() => {
+    if (unifiedHistory) return 0;
     const saved = localStorage.getItem('logOffset');
     return saved ? Number(saved) : 0;
   });
@@ -3271,6 +3276,7 @@ export function ArchivesPage() {
   const { data: archives, isLoading, dataUpdatedAt: archivesUpdatedAt, refetch: refetchArchives } = useQuery({
     queryKey: ['archives', filterPrinter],
     queryFn: () => api.getArchives(filterPrinter || undefined),
+    enabled: !showUnifiedHistory,
   });
 
   // ?highlight=<archive id> (the queue card's and a project's archive links)
@@ -3279,6 +3285,8 @@ export function ArchivesPage() {
   // creates when it starts. So the page jump finds it, and the warning fires
   // only when the filters really hide it.
   const [searchParams] = useSearchParams();
+  const historyRequested = unifiedHistory && searchParams.get('view') === 'history';
+  useEffect(() => { if (historyRequested) setViewMode('log'); }, [historyRequested]);
   const highlightParam = searchParams.get('highlight');
   const handledHighlightRef = useRef<string | null>(null);
   const [highlightRequest, setHighlightRequest] = useState<{ archiveId: number; requestedAt: number } | null>(null);
@@ -3299,7 +3307,7 @@ export function ArchivesPage() {
   useEffect(() => {
     if (!highlightRequest || !archives || archivesUpdatedAt < highlightRequest.requestedAt) return;
     setHighlightRequest(null);
-    if (viewMode === 'log' || viewMode === 'calendar') setViewMode('grid');
+    if (viewMode === 'log' || viewMode === 'calendar') setViewMode(unifiedHistory ? savedFilesView() : 'grid');
     const highlight = (archiveId: number) => {
       setPendingNavigation({ archiveId, notVisibleKey: 'archives.linkedArchiveNotVisible' });
       setHighlightedArchiveId(archiveId);
@@ -3316,7 +3324,7 @@ export function ArchivesPage() {
       .getArchive(requested)
       .then((found) => highlight(found.id))
       .catch(() => highlight(requested));
-  }, [highlightRequest, archives, archivesUpdatedAt, viewMode]);
+  }, [highlightRequest, archives, archivesUpdatedAt, viewMode, unifiedHistory]);
 
   const { data: printers } = useQuery({
     queryKey: ['printers'],
@@ -3337,22 +3345,28 @@ export function ArchivesPage() {
     enabled: viewMode === 'log',
   });
 
-  const { data: printLogData, isLoading: isLogLoading } = useQuery({
-    queryKey: ['print-log', filterPrinter, logFilterUser, logFilterStatus, logFilterDateFrom, logFilterDateTo, search, logOffset, logPageSize, logSort.column, logSort.direction],
+  const { data: printLogData, isLoading: isLogLoading, isError: isLogError, refetch: refetchPrintLog } = useQuery({
+    queryKey: ['print-log', filterPrinter, logFilterUser, logFilterStatus, logFilterDateFrom, logFilterDateTo, search, logOffset, logPageSize, logSort.column, logSort.direction, unifiedHistory],
     queryFn: () => api.getPrintLog({
       search: search || undefined,
       printerId: filterPrinter || undefined,
       username: logFilterUser || undefined,
       status: logFilterStatus || undefined,
-      dateFrom: logFilterDateFrom || undefined,
-      dateTo: logFilterDateTo || undefined,
+      dateFrom: unifiedHistory ? historyDateBoundary(logFilterDateFrom) : logFilterDateFrom || undefined,
+      dateTo: unifiedHistory ? historyDateBoundary(logFilterDateTo, true) : logFilterDateTo || undefined,
       limit: logPageSize,
       offset: logOffset,
       sortBy: logSort.column,
       sortDir: logSort.direction,
-    }),
+    }, unifiedHistory),
     enabled: viewMode === 'log',
+    refetchInterval: unifiedHistory ? 30_000 : false,
   });
+  useEffect(() => {
+    if (showUnifiedHistory && printLogData && logOffset > 0 && logOffset >= printLogData.total) {
+      setLogOffset(Math.max(0, Math.floor((printLogData.total - 1) / logPageSize) * logPageSize));
+    }
+  }, [showUnifiedHistory, printLogData, logOffset, logPageSize]);
 
   const timeFormat: TimeFormat = settings?.time_format || 'system';
   // Desktop "Open in Slicer" target — falls back to preferred_slicer when the
@@ -3423,7 +3437,7 @@ export function ArchivesPage() {
         case 'date':
           return (
             <span className="text-white whitespace-nowrap">
-              {formatDateTime(entry.started_at || entry.created_at, timeFormat)}
+              {formatDateTime(unifiedHistory ? printHistoryDate(entry) : entry.started_at || entry.created_at, timeFormat)}
             </span>
           );
         case 'completed_at':
@@ -3433,7 +3447,7 @@ export function ArchivesPage() {
             </span>
           );
         case 'print_name':
-          return (
+          return unifiedHistory ? <PrintHistoryName entry={entry} /> : (
             <div className="flex items-center gap-2">
               {entry.thumbnail_path && (
                 <img
@@ -3470,17 +3484,19 @@ export function ArchivesPage() {
                 entry.status === 'completed' ? 'bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400' :
                 entry.status === 'failed' ? 'bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-400' :
                 entry.status === 'stopped' ? 'bg-yellow-100 dark:bg-yellow-500/20 text-yellow-700 dark:text-yellow-400' :
-                entry.status === 'cancelled' ? 'bg-orange-100 dark:bg-orange-500/20 text-orange-700 dark:text-orange-400' :
+                entry.status === 'cancelled' || (unifiedHistory && entry.status === 'aborted') ? 'bg-orange-100 dark:bg-orange-500/20 text-orange-700 dark:text-orange-400' :
                 entry.status === 'skipped' ? 'bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-400' :
                 'bg-gray-500/20 text-gray-400'
               }`}>
-                {entry.status}
+                {unifiedHistory ? <PrintHistoryStatus status={entry.status} /> : entry.status}
               </span>
+              {unifiedHistory && entry.queue_only && <span className="block text-xs text-bambu-gray mt-0.5">{t(printHistoryQueueLabel(entry))}</span>}
               {entry.failure_reason && (
                 <span className="block text-[10px] text-bambu-gray mt-0.5">
                   {t(`editArchive.failureReasons.${entry.failure_reason}`, { defaultValue: entry.failure_reason })}
                 </span>
               )}
+              {unifiedHistory && entry.queue_item?.error_message && <span className="block text-xs text-bambu-gray mt-0.5">{entry.queue_item.error_message}</span>}
             </>
           );
         case 'duration':
@@ -3552,7 +3568,7 @@ export function ArchivesPage() {
           return null;
       }
     },
-    [currency, deletedLogArchives, t, timeFormat],
+    [currency, deletedLogArchives, t, timeFormat, unifiedHistory],
   );
 
   const bulkDeleteMutation = useMutation({
@@ -3617,6 +3633,12 @@ export function ArchivesPage() {
     },
   });
 
+  const renderHistoryActions = (entry: PrintLogEntry) => historyActions.renderActions(entry, () => {
+    setEditingLogEntry(entry);
+    setEditingLogFailureReason(entry.failure_reason || '');
+    setEditingLogStatus(entry.status);
+  }, () => setPendingDeleteEntryId(entry.id), updateLogEntryMutation.isPending || deleteLogEntryMutation.isPending);
+
   // Persist all filters to localStorage
   useEffect(() => {
     if (filterPrinter !== null) {
@@ -3680,8 +3702,8 @@ export function ArchivesPage() {
   }, [pageSize]);
 
   useEffect(() => {
-    localStorage.setItem('archiveViewMode', viewMode);
-  }, [viewMode]);
+    if (!unifiedHistory || viewMode === 'grid' || viewMode === 'list') localStorage.setItem('archiveViewMode', viewMode);
+  }, [viewMode, unifiedHistory]);
 
   useEffect(() => {
     localStorage.setItem('archiveSortBy', sortBy);
@@ -3935,7 +3957,7 @@ export function ArchivesPage() {
   const { isDraggingOver, dragHandlers } = usePageFileDrop({
     // Nor while an archive is open over the list: its upload dialog would
     // open underneath it.
-    disabled: showUpload || !!openArchiveId,
+    disabled: showUpload || !!openArchiveId || showUnifiedHistory,
     extensions: ['.3mf'],
     onFiles: (files) => {
       setUploadFiles(files);
@@ -3947,7 +3969,7 @@ export function ArchivesPage() {
   // Keyboard shortcuts
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     // An archive open over the list has the keyboard.
-    if (openArchiveId) return;
+    if (openArchiveId || showUnifiedHistory) return;
     const target = e.target as HTMLElement;
     // Ignore if typing in an input/textarea
     if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
@@ -3975,7 +3997,7 @@ export function ArchivesPage() {
         }
         break;
     }
-  }, [selectionMode, openArchiveId]);
+  }, [selectionMode, openArchiveId, showUnifiedHistory]);
 
   useEffect(() => {
     document.addEventListener('keydown', handleKeyDown);
@@ -3999,7 +4021,7 @@ export function ArchivesPage() {
       )}
 
       {/* Selection Toolbar */}
-      {selectionMode && (
+      {!showUnifiedHistory && selectionMode && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-bambu-dark-secondary border border-bambu-dark-tertiary rounded-lg shadow-xl px-4 py-3 flex items-center gap-4">
           <Button variant="secondary" size="sm" onClick={clearSelection}>
             <X className="w-4 h-4" />
@@ -4067,7 +4089,7 @@ export function ArchivesPage() {
         </div>
       )}
 
-      {collection !== 'duplicates' && duplicateGroups > 0 && !mergeBannerDismissed && (
+      {!showUnifiedHistory && collection !== 'duplicates' && duplicateGroups > 0 && !mergeBannerDismissed && (
         <div
           className="mb-6 rounded-lg border border-bambu-dark-tertiary bg-bambu-dark-secondary px-4 py-3 flex items-center gap-3"
           data-testid="merge-banner"
@@ -4089,7 +4111,7 @@ export function ArchivesPage() {
         </div>
       )}
 
-      {collection === 'duplicates' && canMergeDuplicates && (
+      {!showUnifiedHistory && collection === 'duplicates' && canMergeDuplicates && (
         <div className="mb-6 rounded-lg border border-bambu-dark-tertiary bg-bambu-dark-secondary px-4 py-3 flex items-center gap-3">
           <Combine className="w-5 h-5 text-bambu-green flex-shrink-0" />
           <div className="flex-1 min-w-0 text-sm text-bambu-gray-light">{t('archiveMerge.duplicatesHint')}</div>
@@ -4099,7 +4121,7 @@ export function ArchivesPage() {
         </div>
       )}
 
-      {no3MFWarning?.has_fallback && !no3MFWarningDismissed && (
+      {!showUnifiedHistory && no3MFWarning?.has_fallback && !no3MFWarningDismissed && (
         <div className="mb-6 rounded-lg border border-amber-300 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10 px-4 py-3 flex items-start gap-3">
           <AlertCircle className="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
           <div className="flex-1 min-w-0">
@@ -4142,7 +4164,7 @@ export function ArchivesPage() {
         </div>
       )}
 
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+      <div className={`flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 ${showUnifiedHistory ? '' : 'mb-8'}`}>
         <div>
           <div className="flex items-start gap-3">
             <div>
@@ -4150,11 +4172,11 @@ export function ArchivesPage() {
                 <ArchiveIcon className="w-7 h-7 text-bambu-green" />
                 {t('archives.page.title')}
               </h1>
-              <p className="text-bambu-gray mt-1">
+              {!showUnifiedHistory && <p className="text-bambu-gray mt-1">
                 {filteredArchives?.length || 0} of {archives?.length || 0} prints
-              </p>
+              </p>}
             </div>
-            <select
+            {!showUnifiedHistory && <select
               className="mt-0.5 px-3 py-1.5 bg-bambu-dark border border-bambu-dark-tertiary rounded-lg text-bambu-gray-light text-sm focus:border-bambu-green focus:outline-none"
               value={collection}
               onChange={(e) => setCollection(e.target.value as Collection)}
@@ -4164,10 +4186,10 @@ export function ArchivesPage() {
                   {c.id === 'all' ? t('archives.page.allArchives', { defaultValue: c.label }) : c.label}
                 </option>
               ))}
-            </select>
+            </select>}
           </div>
         </div>
-        <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+        {!showUnifiedHistory && <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
           {/* Export dropdown */}
           <div className="relative">
             <Button
@@ -4291,11 +4313,13 @@ export function ArchivesPage() {
               {t('archivePurge.headerButton')}
             </Button>
           )}
-        </div>
+        </div>}
       </div>
 
+      {unifiedHistory && <PrintHistoryViews view={viewMode} onChange={setViewMode} />}
+
       {/* View mode toggle — always visible */}
-      <div className="flex items-center border border-bambu-dark-tertiary rounded-lg overflow-hidden flex-shrink-0 w-fit mb-4">
+      {(!unifiedHistory || (viewMode !== 'log' && viewMode !== 'calendar')) && <div className="flex items-center border border-bambu-dark-tertiary rounded-lg overflow-hidden flex-shrink-0 w-fit mb-4">
         <button
           className={`p-2 ${viewMode === 'grid' ? 'bg-bambu-green text-white' : 'bg-bambu-dark text-bambu-gray hover:text-white'}`}
           onClick={() => setViewMode('grid')}
@@ -4310,7 +4334,7 @@ export function ArchivesPage() {
         >
           <List className="w-4 h-4" />
         </button>
-        <button
+        {!unifiedHistory && <><button
           className={`p-2 ${viewMode === 'calendar' ? 'bg-bambu-green text-white' : 'bg-bambu-dark text-bambu-gray hover:text-white'}`}
           onClick={() => setViewMode('calendar')}
           title={t('archives.calendarView')}
@@ -4323,8 +4347,8 @@ export function ArchivesPage() {
           title={t('archives.logView')}
         >
           <ClipboardList className="w-4 h-4" />
-        </button>
-      </div>
+        </button></>}
+      </div>}
 
       {/* Filters (hidden in log view which has its own filters) */}
       {viewMode !== 'log' && <Card className="mb-6">
@@ -4539,10 +4563,10 @@ export function ArchivesPage() {
       </Card>}
 
       {/* Pending Uploads Panel (visible when in queue mode with pending files) */}
-      <PendingUploadsPanel />
+      {!showUnifiedHistory && <PendingUploadsPanel />}
 
       {/* Archives */}
-      {isLoading ? (
+      {isLoading && !showUnifiedHistory ? (
         <div className="text-center py-12 text-bambu-gray">{t('archives.loadingArchives')}</div>
       ) : filteredArchives?.length === 0 && viewMode !== 'log' ? (
         // The log view is exempt: `print_log_entries` is an independent table
@@ -4647,7 +4671,17 @@ export function ArchivesPage() {
       ) : viewMode === 'log' ? (
         <div className="space-y-4">
           {/* Log filters */}
-          <Card>
+          {unifiedHistory ? <PrintHistoryFilters
+            values={{ search, status: logFilterStatus ?? '', printer: String(filterPrinter ?? ''), username: logFilterUser ?? '', dateFrom: logFilterDateFrom, dateTo: logFilterDateTo }}
+            onFilter={(key, value) => {
+              const setters = { search: setSearch, status: setLogFilterStatus, username: setLogFilterUser, dateFrom: setLogFilterDateFrom, dateTo: setLogFilterDateTo };
+              if (key === 'printer') setFilterPrinter(value ? Number(value) : null);
+              else setters[key](value);
+              setLogOffset(0);
+            }}
+            printers={single ? undefined : printers} users={users} sort={logSort} sortLabels={LOG_COLUMN_LABEL_KEYS}
+            onSort={handleLogSort} onColumns={() => setShowLogColumnModal(true)}
+          /> : <Card>
             <CardContent className="py-3">
               <div className="flex flex-col md:flex-row gap-3 md:items-center md:flex-wrap">
                 {/* Search */}
@@ -4742,7 +4776,7 @@ export function ArchivesPage() {
                 </div>
               </div>
             </CardContent>
-          </Card>
+          </Card>}
 
           {/* Log table */}
           <Card>
@@ -4750,13 +4784,19 @@ export function ArchivesPage() {
               <div className="flex items-center justify-center py-12">
                 <Loader2 className="w-6 h-6 animate-spin text-bambu-green" />
               </div>
+            ) : unifiedHistory && isLogError && !printLogData ? (
+              <div className="p-6 text-center text-bambu-gray" role="alert">
+                <p className="mb-3">{t('customPrintHistory.loadFailed')}</p>
+                <Button variant="secondary" size="sm" onClick={() => refetchPrintLog()}>{t('common.retry')}</Button>
+              </div>
             ) : !printLogData?.items.length ? (
               <div className="text-center py-12 text-bambu-gray">
                 {t('archives.log.noEntries')}
               </div>
             ) : (
               <>
-                <div className="overflow-x-auto">
+                {unifiedHistory && <PrintHistoryCards entries={printLogData.items} timeFormat={timeFormat} single={single} renderActions={renderHistoryActions} />}
+                <div className={`overflow-x-auto ${unifiedHistory ? 'hidden md:block' : ''}`}>
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b border-bambu-dark-tertiary text-bambu-gray text-left">
@@ -4807,7 +4847,7 @@ export function ArchivesPage() {
                     </thead>
                     <tbody className="divide-y divide-bambu-dark-tertiary">
                       {printLogData.items.map((entry) => (
-                        <tr key={entry.id} className="hover:bg-bambu-dark-secondary/50">
+                        <tr key={unifiedHistory ? printHistoryKey(entry) : entry.id} className="hover:bg-bambu-dark-secondary/50">
                           {visibleLogColumns.map((colId) => (
                             <td
                               key={colId}
@@ -4817,7 +4857,7 @@ export function ArchivesPage() {
                             </td>
                           ))}
                           <td className="px-4 py-3 text-right">
-                            <div className="inline-flex items-center gap-2">
+                            {unifiedHistory ? renderHistoryActions(entry) : <div className="inline-flex items-center gap-2">
                               <button
                                 type="button"
                                 onClick={() => {
@@ -4854,7 +4894,7 @@ export function ArchivesPage() {
                               >
                                 <Trash2 className="w-4 h-4" />
                               </button>
-                            </div>
+                            </div>}
                           </td>
                         </tr>
                       ))}
@@ -4885,10 +4925,10 @@ export function ArchivesPage() {
                     <span className="text-sm text-bambu-gray">
                       {t('archives.log.page')} {Math.floor(logOffset / logPageSize) + 1} / {Math.max(1, Math.ceil(printLogData.total / logPageSize))}
                     </span>
-                    <Button variant="secondary" size="sm" onClick={() => setLogOffset(Math.max(0, logOffset - logPageSize))} disabled={logOffset === 0}>
+                    <Button variant="secondary" size="sm" aria-label={t('common.previous')} onClick={() => setLogOffset(Math.max(0, logOffset - logPageSize))} disabled={logOffset === 0}>
                       <ChevronLeft className="w-4 h-4" />
                     </Button>
-                    <Button variant="secondary" size="sm" onClick={() => setLogOffset(logOffset + logPageSize)} disabled={logOffset + logPageSize >= printLogData.total}>
+                    <Button variant="secondary" size="sm" aria-label={t('common.next')} onClick={() => setLogOffset(logOffset + logPageSize)} disabled={logOffset + logPageSize >= printLogData.total}>
                       <ChevronRight className="w-4 h-4" />
                     </Button>
                   </div>
@@ -4899,6 +4939,8 @@ export function ArchivesPage() {
 
         </div>
       ) : null}
+
+      {unifiedHistory && historyActions.dialogs}
 
       {/* Upload Modal */}
       {showUpload && (
@@ -5037,6 +5079,7 @@ export function ArchivesPage() {
                   onChange={(e) => setEditingLogStatus(e.target.value)}
                   className="w-full px-3 py-2 bg-bambu-dark border border-bambu-dark-tertiary rounded text-white text-sm focus:border-bambu-green focus:outline-none"
                 >
+                  {unifiedHistory && editingLogEntry.status === 'aborted' && <option value="aborted">{t('archives.log.statuses.cancelled')}</option>}
                   <option value="completed">{t('archives.log.statuses.completed', { defaultValue: 'completed' })}</option>
                   <option value="failed">{t('archives.log.statuses.failed', { defaultValue: 'failed' })}</option>
                   <option value="stopped">{t('archives.log.statuses.stopped', { defaultValue: 'stopped' })}</option>

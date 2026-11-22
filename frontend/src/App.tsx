@@ -16,6 +16,7 @@ import { PageLoading } from './components/PageLoading';
 import { AuthRetrying } from './components/AuthRetrying';
 import { lazyPage } from './utils/lazyPage';
 import { ChunkErrorFallback, hardReload, isChunkLoadError } from './custom/app/chunkRecovery'; // custom(chunk-recovery)
+import { QueueHistoryRedirect } from './custom/printHistory/views';
 
 // Every page loads as its own file when first opened (#3175).
 const PrintersPage = lazyPage(() => import('./pages/PrintersPage'), 'PrintersPage');
@@ -237,7 +238,7 @@ function App() {
                   <Route path="archives" element={<ArchivesPage />} />
                   {/* An archive opens over the list (archive redesign P4). */}
                   <Route path="archives/:id" element={<ArchivesPage />} />
-                  <Route path="queue" element={<QueuePage />} />
+                  <Route path="queue" element={<QueueHistoryRedirect><QueuePage /></QueueHistoryRedirect>} />
                   {/* Slicer Pipelines (#1425) — Pipelines tab lives on the
                       Print Queue page (Queue + History + Timeline +
                       Pipelines). Old standalone URL redirects. */}
