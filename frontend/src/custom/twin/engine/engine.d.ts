@@ -9,6 +9,8 @@ export interface TwinTuning {
 }
 
 export interface TwinOptions {
+  printerId?: number;
+  onManualEstimate?: (active: boolean) => void;
   /** URL do SSE de estado (chamada a cada (re)conexão: deve trazer o token de stream atual) */
   eventsUrl: () => string;
   /** URL do pacote do job */

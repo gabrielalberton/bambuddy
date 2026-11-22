@@ -9,13 +9,20 @@ import { A1Model } from './printer.js';
 import { PrintedObject } from './object.js';
 import { decodeJob } from './program.js';
 import { Tracker } from './sync.js';
+import { createManualMotion, listenToTwinMotion, twinMotionStatus } from '../manualMotion';
 
 const REST = { x: 40, y: 170, z: 90 };
+// Limites da cena A1; aplicados à visualização, sem alterar o comando enviado à máquina.
+const constrainPose = ({ x, y, z }) => ({
+  x: Math.min(270, Math.max(-50, x)),
+  y: Math.min(264, Math.max(-2, y)),
+  z: Math.min(260, Math.max(0, z)),
+});
 
 /**
  * @param {HTMLElement} container elemento que recebe o canvas (ocupa 100% dele)
  * @param {{ eventsUrl: () => string, jobUrl: (id: string) => string, modelUrl?: (() => string) | null,
- *           tuning?: { lead?: number, lat?: number, tau?: number, autoFocus?: boolean }, debug?: boolean, procedural?: boolean }} opts
+ *           printerId?: number, onManualEstimate?: (active: boolean) => void, tuning?: { lead?: number, lat?: number, tau?: number, autoFocus?: boolean }, debug?: boolean, procedural?: boolean }} opts
  */
 // O GLB da A1 (~2,8 MB) vem com o token de stream na URL, que muda a cada sessão: o cache HTTP nunca acertava e o modelo
 // era baixado de novo a cada abertura. Guarda o arquivo no Cache Storage (chave sem o token) e na memória da página.
@@ -212,6 +219,36 @@ export function createTwin(container, opts) {
     msg: null, s: {}, job: { status: 'none' }, jobId: '', prog: null, tracker: null, workerBusy: false,
     pose: { ...REST }, trays: [], lastMsgPerf: -1e9, bbox: null, zmax: 0, geom: null, buildT0: 0,
   };
+  const manual = createManualMotion();
+  let motionMessage = null;
+  let shownEstimate = false;
+  function showEstimate(active) {
+    if (active === shownEstimate) return;
+    shownEstimate = active;
+    opts.onManualEstimate?.(active);
+  }
+  function resetManual() {
+    manual.reset();
+    showEstimate(false);
+  }
+  function motionStatus(now) {
+    const status = twinMotionStatus(motionMessage, now - S.lastMsgPerf);
+    if (!status.canJog) resetManual();
+    return status;
+  }
+  const unlisten = opts.printerId == null ? null : listenToTwinMotion(opts.printerId, {
+    jog(delta) {
+      if (!motionStatus(performance.now() / 1000).canJog) return;
+      const rollback = manual.jog(S.pose, delta);
+      showEstimate(true);
+      return () => {
+        rollback();
+        showEstimate(manual.target !== null);
+      };
+    },
+    reset: resetManual,
+  });
+
   const worker = new Worker(new URL('./geom-worker.js', import.meta.url), { type: 'module' });
   worker.onmessage = (ev) => {
     S.workerBusy = false;
@@ -265,6 +302,8 @@ export function createTwin(container, opts) {
     const nowPerf = performance.now() / 1000;
     S.lastMsgPerf = nowPerf;
     S.msg = msg; S.s = msg.s || {}; S.job = msg.job || { status: 'none' };
+    motionMessage = msg;
+    motionStatus(nowPerf);
     S.trays = (S.s.ams && S.s.ams.trays) || [];
     const age = msg.age || 0;
     if (S.job.status === 'ready' && S.job.id && S.job.id !== S.jobId) loadJob(S.job.id);
@@ -284,8 +323,11 @@ export function createTwin(container, opts) {
     src.onopen = () => { retryDelay = 1500; stats.sse = 'open'; };
     src.onmessage = (e) => { try { onMessage(JSON.parse(e.data)); } catch { /* ignora */ } };
     src.onerror = () => {
+      if (es !== src) return;
+      motionMessage = null;
+      resetManual();
       // erro transitório: o EventSource reconecta sozinho. Fechado (ex.: 401 com token vencido): reabre com URL nova.
-      if (src.readyState === EventSource.CLOSED && es === src) {
+      if (src.readyState === EventSource.CLOSED) {
         es = null; stats.sse = 'closed';
         if (!document.hidden) retryTimer = window.setTimeout(connect, retryDelay);
         retryDelay = Math.min(retryDelay * 2, 30000);
@@ -293,6 +335,8 @@ export function createTwin(container, opts) {
     };
   }
   function disconnect() {
+    motionMessage = null;
+    resetManual();
     clearTimeout(retryTimer);
     if (es) { es.close(); es = null; }
     stats.sse = 'closed';
@@ -307,6 +351,7 @@ export function createTwin(container, opts) {
     const dt = Math.min((nowP - lastT) / 1000, 0.1);
     lastT = nowP;
     const nowS = nowP / 1000;
+    const { homed } = motionStatus(nowS);
     const stale = nowS - S.lastMsgPerf > 15;
     let target = REST, printing = false, showObj = false, T = 0, kind = 0;
     const tr = S.tracker;
@@ -314,8 +359,7 @@ export function createTwin(container, opts) {
       T = tr.update(nowS);
       if (tr.locked) {
         S.prog.posAt(Math.min(S.prog.total, Math.max(0, T + LEAD * tr.scale)), tmp);
-        // limites físicos da A1 (curso do G-code: X -48..267, Y 0..262.5, Z 0..256): nunca desenha fora
-        target = { x: Math.min(270, Math.max(-50, tmp.x)), y: Math.min(264, Math.max(-2, tmp.y)), z: Math.min(260, Math.max(0, tmp.z)) };
+        target = constrainPose(tmp);
         kind = tmp.kind;
         const gs = S.s.gcode_state;
         printing = (gs === 'RUNNING') && T >= (S.prog.layerStart[0]?.t ?? 0) - 1 && T < S.prog.total - 2;
@@ -324,12 +368,13 @@ export function createTwin(container, opts) {
     } else if (tr) { T = tr.T; showObj = true; target = S.pose; }
     // placa liberada no Bambuddy depois do fim (plate_wait false fora de RUNNING/PREPARE/PAUSE): a peça saiu da mesa
     if (showObj && S.msg && S.msg.plate_wait === false && !['RUNNING', 'PREPARE', 'PAUSE'].includes(S.s.gcode_state)) showObj = false;
+    if (manual.target) target = constrainPose(manual.target);
     // suavização curtíssima da pose (esconde correções do estimador)
-    const k = 1 - Math.exp(-dt / (tr && tr.locked ? 0.035 : 0.6));
+    const k = 1 - Math.exp(-dt / (manual.target || tr?.locked ? 0.035 : 0.6));
     S.pose.x += (target.x - S.pose.x) * k; S.pose.y += (target.y - S.pose.y) * k; S.pose.z += (target.z - S.pose.z) * k;
     model.setPose(S.pose.x, S.pose.y, S.pose.z);
     model.setLook({ nozzleTemp: S.s.nozzle_temper ?? 25, fan: (S.s.cooling_fan_speed ?? 0) / 15 + (kind === 1 ? 0.25 : 0), printing,
-      unreliable: typeof S.s.home_flag === 'number' && (S.s.home_flag & 7) !== 7 }, dt);
+      unreliable: !homed }, dt);
     object.update(T, dt, showObj && S.prog != null, printing ? 1 : 0);
     updateCamera(nowS);
     renderer.render(scene, camera);
@@ -371,6 +416,7 @@ export function createTwin(container, opts) {
       disposed = true;
       renderer.setAnimationLoop(null);
       abort.abort();
+      unlisten?.();
       disconnect();
       document.removeEventListener('visibilitychange', onVisibility);
       io.disconnect();

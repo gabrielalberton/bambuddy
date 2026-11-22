@@ -19,6 +19,7 @@ export interface DigitalTwinViewProps {
 export default function DigitalTwinView({ printerId, className = '' }: DigitalTwinViewProps) {
   const ref = useRef<HTMLDivElement | null>(null);
   const [failed, setFailed] = useState(false);
+  const [manualEstimate, setManualEstimate] = useState(false);
   const s = useTwinStrings();
 
   useEffect(() => {
@@ -28,6 +29,8 @@ export default function DigitalTwinView({ printerId, className = '' }: DigitalTw
     let handle: TwinHandle | null = null;
     try {
       handle = createTwin(el, {
+        printerId,
+        onManualEstimate: setManualEstimate,
         eventsUrl: () => withStreamToken(`${BASE}/${printerId}/events`),
         jobUrl: (id) => withStreamToken(`${BASE}/${printerId}/job/${encodeURIComponent(id)}`),
         modelUrl: () => withStreamToken(`${BASE}/${printerId}/model.glb`),
@@ -48,7 +51,7 @@ export default function DigitalTwinView({ printerId, className = '' }: DigitalTw
     <div
       ref={ref}
       role="img"
-      aria-label={s.twinLabel}
+      aria-label={manualEstimate ? `${s.twinLabel}. ${s.manualEstimate}` : s.twinLabel}
       data-testid="digital-twin-view"
       // gestos são do canvas (girar/zoom do twin): não chegam ao pan/zoom da imagem da câmera no quadro em volta
       onWheel={stop}
@@ -60,6 +63,11 @@ export default function DigitalTwinView({ printerId, className = '' }: DigitalTw
       onTouchEnd={stop}
       className={`absolute inset-0 overflow-hidden bg-[#171a21] select-none ${className}`}
     >
+      {manualEstimate && (
+        <span className="pointer-events-none absolute bottom-2 left-2 rounded bg-black/70 px-2 py-1 text-xs text-white">
+          {s.manualEstimate}
+        </span>
+      )}
       {failed && (
         <div className="absolute inset-0 flex items-center justify-center text-xs text-bambu-gray p-4 text-center">
           {s.unavailable}

@@ -87,6 +87,8 @@ function dryingBlockedKey(reasons: Array<number | string> | undefined): string {
 }
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
+import { HomingButton } from '../custom/twin/HomingButton';
+import { hasTwinMovementControls, previewTwinJog, resetTwinMotion } from '../custom/twin/manualMotion';
 import { useSinglePrinter } from '../custom/useSinglePrinter';
 import { InlineCamera } from '../custom/camera/InlineCamera';
 import { NozzleSizeBadge, QueueChip } from '../custom/printer/CardExtras';
@@ -3141,14 +3143,14 @@ function PrinterCard({
 
   const bedJogMutation = useMutation({
     mutationFn: ({ distance }: { distance: number }) =>
-      api.bedJog(printer.id, distance),
+      previewTwinJog(printer.id, { x: 0, y: 0, z: distance }, () => api.bedJog(printer.id, distance)),
     onError: (error: Error) =>
       showToast(error.message || t('printers.toast.failedToSendCommand'), 'error'),
   });
 
   const xyJogMutation = useMutation({
     mutationFn: ({ x, y }: { x: number; y: number }) =>
-      api.xyJog(printer.id, x, y),
+      previewTwinJog(printer.id, { x, y, z: 0 }, () => api.xyJog(printer.id, x, y)),
     onError: (error: Error) =>
       showToast(error.message || t('printers.toast.failedToSendCommand'), 'error'),
   });
@@ -3162,6 +3164,7 @@ function PrinterCard({
 
   const homeAxesMutation = useMutation({
     mutationFn: (axes: 'z' | 'xy' | 'all') => api.homeAxes(printer.id, axes),
+    onMutate: () => resetTwinMotion(printer.id),
     onSuccess: () => {
       showToast(t('printers.bedJog.homingStarted'));
     },
@@ -5109,6 +5112,7 @@ function PrinterCard({
                         // toolhead and opens the gap, on a bed-on-Z printer it raises the
                         // plate toward the nozzle and closes it.
                         const zMovesToolhead = isBedSlinger(printer.model);
+                        const labeledHoming = hasTwinMovementControls(printer.model);
                         const requestZJog = (arrow: 'up' | 'down') => {
                           const opensGap = zMovesToolhead ? arrow === 'up' : arrow === 'down';
                           // No not-homed gate here, and no endstop bypass to gate either:
@@ -5175,7 +5179,7 @@ function PrinterCard({
                                       >
                                         <ArrowLeft className="w-[var(--pc-i4,1rem)] h-[var(--pc-i4,1rem)]" />
                                       </button>
-                                      <button
+                                      {labeledHoming ? <div /> : <button
                                         onClick={() => {
                                           setShowBedJogMenu(null);
                                           homeAxesMutation.mutate('all');
@@ -5185,7 +5189,7 @@ function PrinterCard({
                                         aria-label={t('printers.bedJog.homeZ')}
                                       >
                                         <Home className="w-[var(--pc-i4,1rem)] h-[var(--pc-i4,1rem)]" />
-                                      </button>
+                                      </button>}
                                       <button
                                         onClick={() => requestXyJog(bedJogStep, 0)}
                                         disabled={xyJogMutation.isPending}
@@ -5249,6 +5253,11 @@ function PrinterCard({
                                     </div>
                                     </div>
                                   </div>
+                                  {labeledHoming && <HomingButton
+                                    onClick={() => homeAxesMutation.mutate('all')}
+                                    disabled={disabled || !IDLE_PRINTER_STATES.includes(status.state ?? '') || homeAxesMutation.isPending
+                                      || xyJogMutation.isPending || bedJogMutation.isPending || extruderJogMutation.isPending}
+                                  />}
                                   <div className="h-px bg-bambu-dark-tertiary" />
                                   <div className="px-3 pt-2.5 pb-3">
                                     <div className="mb-1 text-[length:var(--pc-t9,9px)] uppercase tracking-wider text-bambu-gray/70">

@@ -99,6 +99,16 @@ leva só a lista branca (`state.PUBLIC_KEYS`): nada de IP, serial, access code, 
   o `EventSource` fecha com 401 e o twin reabre com backoff (1,5 s → 30 s) usando o token novo.
 - `frontend/public/sw.js` não foi tocado.
 
+## Controles de movimento
+
+O botão **Homing (XYZ)** no painel da A1 usa o comando de homing completo do Bambuddy e mantém o painel aberto.
+Com a impressora parada e os três eixos referenciados pela telemetria (`home_flag & 7 == 7`), o gêmeo antecipa
+os movimentos X/Y/Z acionados neste painel, a partir da posição que já está desenhada na tela. O quadro indica
+**Posição estimada** porque a A1 transmite o estado do homing, mas não as coordenadas. A estimativa é local à
+página: comandos enviados pelo visor da impressora, por outro navegador ou por outro app não aparecem nela.
+Falhas devolvidas pela API desfazem o avanço correspondente. Novo homing, perda da telemetria ou início de
+impressão descartam a estimativa. Durante a impressão, a pose continua vindo do estimador de G-code.
+
 ## Modelo 3D da A1 (GLB opcional, NUNCA no git)
 
 O STEP da comunidade (MakerWorld "Bambulab A1 CAD step model", vajojajo) tem **licença desconhecida**: o GLB não vai
