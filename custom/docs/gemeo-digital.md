@@ -102,12 +102,16 @@ leva só a lista branca (`state.PUBLIC_KEYS`): nada de IP, serial, access code, 
 ## Controles de movimento
 
 O botão **Homing (XYZ)** no painel da A1 usa o comando de homing completo do Bambuddy e mantém o painel aberto.
-Com a impressora parada e os três eixos referenciados pela telemetria (`home_flag & 7 == 7`), o gêmeo antecipa
-os movimentos X/Y/Z acionados neste painel, a partir da posição que já está desenhada na tela. O quadro indica
-**Posição estimada** porque a A1 transmite o estado do homing, mas não as coordenadas. A estimativa é local à
-página: comandos enviados pelo visor da impressora, por outro navegador ou por outro app não aparecem nela.
+Fora de impressão, a posição começa em vermelho. Para sair desse estado, o gêmeo observa o fim do estágio de
+homing ou a transição de eixos sem referência para os três referenciados (`home_flag & 7 == 7`). Uma leitura
+inicial do flag completo por si só não diz que a posição desenhada corresponde à impressora.
+
+Com a impressora parada e a referência estabelecida, o gêmeo antecipa os movimentos X/Y/Z acionados nesse painel
+a partir da pose desenhada. O quadro indica **Posição estimada** porque a A1 não transmite coordenadas. Comandos
+do visor da impressora ou de outro navegador não aparecem nessa estimativa. A A1 também não avisa se alguém mexe
+nos eixos à mão. O botão **Movi à mão** marca a posição como desconhecida imediatamente, até observar novo homing.
 Falhas devolvidas pela API desfazem o avanço correspondente. Novo homing, perda da telemetria ou início de
-impressão descartam a estimativa. Durante a impressão, a pose continua vindo do estimador de G-code.
+impressão descartam a referência manual. Durante a impressão, a pose vem do estimador de G-code.
 
 ## Modelo 3D da A1 (GLB opcional, NUNCA no git)
 

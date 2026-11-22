@@ -22,7 +22,7 @@ const constrainPose = ({ x, y, z }) => ({
 /**
  * @param {HTMLElement} container elemento que recebe o canvas (ocupa 100% dele)
  * @param {{ eventsUrl: () => string, jobUrl: (id: string) => string, modelUrl?: (() => string) | null,
- *           printerId?: number, onManualEstimate?: (active: boolean) => void, tuning?: { lead?: number, lat?: number, tau?: number, autoFocus?: boolean }, debug?: boolean, procedural?: boolean }} opts
+ *           printerId?: number, onMotionStatus?: (status: 'unknown' | 'estimated' | 'print') => void, tuning?: { lead?: number, lat?: number, tau?: number, autoFocus?: boolean }, debug?: boolean, procedural?: boolean }} opts
  */
 // O GLB da A1 (~2,8 MB) vem com o token de stream na URL, que muda a cada sessão: o cache HTTP nunca acertava e o modelo
 // era baixado de novo a cada abertura. Guarda o arquivo no Cache Storage (chave sem o token) e na memória da página.
@@ -221,30 +221,25 @@ export function createTwin(container, opts) {
   };
   const manual = createManualMotion();
   let motionMessage = null;
-  let shownEstimate = false;
-  function showEstimate(active) {
-    if (active === shownEstimate) return;
-    shownEstimate = active;
-    opts.onManualEstimate?.(active);
+  let displayedMotion = 'unknown';
+  function showMotion(status) {
+    if (status === displayedMotion) return;
+    displayedMotion = status;
+    opts.onMotionStatus?.(status);
   }
   function resetManual() {
     manual.reset();
-    showEstimate(false);
+    showMotion('unknown');
   }
   function motionStatus(now) {
     const status = twinMotionStatus(motionMessage, now - S.lastMsgPerf);
-    if (!status.canJog) resetManual();
+    manual.observe(status);
     return status;
   }
   const unlisten = opts.printerId == null ? null : listenToTwinMotion(opts.printerId, {
     jog(delta) {
-      if (!motionStatus(performance.now() / 1000).canJog) return;
-      const rollback = manual.jog(S.pose, delta);
-      showEstimate(true);
-      return () => {
-        rollback();
-        showEstimate(manual.target !== null);
-      };
+      motionStatus(performance.now() / 1000);
+      if (manual.referenced) return manual.jog(S.pose, delta);
     },
     reset: resetManual,
   });
@@ -351,7 +346,7 @@ export function createTwin(container, opts) {
     const dt = Math.min((nowP - lastT) / 1000, 0.1);
     lastT = nowP;
     const nowS = nowP / 1000;
-    const { homed } = motionStatus(nowS);
+    const { homed, trackingPrint } = motionStatus(nowS);
     const stale = nowS - S.lastMsgPerf > 15;
     let target = REST, printing = false, showObj = false, T = 0, kind = 0;
     const tr = S.tracker;
@@ -373,8 +368,10 @@ export function createTwin(container, opts) {
     const k = 1 - Math.exp(-dt / (manual.target || tr?.locked ? 0.035 : 0.6));
     S.pose.x += (target.x - S.pose.x) * k; S.pose.y += (target.y - S.pose.y) * k; S.pose.z += (target.z - S.pose.z) * k;
     model.setPose(S.pose.x, S.pose.y, S.pose.z);
+    const poseKnown = manual.referenced || (trackingPrint && homed && tr?.locked && !stale);
+    showMotion(manual.referenced ? 'estimated' : poseKnown ? 'print' : 'unknown');
     model.setLook({ nozzleTemp: S.s.nozzle_temper ?? 25, fan: (S.s.cooling_fan_speed ?? 0) / 15 + (kind === 1 ? 0.25 : 0), printing,
-      unreliable: !homed }, dt);
+      unreliable: !poseKnown }, dt);
     object.update(T, dt, showObj && S.prog != null, printing ? 1 : 0);
     updateCamera(nowS);
     renderer.render(scene, camera);

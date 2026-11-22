@@ -7,14 +7,44 @@ const up = { x: 0, y: 0, z: 1 };
 const ready = { conn: { mqtt: true }, age: 0, s: { home_flag: 7, gcode_state: 'IDLE' } };
 
 describe('manual motion in the A1 twin', () => {
-  it('requires live telemetry, all three homed axes and an idle printer', () => {
-    expect(twinMotionStatus(null, 0)).toEqual({ homed: false, canJog: false });
-    expect(twinMotionStatus({ ...ready, s: { ...ready.s, home_flag: 3 } }, 0).canJog).toBe(false);
-    expect(twinMotionStatus(ready, 0)).toEqual({ homed: true, canJog: true });
-    expect(twinMotionStatus({ ...ready, s: { ...ready.s, gcode_state: 'RUNNING' } }, 0))
-      .toEqual({ homed: true, canJog: false });
-    expect(twinMotionStatus({ ...ready, conn: { mqtt: false } }, 0).canJog).toBe(false);
-    expect(twinMotionStatus({ ...ready, age: 14 }, 2).canJog).toBe(false);
+  it('starts unknown even with all flags set, and requires an observed reference after manual invalidation', () => {
+    const motion = createManualMotion();
+    const report = (s: Partial<typeof ready.s> & { stg_cur?: number }) =>
+      motion.observe(twinMotionStatus({ ...ready, s: { ...ready.s, ...s } }, 0));
+    report({});
+    expect(motion.referenced).toBe(false);
+    report({ home_flag: 0 });
+    report({ home_flag: 3 });
+    expect(motion.referenced).toBe(false);
+    report({});
+    expect(motion.referenced).toBe(true);
+    motion.reset();
+    report({});
+    expect(motion.referenced).toBe(false);
+    report({ stg_cur: 13 });
+    expect(motion.referenced).toBe(false);
+    report({ stg_cur: 0 });
+    expect(motion.referenced).toBe(true);
+    motion.jog(base, right);
+    report({ gcode_state: 'PREPARE' });
+    expect(motion.referenced).toBe(false);
+    expect(motion.target).toBeNull();
+  });
+
+  it('invalidates a reference when the printer or stream goes offline', () => {
+    const motion = createManualMotion();
+    const unhomed = { ...ready, s: { ...ready.s, home_flag: 0 } };
+    for (const [msg, elapsed] of [
+      [null, 0],
+      [{ ...ready, conn: { mqtt: false } }, 0],
+      [{ ...ready, age: 14 }, 2],
+    ] as const) {
+      motion.observe(twinMotionStatus(unhomed, 0));
+      motion.observe(twinMotionStatus(ready, 0));
+      expect(motion.referenced).toBe(true);
+      motion.observe(twinMotionStatus(msg, elapsed));
+      expect(motion.referenced).toBe(false);
+    }
   });
 
   it('moves before HTTP responds, scopes commands by printer and undoes only the failed jog', async () => {

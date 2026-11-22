@@ -8,9 +8,11 @@ export interface TwinTuning {
   autoFocus?: boolean;
 }
 
+export type MotionStatus = 'unknown' | 'estimated' | 'print';
+
 export interface TwinOptions {
   printerId?: number;
-  onManualEstimate?: (active: boolean) => void;
+  onMotionStatus?: (status: MotionStatus) => void;
   /** URL do SSE de estado (chamada a cada (re)conexão: deve trazer o token de stream atual) */
   eventsUrl: () => string;
   /** URL do pacote do job */

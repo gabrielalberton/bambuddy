@@ -5255,6 +5255,7 @@ function PrinterCard({
                                   </div>
                                   {labeledHoming && <HomingButton
                                     onClick={() => homeAxesMutation.mutate('all')}
+                                    onInvalidate={() => resetTwinMotion(printer.id)}
                                     disabled={disabled || !IDLE_PRINTER_STATES.includes(status.state ?? '') || homeAxesMutation.isPending
                                       || xyJogMutation.isPending || bedJogMutation.isPending || extruderJogMutation.isPending}
                                   />}

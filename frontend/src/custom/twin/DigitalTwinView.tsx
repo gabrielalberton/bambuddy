@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { withStreamToken } from '../../api/client';
-import { createTwin, type TwinHandle } from './engine/engine.js';
+import { createTwin, type TwinHandle, type MotionStatus } from './engine/engine.js';
 import { useTwinStrings } from './i18n';
 
 const BASE = '/api/v1/custom/twin/stream';
@@ -19,8 +19,9 @@ export interface DigitalTwinViewProps {
 export default function DigitalTwinView({ printerId, className = '' }: DigitalTwinViewProps) {
   const ref = useRef<HTMLDivElement | null>(null);
   const [failed, setFailed] = useState(false);
-  const [manualEstimate, setManualEstimate] = useState(false);
+  const [motionStatus, setMotionStatus] = useState<MotionStatus>('unknown');
   const s = useTwinStrings();
+  const positionLabel = motionStatus === 'estimated' ? s.manualEstimate : motionStatus === 'unknown' ? s.unknownPosition : null;
 
   useEffect(() => {
     const el = ref.current;
@@ -30,7 +31,7 @@ export default function DigitalTwinView({ printerId, className = '' }: DigitalTw
     try {
       handle = createTwin(el, {
         printerId,
-        onManualEstimate: setManualEstimate,
+        onMotionStatus: setMotionStatus,
         eventsUrl: () => withStreamToken(`${BASE}/${printerId}/events`),
         jobUrl: (id) => withStreamToken(`${BASE}/${printerId}/job/${encodeURIComponent(id)}`),
         modelUrl: () => withStreamToken(`${BASE}/${printerId}/model.glb`),
@@ -51,7 +52,7 @@ export default function DigitalTwinView({ printerId, className = '' }: DigitalTw
     <div
       ref={ref}
       role="img"
-      aria-label={manualEstimate ? `${s.twinLabel}. ${s.manualEstimate}` : s.twinLabel}
+      aria-label={positionLabel && !failed ? `${s.twinLabel}. ${positionLabel}` : s.twinLabel}
       data-testid="digital-twin-view"
       // gestos são do canvas (girar/zoom do twin): não chegam ao pan/zoom da imagem da câmera no quadro em volta
       onWheel={stop}
@@ -63,9 +64,9 @@ export default function DigitalTwinView({ printerId, className = '' }: DigitalTw
       onTouchEnd={stop}
       className={`absolute inset-0 overflow-hidden bg-[#171a21] select-none ${className}`}
     >
-      {manualEstimate && (
+      {!failed && positionLabel && (
         <span className="pointer-events-none absolute bottom-2 left-2 rounded bg-black/70 px-2 py-1 text-xs text-white">
-          {s.manualEstimate}
+          {positionLabel}
         </span>
       )}
       {failed && (
