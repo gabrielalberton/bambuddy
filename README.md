@@ -2,7 +2,20 @@
   <img src="static/img/bambuddy_logo_dark.png" alt="Bambuddy Logo" width="300">
 </p>
 
-<h1 align="center">Bambuddy</h1>
+<h1 align="center">Bambuddy for a single printer</h1>
+
+This open-source fork is a workflow optimization for people who use Bambuddy with a single printer.
+When a user has access to exactly one printer, the fork selects it automatically and simplifies the
+interface by hiding controls meant for choosing between printers.
+
+All credit for the original application goes to [Bambuddy](https://github.com/maziggy/bambuddy), created
+by [maziggy](https://github.com/maziggy) and built by the
+[Bambuddy contributors](https://github.com/maziggy/bambuddy/graphs/contributors). This fork is distributed
+under the same [GNU Affero General Public License v3.0](LICENSE).
+
+The fork source is in the `gabriel` branch. See the [customization inventory](custom/CUSTOMIZATIONS.md)
+for the changes and the [build script](custom/build.sh) for building the fork's Docker image.
+The documentation below comes from the original Bambuddy project.
 
 <p align="center">
   <strong>Your printers. No cloud. Your rules.</strong><br>
