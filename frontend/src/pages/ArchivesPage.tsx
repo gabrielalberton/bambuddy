@@ -4148,7 +4148,7 @@ export function ArchivesPage() {
             <div>
               <h1 className="text-2xl font-bold text-white flex items-center gap-3">
                 <ArchiveIcon className="w-7 h-7 text-bambu-green" />
-                Archives
+                {t('archives.page.title')}
               </h1>
               <p className="text-bambu-gray mt-1">
                 {filteredArchives?.length || 0} of {archives?.length || 0} prints
@@ -4161,7 +4161,7 @@ export function ArchivesPage() {
             >
               {collections.map((c) => (
                 <option key={c.id} value={c.id}>
-                  {c.label}
+                  {c.id === 'all' ? t('archives.page.allArchives', { defaultValue: c.label }) : c.label}
                 </option>
               ))}
             </select>

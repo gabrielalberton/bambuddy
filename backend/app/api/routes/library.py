@@ -2466,6 +2466,7 @@ async def list_files(
     # Prevent browser caching of file list
     response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
 
+    visible_file_ids = {f.id for f in files}
     file_list = []
     for f in files:
         # Extract key metadata for display
@@ -2479,6 +2480,7 @@ async def list_files(
             filament_grams = f.file_metadata.get("filament_used_grams")
             sliced_for_model = f.file_metadata.get("sliced_for_model")
 
+        source_id = (f.file_metadata or {}).get("sliced_from_library_file_id")
         file_list.append(
             FileListResponse(
                 id=f.id,
@@ -2498,6 +2500,7 @@ async def list_files(
                 print_time_seconds=print_time,
                 filament_used_grams=filament_grams,
                 sliced_for_model=sliced_for_model,
+                sliced_from_library_file_id=source_id if type(source_id) is int and source_id in visible_file_ids else None,
                 tags=[TagSummary(id=t.id, name=t.name) for t in f.tags],
                 variant_group_id=f.variant_group_id,
                 variant_count=variant_counts.get(f.variant_group_id, 0) if f.variant_group_id else 0,

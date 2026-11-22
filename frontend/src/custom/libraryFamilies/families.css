@@ -1,0 +1,20 @@
+.library-file-family {
+  min-width: 0;
+}
+
+.library-file-family__slices {
+  margin-inline-start: 0.5rem;
+  padding-inline-start: 0.5rem;
+  border-inline-start: 2px solid color-mix(in srgb, currentColor 20%, transparent);
+}
+
+.library-file-family--grid .library-file-family__slices {
+  display: grid;
+  gap: 0.5rem;
+  margin-block-start: 0.5rem;
+}
+
+/* A small thumbnail on a nested grid card leaves the file actions in reach. */
+.library-file-family--grid .library-file-family__slices .aspect-square {
+  aspect-ratio: 2 / 1;
+}

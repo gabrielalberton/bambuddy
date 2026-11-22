@@ -8950,6 +8950,7 @@ export interface LibraryFileListItem {
   print_time_seconds: number | null;
   filament_used_grams: number | null;
   sliced_for_model: string | null;
+  sliced_from_library_file_id?: number | null;
   // Tags assigned to this file (#1268). The backend always emits an empty
   // array when a file has no tags, but the field is typed optional so any
   // legacy code path (or mock) that constructs a LibraryFileListItem without

@@ -1,3 +1,4 @@
+import { orderLibraryFamilies, renderLibraryFamilies } from '../custom/libraryFamilies/render';
 import { useState, useRef, useCallback, useMemo, useEffect, useId, lazy, Suspense, type DragEvent } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueries, useMutation, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
@@ -2187,13 +2188,13 @@ export function FileManagerPage() {
   // Filter and sort files
   const filteredAndSortedFiles = useMemo(
     () =>
-      filterAndSortFiles(files ?? [], {
+      orderLibraryFamilies(filterAndSortFiles(files ?? [], {
         query: searchQuery,
         filterType,
         filterUsername,
         sortField,
         sortDirection,
-      }),
+      })),
     [files, searchQuery, filterType, filterUsername, sortField, sortDirection],
   );
 
@@ -2748,7 +2749,7 @@ export function FileManagerPage() {
   columnFileLevels.forEach((level, i) => {
     const query = columnFileQueries.results[i];
     columnFiles.set(level.key, {
-      files: filterAndSortFiles(query?.data ?? [], { filterType, filterUsername, sortField, sortDirection }),
+      files: orderLibraryFamilies(filterAndSortFiles(query?.data ?? [], { filterType, filterUsername, sortField, sortDirection })),
       loading: Boolean(query?.isPending),
     });
   });
@@ -3883,7 +3884,7 @@ export function FileManagerPage() {
                     {level?.loading && (
                       <div className="px-3 py-2 text-sm text-bambu-gray" aria-hidden="true">…</div>
                     )}
-                    {level && !level.loading && level.files.map((file) => (
+                    {level && !level.loading && renderLibraryFamilies(level.files, 'columns', (file) => (
                       <ColumnFileRow
                         key={file.id}
                         file={file}
@@ -3930,7 +3931,7 @@ export function FileManagerPage() {
                             : t('fileManager.noFilesYet')}
                     </div>
                   ) : (
-                    filteredAndSortedFiles.map((file) => (
+                    renderLibraryFamilies(filteredAndSortedFiles, 'columns', (file) => (
                       <ColumnFileRow
                         key={file.id}
                         file={file}
@@ -3996,7 +3997,7 @@ export function FileManagerPage() {
           ) : viewMode === 'grid' ? (
             <div className="flex-1 lg:overflow-y-auto">
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4">
-                {filteredAndSortedFiles.map((file) => (
+                {renderLibraryFamilies(filteredAndSortedFiles, 'grid', (file) => (
                   <FileCard
                     key={file.id}
                     file={file}
@@ -4055,7 +4056,7 @@ export function FileManagerPage() {
                   <div />
                 </div>
                 {/* List rows */}
-                {filteredAndSortedFiles.map((file) => (
+                {renderLibraryFamilies(filteredAndSortedFiles, 'list', (file) => (
                   <div
                     key={file.id}
                     data-testid="file-list-grid-row"

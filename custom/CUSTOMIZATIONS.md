@@ -495,3 +495,10 @@ Ver [prévia e perfil leve](docs/camera-previa.md).
 - Ligado no servidor com `BAMBUDDY_CUSTOM_MODEL_PREVIEW=1`. Para desativar no navegador, use `localStorage.setItem('custom.modelPreview', 'off')` no navegador. Projetos com múltiplas placas mantêm a seleção de placas do visualizador original.
 
 - A lista, os cartões e o menu de detalhes usam `archivePreviewTarget` em conjunto. Abrir uma prévia geométrica antiga também salva a miniatura ausente para aquele registro, incluindo cópias que compartilham o mesmo conteúdo.
+
+## Fatiamentos junto ao modelo de origem
+
+- `backend/app/api/routes/library.py` e `schemas/library.py` projetam no resultado da listagem o ID da origem salvo em `file_metadata.sliced_from_library_file_id`, quando a origem também está visível na resposta.
+- `frontend/src/custom/libraryFamilies/` reaproveita o vínculo para organizar grade, lista e colunas com os fatiamentos sob a origem na mesma pasta. Busca ou filtros que ocultam a origem mantêm os resultados fatiados acessíveis. Os arquivos conservam suas ações, pastas e IDs.
+- Ganchos em `FileManagerPage` nos mapas de renderização e nas listas ordenadas usadas pelo teclado. Desativar com `localStorage.setItem('custom.libraryFamilies', 'off')` e recarregar.
+- `ArchivesPage` usa a própria chave de título traduzível; o português do fork apresenta essa área como **Impressos**, inclusive no menu.

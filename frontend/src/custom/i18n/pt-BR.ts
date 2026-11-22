@@ -1,5 +1,7 @@
 // Textos do fork (pt-BR). Mesclados no i18n do upstream por ./index.ts.
 const ptBR = {
+  nav: { archives: 'Impressos' },
+  archives: { page: { title: 'Impressos', allArchives: 'Todos os impressos' } },
   notifications: {
     providerTypes: { webpush: 'Web Push (PWA)' },
     providerDescriptions: {
