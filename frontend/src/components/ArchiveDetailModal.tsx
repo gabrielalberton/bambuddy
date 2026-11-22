@@ -1,3 +1,6 @@
+import { ArchiveGeometryPreview } from '../custom/modelPreview/ArchiveGeometryPreview';
+import { archivePreviewTarget } from '../custom/modelPreview/archivePreviewTarget';
+import { PlatePickerModal } from './PlatePickerModal';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -105,6 +108,8 @@ export function ArchiveDetailModal({ archiveId, onClose }: { archiveId: number; 
   const useSlicerApi = settings?.use_slicer_api ?? false;
 
   const [showEdit, setShowEdit] = useState(false);
+  const [showGeometryPreview, setShowGeometryPreview] = useState(false);
+  const [previewPlates, setPreviewPlates] = useState<PlateMetadata[] | null>(null);
   // The plate a reprint starts on: the archive's, a plate card's or a print's.
   const [reprintPlate, setReprintPlate] = useState<number | null | undefined>(undefined);
   const [showSlice, setShowSlice] = useState(false);
@@ -144,7 +149,7 @@ export function ArchiveDetailModal({ archiveId, onClose }: { archiveId: number; 
 
   // Escape closes the archive, unless it closes a dialog opened from it first.
   const childOpen =
-    showEdit || reprintPlate !== undefined || showSlice || showDelete || confirmRun != null || media != null || menu != null;
+    showGeometryPreview || previewPlates != null || showEdit || reprintPlate !== undefined || showSlice || showDelete || confirmRun != null || media != null || menu != null;
   useEffect(() => {
     if (childOpen) return;
     const onKey = (e: KeyboardEvent) => {
@@ -272,7 +277,7 @@ export function ArchiveDetailModal({ archiveId, onClose }: { archiveId: number; 
     .join(' · ');
   const subtitle = [
     archive.print_name && archive.filename !== archive.print_name ? archive.filename : null,
-    archive.sliced_for_model ? t('archivePage.slicedFor', { model: archive.sliced_for_model }) : null,
+    archive.sliced_for_model && printable ? t('archivePage.slicedFor', { model: archive.sliced_for_model }) : archive.sliced_for_model,
     archive.nozzle_diameter ? `${archive.nozzle_diameter} mm` : null,
     archive.bed_type,
   ].filter(Boolean);
@@ -294,7 +299,13 @@ export function ArchiveDetailModal({ archiveId, onClose }: { archiveId: number; 
     {
       label: t('archivePage.preview'),
       icon: <Box className="w-4 h-4" />,
-      onClick: () => navigate(`/gcode-viewer?archive=${archive.id}`),
+      onClick: async () => {
+        const target = await archivePreviewTarget(archive);
+        if (target.kind === 'geometry') setShowGeometryPreview(true);
+        else if (target.kind === 'no-gcode') showToast(t('archives.platePicker.noGcode'), 'info');
+        else if (target.kind === 'choose-plate') setPreviewPlates(target.plates);
+        else navigate(`/gcode-viewer?archive=${archive.id}`);
+      },
     },
     {
       label: t('archivePage.download'),
@@ -340,7 +351,7 @@ export function ArchiveDetailModal({ archiveId, onClose }: { archiveId: number; 
     archive.layer_height ? { label: t('archivePage.layerHeight'), value: `${archive.layer_height} mm` } : null,
     archive.nozzle_diameter ? { label: t('archivePage.nozzle'), value: `${archive.nozzle_diameter} mm` } : null,
     archive.bed_type ? { label: t('archivePage.bedType'), value: archive.bed_type } : null,
-    archive.sliced_for_model ? { label: t('archivePage.slicedForLabel'), value: archive.sliced_for_model } : null,
+    archive.sliced_for_model && printable ? { label: t('archivePage.slicedForLabel'), value: archive.sliced_for_model } : null,
     archive.total_layers ? { label: t('archivePage.layers'), value: String(archive.total_layers) } : null,
     archive.file_size ? { label: t('archivePage.size'), value: formatFileSize(archive.file_size) } : null,
     { label: t('archivePage.archived'), value: formatDateTime(archive.created_at, timeFormat) },
@@ -597,6 +608,14 @@ export function ArchiveDetailModal({ archiveId, onClose }: { archiveId: number; 
         )}
       </section>
 
+      {showGeometryPreview && <ArchiveGeometryPreview archiveId={archive.id} title={name} onClose={() => setShowGeometryPreview(false)} />}
+      {previewPlates && (
+        <PlatePickerModal
+          plates={previewPlates}
+          onSelect={(plate) => navigate(`/gcode-viewer?archive=${archive.id}&plate=${plate}`)}
+          onClose={() => setPreviewPlates(null)}
+        />
+      )}
       {showEdit && <EditArchiveModal archive={archive} onClose={() => setShowEdit(false)} />}
       {reprintPlate !== undefined && (
         <PrintModal

@@ -11,15 +11,16 @@ from backend.app.core.auth import RequestPrinterScope, require_ownership_permiss
 from backend.app.core.database import get_db
 from backend.app.core.permissions import Permission
 from backend.app.core.printer_scope import PrinterScope
+from backend.app.core.tasks import spawn_background_task
 from backend.app.models.archive import PrintArchive
 from backend.app.models.library import LibraryFile
 
-from .service import enabled, preview_artifacts
+from .service import enabled, preview_artifacts, publish_thumbnail
 
 router = APIRouter(prefix="/custom/model-preview", tags=["custom-model-preview"])
 
 
-async def _send(stored_path: str):
+async def _send(stored_path: str, *, missing_thumbnail: tuple | None):
     path = to_absolute_path(stored_path)
     if not enabled() or not path or path.suffix.lower() != ".3mf" or not path.is_file():
         raise HTTPException(404, "Model preview is unavailable")
@@ -29,6 +30,11 @@ async def _send(stored_path: str):
         return Response(status_code=202, headers={"Retry-After": "2", "Cache-Control": "no-store"})
     except (OSError, ValueError) as exc:
         raise HTTPException(422, "Could not generate the model preview") from exc
+    if missing_thumbnail is not None:
+        model, row_id, file_path = missing_thumbnail
+        spawn_background_task(
+            publish_thumbnail(model, row_id, file_path, path, artifacts=artifacts), name="publish-3mf-thumbnail",
+        )
     return FileResponse(artifacts / "preview.glb", media_type="model/gltf-binary", headers={"Cache-Control": "private, no-store"})
 
 
@@ -41,8 +47,9 @@ async def archive_preview(
 ):
     archive = await _ensure_archive_visible(await db.get(PrintArchive, archive_id), *auth, printer_scope)
     stored_path = archive.source_3mf_path or archive.file_path
+    missing = None if archive.thumbnail_path else (PrintArchive, archive.id, archive.file_path)
     await db.close()
-    return await _send(stored_path)
+    return await _send(stored_path, missing_thumbnail=missing)
 
 
 @router.get("/library/{file_id}")
@@ -53,5 +60,6 @@ async def library_preview(
 ):
     entry = _ensure_library_file_visible(await db.get(LibraryFile, file_id), *auth)
     stored_path = entry.file_path
+    missing = None if entry.thumbnail_path else (LibraryFile, entry.id, entry.file_path)
     await db.close()
-    return await _send(stored_path)
+    return await _send(stored_path, missing_thumbnail=missing)

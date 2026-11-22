@@ -83,8 +83,11 @@ async def preview_artifacts(source: Path) -> Path:
     return destination
 
 
-async def publish_thumbnail(model, row_id: int, stored_source: str, source: Path, *, replace: bool = False) -> None:
-    artifacts = await preview_artifacts(source)
+async def publish_thumbnail(
+    model, row_id: int, stored_source: str, source: Path, *, replace: bool = False, artifacts: Path | None = None
+) -> None:
+    if artifacts is None:
+        artifacts = await preview_artifacts(source)
     parent = source.parent if model is PrintArchive else settings.archive_dir / "library" / "thumbnails"
     parent.mkdir(parents=True, exist_ok=True)
     dest = parent / f"model-preview-{uuid4().hex}.png"

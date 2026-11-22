@@ -1,5 +1,5 @@
 import { ArchiveGeometryPreview } from '../custom/modelPreview/ArchiveGeometryPreview';
-import { modelPreviewEnabled } from '../custom/modelPreview/preview';
+import { archivePreviewTarget } from '../custom/modelPreview/archivePreviewTarget';
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -381,23 +381,12 @@ function ArchiveCard({
   // 3D Preview click handler. Multi-plate archives show the plate picker
   // first; single-plate archives navigate straight into the viewer.
   // Source-only archives open the model viewer when enabled.
-  const openGcodeViewer = async () => {
-    try {
-      const resp = await api.getArchivePlates(archive.id);
-      if (resp.has_gcode === false) {
-        if (modelPreviewEnabled()) setShowGeometryPreview(true);
-        else showToast(t('archives.platePicker.noGcode'), 'info');
-        return;
-      }
-      if (resp.is_multi_plate && resp.plates.length > 1) {
-        setPlatePickerPlates(resp.plates);
-        return;
-      }
-    } catch {
-      // Swallow — fall through to the no-plate navigate below so the viewer
-      // still opens on the first plate (the backend's default).
-    }
-    navigate(`/gcode-viewer?archive=${archive.id}`);
+  const openArchivePreview = async () => {
+    const target = await archivePreviewTarget(archive);
+    if (target.kind === 'geometry') setShowGeometryPreview(true);
+    else if (target.kind === 'no-gcode') showToast(t('archives.platePicker.noGcode'), 'info');
+    else if (target.kind === 'choose-plate') setPlatePickerPlates(target.plates);
+    else navigate(`/gcode-viewer?archive=${archive.id}`);
   };
 
   const timelapseDeleteMutation = useMutation({
@@ -636,7 +625,7 @@ function ArchiveCard({
     {
       label: t('archives.menu.preview3d'),
       icon: <Box className="w-4 h-4" />,
-      onClick: () => { openGcodeViewer(); },
+      onClick: () => { openArchivePreview(); },
     },
     {
       label: t('archives.menu.viewTimelapse'),
@@ -1137,7 +1126,7 @@ function ArchiveCard({
           className="absolute bottom-2 right-2 p-1.5 rounded bg-black/60 hover:bg-black/80 transition-colors"
           onClick={(e) => {
             e.stopPropagation();
-            openGcodeViewer();
+            openArchivePreview();
           }}
           title={t('archives.card.preview3d')}
         >
@@ -1965,21 +1954,12 @@ function ArchiveListRow({
 
   // 3D Preview click handler. Multi-plate archives show the plate picker
   // first; single-plate archives navigate straight into the viewer.
-  const openGcodeViewer = async () => {
-    try {
-      const resp = await api.getArchivePlates(archive.id);
-      if (resp.has_gcode === false && modelPreviewEnabled()) {
-        setShowGeometryPreview(true);
-        return;
-      }
-      if (resp.is_multi_plate && resp.plates.length > 1) {
-        setPlatePickerPlates(resp.plates);
-        return;
-      }
-    } catch {
-      // Swallow — fall through to navigate on the first-plate default.
-    }
-    navigate(`/gcode-viewer?archive=${archive.id}`);
+  const openArchivePreview = async () => {
+    const target = await archivePreviewTarget(archive);
+    if (target.kind === 'geometry') setShowGeometryPreview(true);
+    else if (target.kind === 'no-gcode') showToast(t('archives.platePicker.noGcode'), 'info');
+    else if (target.kind === 'choose-plate') setPlatePickerPlates(target.plates);
+    else navigate(`/gcode-viewer?archive=${archive.id}`);
   };
 
   const timelapseDeleteMutation = useMutation({
@@ -2215,7 +2195,7 @@ function ArchiveListRow({
     {
       label: t('archives.menu.preview3d'),
       icon: <Box className="w-4 h-4" />,
-      onClick: () => { openGcodeViewer(); },
+      onClick: () => { openArchivePreview(); },
     },
     {
       label: t('archives.menu.viewTimelapse'),

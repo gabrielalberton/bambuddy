@@ -493,3 +493,5 @@ Ver [prévia e perfil leve](docs/camera-previa.md).
 - As rotas de prévia têm as mesmas permissões da mídia de origem. O GLB é reutilizado pelo hash de conteúdo. `backend/app/custom/api.py` monta as rotas.
 - `frontend/src/custom/modelPreview/` e ganchos em `ArchivesPage`, `ModelViewerModal`, `ModelViewer`, `FileUploadModal` e `useWebSocket`: prévia geométrica de arquivos sem G-code, carregamento do GLB, preservação de pacotes 3MF enviados como ZIP e atualização da miniatura depois do render.
 - Ligado no servidor com `BAMBUDDY_CUSTOM_MODEL_PREVIEW=1`. Para desativar no navegador, use `localStorage.setItem('custom.modelPreview', 'off')` no navegador. Projetos com múltiplas placas mantêm a seleção de placas do visualizador original.
+
+- A lista, os cartões e o menu de detalhes usam `archivePreviewTarget` em conjunto. Abrir uma prévia geométrica antiga também salva a miniatura ausente para aquele registro, incluindo cópias que compartilham o mesmo conteúdo.

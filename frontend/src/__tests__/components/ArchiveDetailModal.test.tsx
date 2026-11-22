@@ -27,6 +27,10 @@ vi.mock('react-router-dom', async () => {
   };
 });
 
+vi.mock('../../custom/modelPreview/ArchiveGeometryPreview', () => ({
+  ArchiveGeometryPreview: ({ archiveId }: { archiveId: number }) => <div data-testid="geometry-preview">{archiveId}</div>,
+}));
+
 const archive = {
   id: 5,
   filename: 'planter.gcode.3mf',
@@ -274,6 +278,23 @@ describe('ArchiveDetailModal', () => {
     const before = screen.queryAllByText('Timelapse video').length;
     fireEvent.click(screen.getByRole('button', { name: 'More actions' }));
     expect(screen.queryAllByText('Timelapse video')).toHaveLength(before + 1);
+  });
+
+  it('opens source-only 3MF geometry from the details action without navigating to G-code', async () => {
+    server.use(
+      http.get('/api/v1/archives/5', () => HttpResponse.json({
+        ...archive, filename: 'planter.3mf', total_layers: null, print_time_seconds: null,
+      })),
+      http.get('/api/v1/archives/5/plates', () => HttpResponse.json({
+        archive_id: 5, filename: 'planter.3mf', plates: [], is_multi_plate: false, has_gcode: false,
+      })),
+    );
+    render(<ArchiveDetailModal archiveId={5} onClose={onClose} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'More actions' }));
+    fireEvent.click(screen.getByText('3D preview'));
+    expect(await screen.findByTestId('geometry-preview')).toHaveTextContent('5');
+    expect(navigate).not.toHaveBeenCalled();
+    expect(screen.queryByText(/sliced for X1C/i)).not.toBeInTheDocument();
   });
 
   it('gives focus back to the actions button when its menu closes', async () => {
