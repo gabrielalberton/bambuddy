@@ -1248,6 +1248,7 @@ async def _stream_rtsp(
         logger.error("ffmpeg not found - required for RTSP streaming")
         return
 
+    from backend.app.custom.camera_rtsp import live_rtsp_input_options, live_rtsp_output_options
     from backend.app.services.camera import rtsp_socket_timeout_flag
 
     safe_url = _sanitize_camera_url(url, ("rtsp", "rtsps"))
@@ -1312,6 +1313,7 @@ async def _stream_rtsp(
         # a camera could pass the connection test and still show a black live
         # view. The printer path is the opposite case — a known Bambu camera
         # per model — and keeps its tuning in `camera_profiles.py`.
+        *live_rtsp_input_options(),  # fork: opt-in tuning for a known go2rtc feed
         "-fflags",
         "nobuffer",
         "-flags",
@@ -1322,8 +1324,7 @@ async def _stream_rtsp(
         "mjpeg",
         "-q:v",
         "5",
-        "-r",
-        str(fps),
+        *live_rtsp_output_options(fps),
         "-an",
         "-",
     ]

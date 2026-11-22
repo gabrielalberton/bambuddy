@@ -475,3 +475,12 @@ estreitas ou com ponteiro de toque. Para desativar o ajuste, use
 |---|---|---|
 | `frontend/src/pages/SettingsPage.tsx` | `{/* Edit User Modal */}` | Usa `EditUserOverlay` e marca o cartão do formulário. |
 | `frontend/src/custom/users/` | `EditUserOverlay.tsx`, `editUserOverlay.css` | Limita o modal à área visível, contém a rolagem e reserva a margem inferior. |
+
+## Perfil leve da câmera RTSP externa
+
+| Arquivo | Âncora | Efeito |
+|---|---|---|
+| `backend/app/services/external_camera.py` | `_stream_rtsp`, argumentos de entrada e saída | Usa o perfil opcional de vídeo ao vivo do fork. |
+| `backend/app/custom/camera_rtsp.py` | `BAMBUDDY_CUSTOM_LIGHT_RTSP=1` | Sondagem curta para o go2rtc e MJPEG de até 1280 px e 8 fps. |
+
+Ver [prévia e perfil leve](docs/camera-previa.md).

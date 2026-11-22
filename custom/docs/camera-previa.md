@@ -25,3 +25,12 @@ quadro-chave; o stream baixo tem o mesmo GOP, então não ajuda. Já o Frigate m
 - Desligar: tirar a variável (backend) ou `localStorage['custom.cameraPreview']='off'` (aparelho).
 
 Complemento possível sem código: GOP 15 (1 s) no stream principal da Thingino reduz a espera da alta para ~1-2 s.
+
+## Perfil leve de vídeo ao vivo
+
+Com `BAMBUDDY_CUSTOM_LIGHT_RTSP=1`, o MJPEG ao vivo de uma câmera RTSP externa tem
+largura máxima de 1280 px e até 8 fps. O FFmpeg descarta quadros antes de redimensionar
+e codificar, e reduz a sondagem inicial para a fonte H.264 conhecida do go2rtc.
+A opção é específica para essa implantação. Remover a variável volta aos parâmetros
+do upstream. A prévia, as capturas individuais e a gravação do Frigate seguem seus
+próprios caminhos.
