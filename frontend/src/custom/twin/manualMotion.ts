@@ -2,6 +2,10 @@ import { ACTIVE_PRINT_STATES, IDLE_PRINTER_STATES } from '../../utils/printer';
 import { isTwinEnabled, isTwinModel } from './twinFlags';
 
 type Position = { x: number; y: number; z: number };
+
+// After a full G28 the A1 is near the center of the plate with the nozzle slightly raised.
+// This visual reference comes from the camera after homing. The firmware reports no XYZ.
+const A1_HOME_POSE: Readonly<Position> = { x: 128, y: 128, z: 5 };
 type Jog = (delta: Position) => (() => void) | undefined;
 type Listener = { jog: Jog; reset: () => void };
 
@@ -52,7 +56,6 @@ export function twinMotionStatus(
 }
 
 export function createManualMotion() {
-  // The A1 reports homing flags but no XYZ. Anchor relative moves to the pose already on screen.
   let estimate: { target: Position; moves: number } | null = null;
   let observedUnhomed = false;
   let referenced = false;
@@ -62,7 +65,7 @@ export function createManualMotion() {
     referenced = false;
   }
   return {
-    get target() { return estimate?.target ?? null; },
+    get target() { return referenced ? estimate?.target ?? A1_HOME_POSE : null; },
     get referenced() { return referenced; },
     reset,
     observe(status: ReturnType<typeof twinMotionStatus>) {
@@ -79,8 +82,9 @@ export function createManualMotion() {
         reset();
       }
     },
-    jog(base: Position, delta: Position) {
-      const current = estimate ?? { target: { ...base }, moves: 0 };
+    jog(delta: Position) {
+      if (!referenced) return;
+      const current = estimate ?? { target: { ...A1_HOME_POSE }, moves: 0 };
       estimate = current;
       current.moves++;
       current.target.x += delta.x;

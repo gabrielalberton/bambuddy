@@ -107,7 +107,8 @@ homing ou a transição de eixos sem referência para os três referenciados (`h
 inicial do flag completo por si só não diz que a posição desenhada corresponde à impressora.
 
 Com a impressora parada e a referência estabelecida, o gêmeo antecipa os movimentos X/Y/Z acionados nesse painel
-a partir da pose desenhada. O quadro indica **Posição estimada** porque a A1 não transmite coordenadas. Comandos
+a partir da pose final observada na câmera após o `G28`: próximo ao centro da placa e com o bico baixo
+(referência visual de 128, 128, 5 mm). O quadro indica **Posição estimada** porque a A1 não transmite coordenadas. Comandos
 do visor da impressora ou de outro navegador não aparecem nessa estimativa. A A1 também não avisa se alguém mexe
 nos eixos à mão. O botão **Movi à mão** marca a posição como desconhecida imediatamente, até observar novo homing.
 Falhas devolvidas pela API desfazem o avanço correspondente. Novo homing, perda da telemetria ou início de

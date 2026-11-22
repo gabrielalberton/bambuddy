@@ -239,7 +239,7 @@ export function createTwin(container, opts) {
   const unlisten = opts.printerId == null ? null : listenToTwinMotion(opts.printerId, {
     jog(delta) {
       motionStatus(performance.now() / 1000);
-      if (manual.referenced) return manual.jog(S.pose, delta);
+      return manual.jog(delta);
     },
     reset: resetManual,
   });
