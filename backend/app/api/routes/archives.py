@@ -5206,6 +5206,7 @@ async def get_archive_plates(
                     "filename": archive.filename,
                     "plates": [],
                     "is_multi_plate": False,
+                    "has_gcode": names_carry_gcode(namelist),
                 }
 
             plate_indices.sort()
