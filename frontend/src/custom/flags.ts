@@ -173,10 +173,10 @@ export function isCatalogFiltersEnabled(): boolean {
   return CATALOG_FILTERS === 'on';
 }
 
-/** No navegador, custom.editUserOverlay = 'off' restaura o layout anterior. */
-export function isEditUserOverlayEnabled(): boolean {
+/** No navegador, custom.scrollableModals = 'off' restaura o layout anterior. */
+export function areScrollableModalsEnabled(): boolean {
   try {
-    return localStorage.getItem('custom.editUserOverlay') !== 'off';
+    return localStorage.getItem('custom.scrollableModals') !== 'off';
   } catch {
     return true;
   }

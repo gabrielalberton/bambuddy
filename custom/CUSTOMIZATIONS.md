@@ -463,18 +463,19 @@ material, `KValueLine` (opcional) e trilha da barra por último.
   - `<TempBar kind="bed" .../>` depois do `<p>` de `{Math.round(status.temperatures.bed || 0)}°C`.
 - Testes: `custom/__tests__/tempBars.test.tsx`, que cobre escala/clamp, os limiares 29,9/30 e 39,9/40, as cores nos extremos e no meio, o card real com a flag ligada e desligada, e o bico duplo.
 
-## Rolagem de Editar usuário no PWA
+## Rolagem de modais no PWA
 
-O modal em Configurações → Usuários acompanha a área visível do Chrome quando o teclado abre
-e tem rolagem própria, com espaço inferior para a barra de navegação do Android.
-A personalização entra ao abrir Editar usuário. A margem extra é aplicada apenas em telas
-estreitas ou com ponteiro de toque. Para desativar o ajuste, use
-`localStorage.setItem('custom.editUserOverlay', 'off')` e reabra o modal.
+O componente compartilhado limita o overlay ao viewport visível quando o teclado abre,
+isola sua rolagem e deixa margem para a navegação do Android. O modal de envio usa o
+mesmo tratamento tanto no Gerenciador de Arquivos quanto na página Impressoras.
+`localStorage.setItem('custom.scrollableModals', 'off')` desativa ao reabrir o modal.
 
 | Arquivo | Âncora | Efeito |
 |---|---|---|
-| `frontend/src/pages/SettingsPage.tsx` | `{/* Edit User Modal */}` | Usa `EditUserOverlay` e marca o cartão do formulário. |
-| `frontend/src/custom/users/` | `EditUserOverlay.tsx`, `editUserOverlay.css` | Limita o modal à área visível, contém a rolagem e reserva a margem inferior. |
+| `frontend/src/pages/SettingsPage.tsx` | criar, editar e excluir usuário, alterar senha | Usa `ScrollableModalOverlay`. |
+| `frontend/src/components/Layout.tsx` | alterar senha pelo menu da conta | Usa `ScrollableModalOverlay`. |
+| `frontend/src/components/{CreateUserAdvancedAuthModal,FileUploadModal,PurgeArchivesModal,PurgeOldFilesModal,AddExternalLinkModal,VirtualPrinterAddDialog,ConfirmModal,ConfirmOutcomeDialog}.tsx` | overlay externo | Usa `ScrollableModalOverlay`, preservando eventos e z-index de cada janela. |
+| `frontend/src/custom/dialogs/` | `ScrollableModalOverlay.tsx` e CSS | Contém a rolagem, acompanha a área visível e reserva a margem inferior. |
 
 ## Perfil leve da câmera RTSP externa
 

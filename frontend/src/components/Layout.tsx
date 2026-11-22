@@ -1,3 +1,4 @@
+import { ScrollableModalOverlay } from '../custom/dialogs/ScrollableModalOverlay';
 import { Suspense, useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { PageLoading } from './PageLoading';
 import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
@@ -1234,8 +1235,8 @@ export function Layout() {
 
       {/* Change Password Modal */}
       {showChangePasswordModal && (
-        <div
-          className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4"
+        <ScrollableModalOverlay
+          className="bg-black/70"
           onClick={() => {
             setShowChangePasswordModal(false);
             setChangePasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
@@ -1374,7 +1375,7 @@ export function Layout() {
               </div>
             </CardContent>
           </Card>
-        </div>
+        </ScrollableModalOverlay>
       )}
       {/* The panel always mounts here, at the Layout root. It must not move
           into the header alongside its compact-layout trigger: the header is

@@ -1,3 +1,4 @@
+import { ScrollableModalOverlay } from '../custom/dialogs/ScrollableModalOverlay';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { MultiPrinterOnly } from '../custom/MultiPrinterOnly';
@@ -55,8 +56,8 @@ export function VirtualPrinterAddDialog({ onClose }: VirtualPrinterAddDialogProp
   });
 
   return (
-    <div
-      className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+    <ScrollableModalOverlay
+      className="bg-black/50"
       onClick={onClose}
     >
       <Card
@@ -156,6 +157,6 @@ export function VirtualPrinterAddDialog({ onClose }: VirtualPrinterAddDialogProp
           </div>
         </CardContent>
       </Card>
-    </div>
+    </ScrollableModalOverlay>
   );
 }

@@ -1,3 +1,4 @@
+import { ScrollableModalOverlay } from '../custom/dialogs/ScrollableModalOverlay';
 import { useQuery, useQueries, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Loader2, Plus, Plug, AlertTriangle, RotateCcw, Bell, Download, RefreshCw, ExternalLink, Globe, Droplets, Thermometer, FileText, Edit2, Pencil, Send, CheckCircle, XCircle, History, Trash2, Zap, TrendingUp, Calendar, DollarSign, Power, PowerOff, Key, Copy, Database, X, Shield, Printer, Cylinder, Wifi, Home, Video, Users, Lock, Unlock, ChevronDown, Save, Mail, Flame, Layers, ListOrdered, Code, Search, Scale, Settings as SettingsIcon, ScanEye, Cog, QrCode, Heart, Briefcase, Workflow, UploadCloud, MonitorPlay, Info, Lightbulb } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
@@ -58,7 +59,6 @@ import { LDAPSettings } from '../components/LDAPSettings';
 import { PrinterAccessSettings } from '../components/PrinterAccessSettings';
 import { TwoFactorSettings } from '../components/TwoFactorSettings';
 import { AdminDisableTwoFactor } from '../components/AdminDisableTwoFactor';
-import { EditUserOverlay } from '../custom/users/EditUserOverlay';
 import { cameraTestSuccessMessage } from '../utils/cameraTestMessage';
 import { OIDCProviderSettings } from '../components/OIDCProviderSettings';
 import { SecurityStatusCard } from '../components/SecurityStatusCard';
@@ -7384,8 +7384,8 @@ export function SettingsPage() {
 
       {/* Create User Modal */}
       {showCreateUserModal && !advancedAuthStatus?.advanced_auth_enabled && (
-        <div
-          className="fixed inset-0 bg-black flex items-center justify-center z-50 p-4"
+        <ScrollableModalOverlay
+          className="bg-black"
           onClick={() => {
             setShowCreateUserModal(false);
             setUserFormData({ username: '', password: '', email: '', confirmPassword: '', role: 'user', group_ids: [] });
@@ -7575,7 +7575,7 @@ export function SettingsPage() {
               )}
             </CardContent>
           </Card>
-        </div>
+        </ScrollableModalOverlay>
       )}
 
       {/* Create User Modal - Advanced Authentication */}
@@ -7602,7 +7602,8 @@ export function SettingsPage() {
 
       {/* Edit User Modal */}
       {showEditUserModal && editingUserId !== null && (
-        <EditUserOverlay
+        <ScrollableModalOverlay
+          className="bg-black"
           onClick={() => {
             setShowEditUserModal(false);
             setEditingUserId(null);
@@ -7610,7 +7611,7 @@ export function SettingsPage() {
           }}
         >
           <Card
-            className="w-full max-w-md edit-user-card"
+            className="w-full max-w-md"
             onClick={(e: React.MouseEvent) => e.stopPropagation()}
           >
             <CardHeader>
@@ -7799,13 +7800,13 @@ export function SettingsPage() {
               </div>
             </CardContent>
           </Card>
-        </EditUserOverlay>
+        </ScrollableModalOverlay>
       )}
 
       {/* Delete User Confirmation Modal */}
       {deleteUserId !== null && (
-        <div
-          className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4"
+        <ScrollableModalOverlay
+          className="bg-black/80"
           onClick={() => {
             setDeleteUserId(null);
             setDeleteUserItemCounts(null);
@@ -7898,7 +7899,7 @@ export function SettingsPage() {
               )}
             </CardContent>
           </Card>
-        </div>
+        </ScrollableModalOverlay>
       )}
 
       {/* Delete Group Confirmation Modal */}
@@ -7959,8 +7960,8 @@ export function SettingsPage() {
 
       {/* Change Password Modal */}
       {showChangePasswordModal && (
-        <div
-          className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4"
+        <ScrollableModalOverlay
+          className="bg-black/70"
           onClick={() => {
             setShowChangePasswordModal(false);
             setChangePasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
@@ -8089,7 +8090,7 @@ export function SettingsPage() {
               </div>
             </CardContent>
           </Card>
-        </div>
+        </ScrollableModalOverlay>
       )}
       </div>
       </div>
