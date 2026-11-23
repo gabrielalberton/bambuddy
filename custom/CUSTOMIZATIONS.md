@@ -499,6 +499,7 @@ Ver [prévia e perfil leve](docs/camera-previa.md).
 
 - A lista, os cartões e o menu de detalhes usam `archivePreviewTarget` em conjunto. Abrir uma prévia geométrica antiga também salva a miniatura ausente para aquele registro, incluindo cópias que compartilham o mesmo conteúdo.
 - O render conecta vértices de coordenadas idênticas dentro de cada peça e cor antes de simplificar a malha. Assim as junções do 3MF permanecem fechadas na prévia, como nas seis peças do Family Figurine Split. O cache `model-previews-v2` gera novamente as prévias dos arquivos já enviados.
+- Em `ModelViewer`, o gancho `useModelAppearance` em `custom/modelPreview/appearance.tsx` abre o visor em **Colorido** e oferece **Branco**. Arquivos com pintura usam as cores do carregador. Quando todos os materiais do visor são brancos, uma paleta de visualização aplica cores distintas às peças carregadas. A troca de modo afeta apenas os materiais exibidos e preserva a câmera e o zoom. Segue o interruptor `custom.modelPreview`.
 
 ## Fatiamentos junto ao modelo de origem
 

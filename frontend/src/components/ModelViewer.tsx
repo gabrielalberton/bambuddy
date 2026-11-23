@@ -1,4 +1,5 @@
 import { loadModelPreview } from '../custom/modelPreview/preview';
+import { useModelAppearance } from '../custom/modelPreview/appearance';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import * as THREE from 'three';
@@ -792,6 +793,7 @@ export function ModelViewer({
   onSnapshot,
 }: ModelViewerProps) {
   const { t } = useTranslation();
+  const { attachAppearance, appearanceControls } = useModelAppearance();
   const containerRef = useRef<HTMLDivElement>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
@@ -1131,6 +1133,7 @@ export function ModelViewer({
         ? buildStepGroup(stepMeshes, filamentColors)
         : buildModelGroup(parsedData!, selectedPlateId ?? null, filamentColors);
     modelGroupRef.current = group;
+    attachAppearance(group);
     sceneRef.current.add(group);
 
     // Get bounding box to position model
@@ -1231,7 +1234,7 @@ export function ModelViewer({
         }
       });
     }
-  }, [parsedData, stlGeometry, stepMeshes, selectedPlateId, filamentColors, buildVolume]);
+  }, [parsedData, stlGeometry, stepMeshes, selectedPlateId, filamentColors, buildVolume, attachAppearance]);
 
   const resetView = () => {
     const camera = cameraRef.current;
@@ -1296,6 +1299,7 @@ export function ModelViewer({
           </Button>
         </div>
       )}
+      {!loading && !error && appearanceControls}
     </div>
   );
 }

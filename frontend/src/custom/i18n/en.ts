@@ -1,5 +1,8 @@
 // Textos do fork (inglês). Mesclados no i18n do upstream por ./index.ts.
 const en = {
+  customModelAppearance: {
+    label: 'Model appearance', colored: 'Color', white: 'White', previewColors: 'Preview colors',
+  },
   customPrintHistory: {
     history: 'History', files: 'Files', calendar: 'Calendar', filters: 'Filters', sort: 'Sort',
     ascending: 'Sort ascending', descending: 'Sort descending',

@@ -1,5 +1,8 @@
 // Textos do fork (pt-BR). Mesclados no i18n do upstream por ./index.ts.
 const ptBR = {
+  customModelAppearance: {
+    label: 'Aparência do modelo', colored: 'Colorido', white: 'Branco', previewColors: 'Cores de visualização',
+  },
   customPrintHistory: {
     history: 'Histórico', files: 'Arquivos', calendar: 'Calendário', filters: 'Filtros', sort: 'Ordenar',
     ascending: 'Ordem crescente', descending: 'Ordem decrescente',
