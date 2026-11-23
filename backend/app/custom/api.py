@@ -48,6 +48,10 @@ def install(app: FastAPI) -> list[str]:
     from .model_preview.router import router as model_preview_router
 
     app.include_router(model_preview_router, prefix=app_settings.api_prefix)
+    # Área da mesa em quadrilátero: fundo do editor (custom/CUSTOMIZATIONS.md)
+    from .plate_roi_router import router as plate_roi_router
+
+    app.include_router(plate_roi_router, prefix=app_settings.api_prefix)
     from .print_history import router as print_history_router
 
     app.include_router(print_history_router, prefix=app_settings.api_prefix)

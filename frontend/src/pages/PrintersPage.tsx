@@ -100,6 +100,9 @@ import { InHeader } from '../custom/layout/HeaderSlot';
 import { headerStatusEnabled } from '../custom/layout/headerFlags';
 import { useFilamentListClass } from '../custom/printer/filamentList';
 import { TempBar, tempRowAttr } from '../custom/printer/TempBar'; // custom(temp-bars)
+import { PlateRoiEditor } from '../custom/plateRoi/PlateRoiEditor'; // custom(plate-roi-quad)
+import { plateRoiQuadEnabled } from '../custom/plateRoi/plateRoiGeom';
+import type { PlateDetectionROI } from '../api/client';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import {
@@ -2346,11 +2349,11 @@ function PrinterCard({
     light_warning?: boolean;
     reference_count?: number;
     max_references?: number;
-    roi?: { x: number; y: number; w: number; h: number };
+    roi?: PlateDetectionROI;
   } | null>(null);
   const [isCheckingPlate, setIsCheckingPlate] = useState(false);
   const [isCalibrating, setIsCalibrating] = useState(false);
-  const [editingRoi, setEditingRoi] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
+  const [editingRoi, setEditingRoi] = useState<PlateDetectionROI | null>(null);
   const [isSavingRoi, setIsSavingRoi] = useState(false);
   const [plateCheckLightWasOff, setPlateCheckLightWasOff] = useState(false);
 
@@ -7250,7 +7253,7 @@ function PrinterCard({
                       </div>
                     )}
                   </div>
-                  {editingRoi ? (
+                  {editingRoi ? (plateRoiQuadEnabled() ? <PlateRoiEditor printerId={printer.id} value={editingRoi} onChange={setEditingRoi} fallbackImage={plateCheckResult.debug_image_url} /> : (
                     <div className="space-y-3 bg-bambu-dark-tertiary/50 p-3 rounded-lg">
                       <div className="grid grid-cols-2 gap-3">
                         <div>
@@ -7310,7 +7313,7 @@ function PrinterCard({
                         {t('printers.roi.instruction')}
                       </p>
                     </div>
-                  ) : (
+                  )) : (
                     <p className="text-xs text-bambu-gray">
                       Current: X={Math.round((plateCheckResult.roi?.x || 0.15) * 100)}%, Y={Math.round((plateCheckResult.roi?.y || 0.35) * 100)}%,
                       W={Math.round((plateCheckResult.roi?.w || 0.70) * 100)}%, H={Math.round((plateCheckResult.roi?.h || 0.55) * 100)}%

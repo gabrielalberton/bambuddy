@@ -568,3 +568,20 @@ Interruptores: `localStorage['custom.nativeCamera'] = 'off'` oculta o item.
 | `backend/app/main.py` | `on_print_start` | Delega o controle da luz à captura nativa e usa a imagem dela no alerta existente. |
 | `backend/app/api/routes/camera.py`, `printers.py` e `backend/app/schemas/printer.py` | verificação, calibração e atualização da área | Informam o modo ao frontend, retornam a área correspondente e gravam a área nativa sem sobrescrever a anterior. |
 | `frontend/src/pages/PrintersPage.tsx` e `frontend/src/api/client.ts` | modal de calibração e gerenciamento da luz | Usam o controle do servidor no modo nativo e exibem a foto da câmera na primeira calibração. A rolagem usa `ScrollableModalOverlay`. |
+
+## Área da mesa em quadrilátero
+
+- Pedido do Gabriel (2026-11-23): a "Área de Detecção (ROI)" do modal "Verificação da mesa" deixa de ser um retângulo de sliders e vira **4 cantos livres** arrastados por mouse ou toque sobre a foto da mesa vazia (referência mais recente, até 960 px; sem referência, a imagem de análise). Arrastar dentro da área move tudo; tocar num canto o seleciona para ajuste fino pelas setas (0,5%). Alças de 44 px, `touch-action: none` só na imagem em edição, pointer events com captura.
+- Backend: `backend/app/custom/plate_roi_quad.py`. A comparação continua no retângulo envolvente do upstream, com **máscara do polígono** (`cv2.fillPoly`): fora dele a imagem recebe o tom médio de dentro antes do desfoque, a normalização usa só o polígono e a média da diferença conta só os pixels de dentro. A imagem de análise desenha o polígono em verde. Um quadrilátero que é o próprio retângulo dispensa a máscara (resultado idêntico ao upstream).
+- Persistência: câmera externa = retângulo envolvente nas colunas do upstream + cantos em `plate_calibration/printer_<id>_roi.json` (vale só enquanto bate com as colunas); câmera nativa = `plate_calibration/native-camera/printer_<id>_roi.json` com `points`. Área antiga sem `points` é lida como os 4 cantos do retângulo (migração na leitura, nada é regravado). Referências não são tocadas.
+- Fundo do editor: `GET /api/v1/custom/plate-roi/{id}/backdrop.jpg` (`plate_roi_router.py`, token de stream como a miniatura do upstream).
+- Interruptores: `BAMBUDDY_CUSTOM_PLATE_QUAD=0` ignora os cantos (volta ao retângulo envolvente); `localStorage['custom.plateRoiQuad'] = 'off'` volta aos sliders do upstream.
+
+| Gancho upstream | Âncora | Efeito |
+|---|---|---|
+| `backend/app/services/plate_detection.py` | `mean_diff = ...`, `# Draw ROI rectangle`, `detector = ...` em `check_plate_empty` (+1 import) | Média só dentro do polígono, contorno poligonal na imagem de análise e detector com máscara. |
+| `backend/app/schemas/printer.py` | `PlateDetectionROI` (+1 import, +1 campo) | Aceita `points` (4 pares 0-1) no PATCH. |
+| `backend/app/api/routes/camera.py` | `response["roi"]` em `check_plate_empty` (+1 import) | Devolve a área com `points`. |
+| `backend/app/api/routes/printers.py` | gancho já existente `save_native_plate_roi` | Agora também grava os cantos da câmera externa e corrige x/y/w/h para o envolvente. |
+| `frontend/src/pages/PrintersPage.tsx` | estado `editingRoi`/`plateCheckResult.roi` (tipo), `{editingRoi ? (` do editor de ROI (+3 imports) | Troca os sliders por `PlateRoiEditor` quando o interruptor está ligado. |
+| `frontend/src/api/client.ts` | `PlateDetectionROI` | `points?` opcional. |

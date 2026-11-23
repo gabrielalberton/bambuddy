@@ -18,6 +18,7 @@ from backend.app.custom.native_plate_detection import (
     native_plate_reference_dir,
     native_plate_roi,
 )
+from backend.app.custom.plate_roi_quad import draw_roi_outline, make_plate_detector, roi_mean
 
 logger = logging.getLogger(__name__)
 
@@ -501,7 +502,7 @@ class PlateDetector:
                 diff = cv2.absdiff(current_processed, reference_processed)
 
                 # Calculate mean difference as percentage
-                mean_diff = np.mean(diff)
+                mean_diff = roi_mean(self, diff)
                 difference_percent = (mean_diff / 255.0) * 100
 
                 if difference_percent < best_difference_percent:
@@ -546,13 +547,7 @@ class PlateDetector:
                 debug_frame = current_frame.copy()
 
                 # Draw ROI rectangle
-                cv2.rectangle(
-                    debug_frame,
-                    (x_start, y_start),
-                    (x_start + roi_width, y_start + roi_height),
-                    (0, 255, 0),
-                    2,
-                )
+                draw_roi_outline(self, debug_frame, (x_start, y_start), (x_start + roi_width, y_start + roi_height))
 
                 # Create colored difference overlay
                 # Red = areas that are different from reference
@@ -768,7 +763,7 @@ async def check_plate_empty(
         )
 
     # Analyze the captured frame
-    detector = PlateDetector(roi=native_plate_roi(printer_id, roi))
+    detector = make_plate_detector(native_plate_roi(printer_id, roi))
     result = detector.analyze_frame(image_data, printer_id, plate_type, include_debug_image)
     if native_plate_check_enabled():
         if not result.is_empty:

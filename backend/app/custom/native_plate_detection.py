@@ -3,13 +3,21 @@
 from __future__ import annotations
 
 import asyncio
-import json
 import os
 from collections.abc import AsyncIterator
 from contextlib import aclosing
 from pathlib import Path
 from types import SimpleNamespace
 
+from backend.app.custom.plate_roi_quad import (
+    PlateROI,
+    external_plate_roi,
+    normalize_update,
+    read_json,
+    roi_from_dict,
+    save_external_quad,
+    write_json,
+)
 from backend.app.services.camera_light import camera_light, chamber_light_is_on, wait_for_previous_flash
 
 _STARTUP_TIMEOUT_SECONDS = 10.0
@@ -37,29 +45,32 @@ def _roi_path(printer_id: int) -> Path:
     return native_plate_reference_dir(settings.plate_calibration_dir) / f"printer_{printer_id}_roi.json"
 
 
-def native_plate_roi(
-    printer_id: int, legacy: tuple[float, float, float, float] | None
-) -> tuple[float, float, float, float] | None:
+def native_plate_roi(printer_id: int, legacy: tuple[float, float, float, float] | None) -> PlateROI | None:
+    """Área de detecção em uso: a da câmera nativa (modo nativo) ou a da câmera externa (colunas do upstream).
+
+    Devolve ``PlateROI`` (retângulo envolvente + 4 cantos); áreas antigas sem cantos migram na leitura.
+    """
     if not native_plate_check_enabled():
-        return legacy
-    try:
-        roi = json.loads(_roi_path(printer_id).read_text())
-        return roi["x"], roi["y"], roi["w"], roi["h"]
-    except (OSError, ValueError, KeyError, TypeError):
-        return DEFAULT_NATIVE_PLATE_ROI
+        return external_plate_roi(printer_id, legacy)
+    return roi_from_dict(read_json(_roi_path(printer_id))) or PlateROI(DEFAULT_NATIVE_PLATE_ROI)
 
 
-def save_native_plate_roi(printer_id: int, roi: dict[str, float] | None) -> bool:
+def save_native_plate_roi(printer_id: int, roi: dict | None) -> bool:
+    """Grava a área (gancho no PATCH da impressora). True: área nativa gravada aqui, o upstream não mexe nas
+    colunas. False: segue o upstream, que grava o retângulo envolvente; os cantos ficam no arquivo nosso."""
+    if isinstance(roi, dict):
+        roi.update(normalize_update(roi))  # o upstream achata este mesmo dict nas colunas
     if not native_plate_check_enabled():
+        save_external_quad(printer_id, roi)
         return False
     path = _roi_path(printer_id)
     if roi is None:
         path.unlink(missing_ok=True)
     else:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        temp = path.with_suffix(".tmp")
-        temp.write_text(json.dumps({name: roi[name] for name in _ROI_FIELDS}))
-        temp.replace(path)
+        data = {name: roi[name] for name in _ROI_FIELDS}
+        if "points" in roi:
+            data["points"] = roi["points"]
+        write_json(path, data)
     return True
 
 

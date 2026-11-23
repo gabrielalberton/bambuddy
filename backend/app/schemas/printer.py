@@ -4,6 +4,7 @@ from urllib.parse import urlparse
 from pydantic import BaseModel, Field, field_serializer, field_validator, model_validator
 
 from backend.app.custom.native_plate_detection import native_plate_check_enabled
+from backend.app.custom.plate_roi_quad import QuadPoints
 from backend.app.schemas.not_null import IgnoresNullForRequiredColumns
 from backend.app.schemas.printer_location import normalize_location_name
 
@@ -163,6 +164,7 @@ class PlateDetectionROI(BaseModel):
     y: float = Field(..., ge=0.0, le=1.0)  # Y start %
     w: float = Field(..., ge=0.0, le=1.0)  # Width %
     h: float = Field(..., ge=0.0, le=1.0)  # Height %
+    points: QuadPoints | None = None  # custom: 4 cantos livres (backend/app/custom/plate_roi_quad.py)
 
 
 class PrinterUpdate(IgnoresNullForRequiredColumns):

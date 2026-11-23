@@ -93,7 +93,13 @@ async def test_capture_and_check_share_native_references_and_flash(
         assert before["needs_calibration"]
         assert before["reference_count"] == 0
         assert before["debug_image_url"].startswith("data:image/jpeg;base64,")
-        assert before["roi"] == {"x": 0.2, "y": 0.3, "w": 0.6, "h": 0.6}
+        assert before["roi"] == {
+            "x": 0.2,
+            "y": 0.3,
+            "w": 0.6,
+            "h": 0.6,
+            "points": [[0.2, 0.3], [0.8, 0.3], [0.8, pytest.approx(0.9)], [0.2, pytest.approx(0.9)]],
+        }
         assert light.calls == [True, False]
 
         saved = (await async_client.post(f"{url}/plate-detection/calibrate?use_external=true&label=Empty")).json()

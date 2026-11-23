@@ -833,6 +833,7 @@ export interface PlateDetectionROI {
   y: number;  // Y start % (0.0-1.0)
   w: number;  // Width % (0.0-1.0)
   h: number;  // Height % (0.0-1.0)
+  points?: [number, number][];  // custom: 4 cantos livres (custom/plateRoi)
 }
 
 export interface PlateDetectionResult {

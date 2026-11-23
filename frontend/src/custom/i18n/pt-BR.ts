@@ -2,6 +2,11 @@
 const ptBR = {
   customFixedSlicePrinter: { chooseNozzle: 'Escolha o bico' },
   customNativePlate: { title: 'Verificação da mesa', preview: 'Câmera nativa', calibrate: 'Salvar referência da mesa vazia' },
+  customPlateRoi: {
+    backdrop: 'Mesa vazia (referência)', corner: 'Canto {{n}}', fine: 'Ajuste fino do canto selecionado',
+    nudge: 'Mover canto selecionado', reset: 'Redefinir',
+    instruction: 'Arraste os 4 cantos até as bordas da mesa; arraste o meio para mover a área. Toque num canto e use as setas para o ajuste fino.',
+  },
   customModelAppearance: {
     label: 'Aparência do modelo', colored: 'Colorido', white: 'Branco', previewColors: 'Cores de visualização',
   },

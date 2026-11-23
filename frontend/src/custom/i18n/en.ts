@@ -2,6 +2,11 @@
 const en = {
   customFixedSlicePrinter: { chooseNozzle: 'Choose the nozzle' },
   customNativePlate: { title: 'Build plate check', preview: 'Native camera', calibrate: 'Save empty plate reference' },
+  customPlateRoi: {
+    backdrop: 'Empty plate (reference)', corner: 'Corner {{n}}', fine: 'Fine adjust of the selected corner',
+    nudge: 'Move selected corner', reset: 'Reset',
+    instruction: 'Drag the 4 corners to the plate edges; drag the middle to move the area. Tap a corner and use the arrows to fine-tune.',
+  },
   customModelAppearance: {
     label: 'Model appearance', colored: 'Color', white: 'White', previewColors: 'Preview colors',
   },

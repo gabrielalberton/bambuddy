@@ -35,6 +35,7 @@ from backend.app.core.database import get_db
 from backend.app.core.permissions import Permission
 from backend.app.custom.native_camera import use_native_camera
 from backend.app.custom.native_plate_detection import native_plate_check_enabled, native_plate_roi
+from backend.app.custom.plate_roi_quad import roi_response
 from backend.app.models.api_key import APIKey
 from backend.app.models.printer import Printer
 from backend.app.models.user import User
@@ -1999,7 +2000,7 @@ async def check_plate_empty(
     roi = native_plate_roi(printer_id, roi)
     # Include current ROI in response
     if roi:
-        response["roi"] = {"x": roi[0], "y": roi[1], "w": roi[2], "h": roi[3]}
+        response["roi"] = roi_response(roi)
     else:
         # Return default ROI
         response["roi"] = {"x": 0.15, "y": 0.35, "w": 0.70, "h": 0.55}
