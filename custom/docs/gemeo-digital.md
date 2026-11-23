@@ -3,7 +3,7 @@
 Porte do twin avulso (`~/projects/3d-printing/twin`, doc em `3d-printing/docs/tools/digital-twin.md`) para o fork.
 Onde o Bambuddy mostra a câmera da A1 aparece uma chave **"Câmera | 3D"** no rodapé do quadro; em "3D" o vídeo dá
 lugar a uma cena Three.js que reproduz em tempo real a posição do cabeçote, da mesa e do eixo Z e o objeto sendo
-impresso. **Somente leitura**: o twin não manda nada para a impressora.
+impresso. O visualizador recebe dados. O botão de homing no painel da impressora usa a rota de controle do fork.
 
 ## Onde aparece
 
@@ -86,7 +86,7 @@ permissão `camera:view`, escopo de impressoras de quem gerou) em `?token=`, por
 cabeçalho; o SSE reconfere a cada 30 s se quem abriu ainda pode ver (como o MJPEG). O middleware global do upstream só
 "sai da frente" para o prefixo `/api/v1/custom/twin/stream/` (entrada adicionada em tempo de execução em
 `PUBLIC_API_PREFIXES` por `include_twin`; se o upstream renomear a lista, as rotas passam a dar 401: falha fechada).
-`health` fica atrás do middleware e exige `camera:view` por cabeçalho. Só GET (POST/PUT/PATCH/DELETE = 405). O SSE
+`health` fica atrás do middleware e exige `camera:view` por cabeçalho. As rotas de visualização são GET. A rota POST de referência exige `printers:control` e escopo da impressora. O SSE
 leva só a lista branca (`state.PUBLIC_KEYS`): nada de IP, serial, access code, SSID ou URL de câmera.
 
 ## Celular / PWA
@@ -101,23 +101,19 @@ leva só a lista branca (`state.PUBLIC_KEYS`): nada de IP, serial, access code, 
 
 ## Controles de movimento
 
-O botão **Homing (XYZ)** no painel da A1 usa o comando de homing completo do Bambuddy e mantém o painel aberto.
-Fora de impressão, a posição começa em vermelho. Para sair desse estado, o gêmeo observa o fim do estágio de
-homing ou a transição de eixos sem referência para os três referenciados (`home_flag & 7 == 7`). Uma leitura
-inicial do flag completo por si só não diz que a posição desenhada corresponde à impressora.
+**Homing (XYZ)** na A1 envia `G28`, aguarda na fila do firmware com `M400`, seleciona o modo absoluto
+com `G90`, move primeiro o Z para 20 mm e depois X e Y para 128 mm. Um `M400` final encerra a sequência.
+O ponto é definido no servidor e vale para A1. Use com a placa livre e o percurso desobstruído.
 
-Com a impressora parada e a referência estabelecida, o gêmeo antecipa os movimentos X/Y/Z acionados nesse painel
-a partir da pose final observada na câmera após o `G28`: próximo ao centro da placa e com o bico baixo
-(referência visual de 128, 128, 5 mm). O quadro indica **Posição estimada** porque a A1 não transmite coordenadas. Comandos
-do visor da impressora ou de outro navegador não aparecem nessa estimativa. A A1 também não avisa se alguém mexe
-nos eixos à mão. O botão **Movi à mão** marca a posição como desconhecida imediatamente, até observar novo homing.
-Falhas devolvidas pela API desfazem o avanço correspondente. Novo homing, perda da telemetria ou início de
-impressão descartam a referência manual. Durante a impressão, a pose vem do estimador de G-code.
+O servidor só entrega a referência ao navegador se a A1 aceitar o comando e publicar estado de eixos
+referenciados após a janela de movimentação de 30 segundos. O reconhecimento MQTT e a telemetria de
+homing não medem o XYZ físico. O quadro indica **Posição estimada**. Se a A1 recusar, o comando expirar
+ou a telemetria parar, a referência não é aplicada.
 
-## Conferência pela câmera
-
-O quadro 3D pode comparar a pose exibida com a câmera enquanto a A1 está parada, quando há um perfil visual local.
-Veja [a comparação sem marcadores](a1-posicao-optica.md#conferência-visual-sem-marcadores).
+Com a referência estabelecida, o gêmeo antecipa os movimentos X/Y/Z acionados nesse painel. Falhas
+devolvidas pela API desfazem o avanço correspondente. **Movi à mão** invalida a referência. Perda de
+telemetria ou início de impressão também descartam a referência manual. Durante a impressão, a pose
+vem do estimador de G-code.
 
 ## Modelo 3D da A1 (GLB opcional, NUNCA no git)
 

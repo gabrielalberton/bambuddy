@@ -242,6 +242,7 @@ export function createTwin(container, opts) {
       return manual.jog(delta);
     },
     reset: resetManual,
+    anchor: manual.anchor,
   });
 
   const worker = new Worker(new URL('./geom-worker.js', import.meta.url), { type: 'module' });
@@ -408,10 +409,6 @@ export function createTwin(container, opts) {
 
   const api = {
     stats,
-    getIdlePose() {
-      if (document.hidden || !twinMotionStatus(motionMessage, performance.now() / 1000 - S.lastMsgPerf).idle) return null;
-      return { ...S.pose };
-    },
     dispose() {
       if (disposed) return;
       disposed = true;

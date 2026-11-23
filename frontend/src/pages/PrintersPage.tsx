@@ -88,7 +88,7 @@ function dryingBlockedKey(reasons: Array<number | string> | undefined): string {
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { HomingButton } from '../custom/twin/HomingButton';
-import { hasTwinMovementControls, previewTwinJog, resetTwinMotion } from '../custom/twin/manualMotion';
+import { anchorTwinMotion, hasTwinMovementControls, previewTwinJog, resetTwinMotion } from '../custom/twin/manualMotion';
 import { useSinglePrinter } from '../custom/useSinglePrinter';
 import { InlineCamera } from '../custom/camera/InlineCamera';
 import { NozzleSizeBadge, QueueChip } from '../custom/printer/CardExtras';
@@ -3163,10 +3163,15 @@ function PrinterCard({
   });
 
   const homeAxesMutation = useMutation({
-    mutationFn: (axes: 'z' | 'xy' | 'all') => api.homeAxes(printer.id, axes),
+    mutationFn: async (axes: 'z' | 'xy' | 'all') => {
+      if (hasTwinMovementControls(printer.model)) return (await api.moveToTwinReference(printer.id)).position;
+      await api.homeAxes(printer.id, axes);
+      return null;
+    },
     onMutate: () => resetTwinMotion(printer.id),
-    onSuccess: () => {
-      showToast(t('printers.bedJog.homingStarted'));
+    onSuccess: (position) => {
+      if (position) anchorTwinMotion(printer.id, position);
+      else showToast(t('printers.bedJog.homingStarted'));
     },
     onError: (error: Error) =>
       showToast(error.message || t('printers.toast.failedToSendCommand'), 'error'),
@@ -5113,6 +5118,7 @@ function PrinterCard({
                         // plate toward the nozzle and closes it.
                         const zMovesToolhead = isBedSlinger(printer.model);
                         const labeledHoming = hasTwinMovementControls(printer.model);
+                        const movementBlocked = labeledHoming && (disabled || homeAxesMutation.isPending);
                         const requestZJog = (arrow: 'up' | 'down') => {
                           const opensGap = zMovesToolhead ? arrow === 'up' : arrow === 'down';
                           // No not-homed gate here, and no endstop bypass to gate either:
@@ -5164,7 +5170,7 @@ function PrinterCard({
                                       <div />
                                       <button
                                         onClick={() => requestXyJog(0, bedJogStep)}
-                                        disabled={xyJogMutation.isPending}
+                                        disabled={movementBlocked || xyJogMutation.isPending}
                                         className={jogButtonClass}
                                         aria-label="Move Y forward"
                                       >
@@ -5173,7 +5179,7 @@ function PrinterCard({
                                       <div />
                                       <button
                                         onClick={() => requestXyJog(-bedJogStep, 0)}
-                                        disabled={xyJogMutation.isPending}
+                                        disabled={movementBlocked || xyJogMutation.isPending}
                                         className={jogButtonClass}
                                         aria-label="Move X left"
                                       >
@@ -5192,7 +5198,7 @@ function PrinterCard({
                                       </button>}
                                       <button
                                         onClick={() => requestXyJog(bedJogStep, 0)}
-                                        disabled={xyJogMutation.isPending}
+                                        disabled={movementBlocked || xyJogMutation.isPending}
                                         className={jogButtonClass}
                                         aria-label="Move X right"
                                       >
@@ -5201,7 +5207,7 @@ function PrinterCard({
                                       <div />
                                       <button
                                         onClick={() => requestXyJog(0, -bedJogStep)}
-                                        disabled={xyJogMutation.isPending}
+                                        disabled={movementBlocked || xyJogMutation.isPending}
                                         className={jogButtonClass}
                                         aria-label="Move Y back"
                                       >
@@ -5212,7 +5218,7 @@ function PrinterCard({
                                     <div className="flex flex-col items-center gap-1">
                                       <button
                                         onClick={() => requestZJog('up')}
-                                        disabled={bedJogMutation.isPending}
+                                        disabled={movementBlocked || bedJogMutation.isPending}
                                         className={jogButtonClass}
                                         aria-label={t(zMovesToolhead ? 'printers.bedJog.toolheadUp' : 'printers.bedJog.up')}
                                       >
@@ -5223,7 +5229,7 @@ function PrinterCard({
                                       </div>
                                       <button
                                         onClick={() => requestZJog('down')}
-                                        disabled={bedJogMutation.isPending}
+                                        disabled={movementBlocked || bedJogMutation.isPending}
                                         className={jogButtonClass}
                                         aria-label={t(zMovesToolhead ? 'printers.bedJog.toolheadDown' : 'printers.bedJog.down')}
                                       >
@@ -5233,7 +5239,7 @@ function PrinterCard({
                                     <div className="flex flex-col items-center gap-1">
                                       <button
                                         onClick={() => requestExtruderJog(-bedJogStep)}
-                                        disabled={extruderJogMutation.isPending}
+                                        disabled={movementBlocked || extruderJogMutation.isPending}
                                         className={jogButtonClass}
                                         aria-label="Retract filament"
                                       >
@@ -5244,7 +5250,7 @@ function PrinterCard({
                                       </div>
                                       <button
                                         onClick={() => requestExtruderJog(bedJogStep)}
-                                        disabled={extruderJogMutation.isPending}
+                                        disabled={movementBlocked || extruderJogMutation.isPending}
                                         className={jogButtonClass}
                                         aria-label="Extrude filament"
                                       >
@@ -5256,6 +5262,7 @@ function PrinterCard({
                                   {labeledHoming && <HomingButton
                                     onClick={() => homeAxesMutation.mutate('all')}
                                     onInvalidate={() => resetTwinMotion(printer.id)}
+                                    pending={homeAxesMutation.isPending}
                                     disabled={disabled || !IDLE_PRINTER_STATES.includes(status.state ?? '') || homeAxesMutation.isPending
                                       || xyJogMutation.isPending || bedJogMutation.isPending || extruderJogMutation.isPending}
                                   />}

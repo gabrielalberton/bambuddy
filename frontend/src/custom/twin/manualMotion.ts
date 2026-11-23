@@ -3,11 +3,8 @@ import { isTwinEnabled, isTwinModel } from './twinFlags';
 
 type Position = { x: number; y: number; z: number };
 
-// After a full G28 the A1 is near the center of the plate with the nozzle slightly raised.
-// This visual reference comes from the camera after homing. The firmware reports no XYZ.
-const A1_HOME_POSE: Readonly<Position> = { x: 128, y: 128, z: 5 };
 type Jog = (delta: Position) => (() => void) | undefined;
-type Listener = { jog: Jog; reset: () => void };
+type Listener = { jog: Jog; reset: () => void; anchor: (position: Position) => void };
 
 const listeners = new Map<number, Set<Listener>>();
 
@@ -35,6 +32,10 @@ export function resetTwinMotion(printerId: number) {
   listeners.get(printerId)?.forEach((listener) => listener.reset());
 }
 
+export function anchorTwinMotion(printerId: number, position: Position) {
+  listeners.get(printerId)?.forEach((listener) => listener.anchor(position));
+}
+
 export function hasTwinMovementControls(model: string | null | undefined) {
   return isTwinEnabled() && isTwinModel(model);
 }
@@ -50,41 +51,31 @@ export function twinMotionStatus(
   return {
     idle: fresh && IDLE_PRINTER_STATES.includes(printState),
     homed: fresh && axes === 7 && !stageHoming,
-    homeInProgress: fresh && (stageHoming || (axes !== null && axes !== 7)),
     trackingPrint: fresh && ACTIVE_PRINT_STATES.includes(printState),
   };
 }
 
 export function createManualMotion() {
   let estimate: { target: Position; moves: number } | null = null;
-  let observedUnhomed = false;
-  let referenced = false;
+  let reference: Position | null = null;
   function reset() {
     estimate = null;
-    observedUnhomed = false;
-    referenced = false;
+    reference = null;
   }
   return {
-    get target() { return referenced ? estimate?.target ?? A1_HOME_POSE : null; },
-    get referenced() { return referenced; },
+    get target() { return estimate?.target ?? reference; },
+    get referenced() { return reference !== null; },
     reset,
+    anchor(position: Position) {
+      estimate = null;
+      reference = { ...position };
+    },
     observe(status: ReturnType<typeof twinMotionStatus>) {
-      if (!status.idle) {
-        reset();
-      } else if (status.homeInProgress) {
-        estimate = null;
-        observedUnhomed = true;
-        referenced = false;
-      } else if (status.homed && observedUnhomed) {
-        observedUnhomed = false;
-        referenced = true;
-      } else if (!status.homed) {
-        reset();
-      }
+      if (!status.idle || !status.homed) reset();
     },
     jog(delta: Position) {
-      if (!referenced) return;
-      const current = estimate ?? { target: { ...A1_HOME_POSE }, moves: 0 };
+      if (!reference) return;
+      const current = estimate ?? { target: { ...reference }, moves: 0 };
       estimate = current;
       current.moves++;
       current.target.x += delta.x;

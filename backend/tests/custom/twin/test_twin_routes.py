@@ -1,7 +1,8 @@
-"""Rotas FastAPI do gêmeo digital: só GET, mesma autorização da câmera, SSE só com a lista branca."""
+"""Rotas do gêmeo digital: autorização da câmera e do controle, SSE só com a lista branca."""
 
 import gzip
 import json
+from types import SimpleNamespace
 
 import pytest
 from httpx import AsyncClient
@@ -49,12 +50,13 @@ async def _camera_token(client: AsyncClient, jwt: str) -> str:
     return r.json()["token"]
 
 
-def test_routes_are_get_only_and_before_spa_catch_all():
+def test_twin_routes_before_spa_catch_all():
     paths = [getattr(r, "path", "") for r in app.router.routes]
     twin = [r for r in app.router.routes if getattr(r, "path", "").startswith(BASE)]
     assert len(twin) == 5
     for r in twin:
-        assert r.methods <= {"GET", "HEAD"}, r.path
+        expected = {"POST"} if r.path.endswith("/reference") else {"GET", "HEAD"}
+        assert r.methods <= expected, r.path
         assert paths.index(r.path) < paths.index("/{full_path:path}")
 
 
@@ -83,17 +85,65 @@ async def test_model_glb_optional(async_client: AsyncClient, printer_factory, tm
     assert r.status_code == 200 and r.content.startswith(b"glTF") and r.headers["content-type"] == "model/gltf-binary"
 
 
-async def test_visual_check_is_opt_in_and_validates_pose(async_client, printer_factory, tmp_path, monkeypatch):
-    p = await printer_factory(model="A1")
-    url = f"{BASE}/stream/{p.id}/visual-check"
-    monkeypatch.setenv("BAMBUDDY_CUSTOM_CAMERA_PREVIEW_URL", "http://example.invalid/latest.jpg")
-    assert (await async_client.get(url)).status_code == 404
-    profile = tmp_path / "visual" / str(p.id) / "profile.json"
-    profile.parent.mkdir(parents=True)
-    profile.write_text("{}")
-    assert (await async_client.get(url)).json() == {"available": True}
-    assert (await async_client.get(url, params={"x": 128, "y": 128})).status_code == 422
-    assert (await async_client.get(url, params={"x": "nan", "y": 128, "z": 5})).status_code == 422
+async def test_reference_requires_control_permission_and_a1(async_client: AsyncClient, printer_factory, monkeypatch):
+    from backend.app.custom.twin import reference
+
+    a1 = await printer_factory(model="A1")
+    p1 = await printer_factory(model="P1S")
+    path = f"{BASE}/{a1.id}/reference"
+    admin = await _admin_jwt(async_client)
+    jwt = await _user_jwt(async_client, admin, "readonly", ["camera:view"])
+    assert (await async_client.post(path, headers={"Authorization": f"Bearer {jwt}"})).status_code == 403
+    assert (await async_client.post(path + "?token=" + await _camera_token(async_client, admin))).status_code == 401
+
+    async def fake_move(_manager, printer_id):
+        assert printer_id == a1.id
+        return {"x": 128, "y": 128, "z": 20}
+
+    monkeypatch.setattr(reference, "move_to_reference", fake_move)
+    headers = {"Authorization": f"Bearer {admin}"}
+    assert (await async_client.post(path, headers=headers)).json() == {"position": {"x": 128, "y": 128, "z": 20}}
+    assert (await async_client.post(f"{BASE}/{p1.id}/reference", headers=headers)).status_code == 400
+
+
+@pytest.mark.parametrize(("reply", "flag", "expected"), [("success", 7, 200), ("fail", 7, 502), ("success", 3, 504)])
+async def test_reference_waits_for_ack_and_homed_report(monkeypatch, reply, flag, expected):
+    from fastapi import HTTPException
+
+    from backend.app.custom.twin import reference
+
+    class Client:
+        topic_subscribe = "device/test/report"
+        state = SimpleNamespace(connected=True, state="IDLE", raw_data={"home_flag": 0})
+        handler = None
+
+        def register_raw_message_handler(self, handler):
+            self.handler = handler
+
+        def unregister_raw_message_handler(self, handler):
+            assert self.handler is handler
+            self.handler = None
+
+        def send_gcode(self, gcode):
+            assert gcode.splitlines() == ["G28", "M400", "G90", "G1 Z20 F1200", "G1 X128 Y128 F6000", "M400"]
+            for report in (
+                {"command": "gcode_line", "param": gcode, "result": reply},
+                {"command": "push_status", "home_flag": flag},
+            ):
+                self.handler(self.topic_subscribe, json.dumps({"print": report}).encode())
+            return True
+
+    client = Client()
+    manager = SimpleNamespace(get_client=lambda _: client)
+    monkeypatch.setattr(reference, "SETTLE_SECONDS", 0)
+    monkeypatch.setattr(reference, "REPORT_TIMEOUT", 0.02)
+    if expected == 200:
+        assert await reference.move_to_reference(manager, 1) == {"x": 128, "y": 128, "z": 20}
+    else:
+        with pytest.raises(HTTPException) as exc:
+            await reference.move_to_reference(manager, 1)
+        assert exc.value.status_code == expected
+    assert client.handler is None
 
 
 async def test_job_404_until_ready(async_client: AsyncClient, printer_factory):
@@ -110,7 +160,7 @@ async def test_auth_on_requires_camera_token_or_permission(async_client: AsyncCl
     (tmp_path / "a1.glb").write_bytes(b"glTF")
     admin = await _admin_jwt(async_client)
     # sem nada: 401 em tudo
-    for path in ("stream/{id}/events", "stream/{id}/model.glb", "stream/{id}/job/x", "stream/{id}/visual-check", "{id}/health"):
+    for path in ("stream/{id}/events", "stream/{id}/model.glb", "stream/{id}/job/x", "{id}/health"):
         assert (await async_client.get(f"{BASE}/" + path.format(id=p.id))).status_code == 401, path
     # token lixo
     assert (await async_client.get(f"{BASE}/stream/{p.id}/model.glb?token=lixo")).status_code == 401
@@ -137,8 +187,6 @@ async def test_auth_on_requires_camera_token_or_permission(async_client: AsyncCl
 
 async def test_sse_stream_sends_only_whitelisted_state(async_client: AsyncClient, printer_factory, monkeypatch):
     """O SSE (chamado direto: o transporte ASGI do httpx não faz streaming infinito) só leva a lista branca."""
-    from types import SimpleNamespace
-
     from backend.app.core.auth import StreamOpener
     from backend.tests.custom.twin.test_twin_core import SECRET, FakeClient, FakeManager
 

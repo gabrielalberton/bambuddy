@@ -164,7 +164,7 @@ Desvio de rota conhecido: em dev local, `uvicorn backend.app.main:app` **não** 
 ## 3. Gêmeo digital da A1 (`custom(twin)`)
 
 Chave **"Câmera | 3D"** onde o Bambuddy mostra a câmera da A1: em "3D", o quadro de vídeo dá lugar ao gêmeo digital
-(porte do `3d-printing/twin`). Somente leitura; sem segunda conexão MQTT. Detalhes, medições e limites:
+(porte do `3d-printing/twin`). O visualizador é somente leitura. O botão de referência usa a conexão MQTT existente. Detalhes, medições e limites:
 `custom/docs/gemeo-digital.md`.
 
 ### Interruptores
@@ -174,8 +174,7 @@ Chave **"Câmera | 3D"** onde o Bambuddy mostra a câmera da A1: em "3D", o quad
 - Frontend: `frontend/src/custom/twin/twinFlags.ts` (`TWIN_VIEW`), ou `localStorage['custom.twin'] = 'off'|'on'`. Nos testes
   do vitest fica desligado (override `setTwinOverride()`). Escolha do usuário: `localStorage['custom.twin.view']`.
 - GLB opcional da A1 em `<data>/custom/twin/a1.glb` (licença desconhecida: **nunca** versionar; sem ele, modelo procedural).
-- Movimento manual da A1: botões **Homing (XYZ)** e **Movi à mão**, com estimativa instantânea de X/Y/Z após homing observado (ver [controles de movimento](docs/gemeo-digital.md#controles-de-movimento)).
-- Conferência visual da A1: botão **Comparar com câmera** com perfil natural opcional e privado. Usa a rota do twin e a prévia da câmera, sem ganchos novos no upstream. [Documentação](docs/a1-posicao-optica.md).
+- Movimento manual da A1: botões **Homing (XYZ)** e **Movi à mão**, com estimativa instantânea de X/Y/Z a partir da referência absoluta comandada (ver [controles de movimento](docs/gemeo-digital.md#controles-de-movimento)).
 - Placa liberada (2026-11-19): o snapshot do SSE traz `plate_wait` (= `printer_manager.is_awaiting_plate_clear`). Com `false` fora de RUNNING/PREPARE/PAUSE ("Marcar placa como liberada" depois do fim), o twin esconde a peça. A próxima impressão volta a mostrar.
 - Recheio (2026-11-20): no orçamento de triângulos (celular 900 mil, desktop 2,2 mi) o recheio passa a ser o último a sair. Antes vira faixa plana (`PROFILE2`, 2 triângulos/segmento) e o perfil das paredes cai de 6 para 4 pontos (`engine/geom-build.js`, teste `twinGeom.test.ts`).
 - Linha sendo depositada (2026-11-19): durante a impressão, os últimos 3 s de programa da peça brilham em laranja e esfriam para a cor do filamento (`HOT_S` em `engine/object.js`), para ver o filete saindo do bico.
@@ -184,7 +183,7 @@ Chave **"Câmera | 3D"** onde o Bambuddy mostra a câmera da A1: em "3D", o quad
 
 | Arquivo | O que é |
 |---|---|
-| `backend/app/custom/twin/` | `gcode.py`/`pack.py`/`state.py`/`sim.py`/`recorder.py` (portados), `jobs.py` (3MF do arquivo/biblioteca, parse em processo spawn, cache em `<data>/custom/twin/cache`), `hub.py` (estado via `register_raw_message_handler` do cliente MQTT do Bambuddy, SSE), `router.py` (rotas GET + `include_twin`) |
+| `backend/app/custom/twin/` | `gcode.py`/`pack.py`/`state.py`/`sim.py`/`recorder.py` (portados), `jobs.py` (3MF do arquivo/biblioteca, parse em processo spawn, cache em `<data>/custom/twin/cache`), `hub.py` (estado via `register_raw_message_handler` do cliente MQTT do Bambuddy, SSE), `router.py` (rotas de visualização GET e de referência POST + `include_twin`) |
 | `backend/app/custom/api.py` | `install()` chama `include_twin(app)` (2 linhas, arquivo nosso) |
 | `backend/tests/custom/twin/` | parser vs G-code real, somente leitura/sem publish, lista branca, rotas e autorização |
 | `frontend/src/custom/twin/` | `engine/` (motor JS portado + `engine.d.ts`), `DigitalTwinView.tsx` (lazy), `CameraOrTwin.tsx`, `TwinSwitch.tsx`, `useTwinView.ts`, `twinFlags.ts`, `i18n.ts`, `index.ts` |
@@ -196,7 +195,8 @@ Chave **"Câmera | 3D"** onde o Bambuddy mostra a câmera da A1: em "3D", o quad
 |---|---|---|---|
 | `frontend/src/components/EmbeddedCameraViewer.tsx` | import após `useIsSidebarCompact`; após `useState` de `isMinimized`; efeito `// Stall detection` (condição e deps); `{!isMinimized && (` do `{/* Video area */}` e o `</div>` antes de `{/* Skip Objects Modal */}` | +6/−2 | `useTwinActive` pausa a checagem de travamento do stream com o 3D ativo (senão ela "reconectaria" uma câmera desmontada); `<CameraOrTwin>` em volta do quadro de vídeo (desenha a chave no rodapé da janela e troca o quadro). |
 | `frontend/src/pages/CameraPage.tsx` | import após `requestCameraPopIn`; após `useState` de `streamMode`; efeito `// Stall detection - periodically check...` (condição e deps); `<div ref={videoAreaRef}` e o `</div>` antes de `{/* Skip Objects Modal */}` | +6/−2 | Idem; a chave fica fixa no rodapé da tela (polegar, `safe-area`). |
-| `frontend/src/pages/PrintersPage.tsx` | Mutações `bedJogMutation`, `xyJogMutation`, `homeAxesMutation` e painel de movimento | +14/−4 | Mostra o homing completo em um botão rotulado na A1 e espelha o comando local no twin via `custom/twin/manualMotion.ts`. |
+| `frontend/src/pages/PrintersPage.tsx` | Mutações `bedJogMutation`, `xyJogMutation`, `homeAxesMutation` e painel de movimento | +28/−8 | Liga o botão de referência da A1 à rota do fork e espelha os deslocamentos locais via `custom/twin/manualMotion.ts`. |
+| `frontend/src/api/client.ts` | `moveToTwinReference` ao lado de `homeAxes` | +3 | Reutiliza a autenticação do cliente para chamar a rota de referência da A1. |
 | `backend/app/main.py` | `PUBLIC_API_PREFIXES` | 0 (em tempo de execução) | `include_twin` acrescenta `/api/v1/custom/twin/stream/` à lista do middleware global (como `/camera/stream` está nos padrões públicos): `EventSource` não manda cabeçalho, quem valida o token é a dependência da rota. Se o upstream renomear a lista: 401 (falha fechada). |
 | `backend/app/services/bambu_mqtt.py` | `register_raw_message_handler` / `unregister_raw_message_handler` | 0 | API pública do upstream usada sem alteração (conferir a assinatura ao atualizar a base). |
 | `backend/app/main.py` / `services/printer_manager.py` / `api/routes/library.py` | `running_print_archive`, `resolve_plate_id`, `printer_manager.get_client`, `to_absolute_path` | 0 | Funções do upstream chamadas (só leitura) para achar o 3MF do job. Conferir ao atualizar a base. |

@@ -5561,6 +5561,9 @@ export const api = {
       { method: 'POST' }
     ),
 
+  moveToTwinReference: (printerId: number) =>
+    request<{ position: { x: number; y: number; z: number } }>(`/custom/twin/${printerId}/reference`, { method: 'POST' }),
+
   // Chamber Light Control
   setChamberLight: (printerId: number, on: boolean) =>
     request<{ success: boolean; message: string }>(`/printers/${printerId}/chamber-light?on=${on}`, {

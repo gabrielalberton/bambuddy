@@ -1,4 +1,4 @@
-"""Rotas do gêmeo digital (somente GET), sob `{api_prefix}/custom/twin/...`.
+"""Rotas do gêmeo digital, sob `{api_prefix}/custom/twin/...`.
 
 Autorização igual à da câmera: `stream/{id}/events`, `stream/{id}/job/{job}` e `stream/{id}/model.glb` são
 carregados pelo navegador sem cabeçalho (EventSource / fetch), então aceitam o token de stream da câmera
@@ -15,7 +15,6 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
-import math
 import os
 import pathlib
 import time
@@ -38,7 +37,6 @@ router = APIRouter(prefix="/custom/twin", tags=["custom-twin"])
 
 RECHECK_SECONDS = 30.0
 HEARTBEAT_SECONDS = 12.0
-_visual_lock = asyncio.Lock()
 
 
 def enabled() -> bool:
@@ -117,34 +115,23 @@ async def twin_model(printer_id: int, _: StreamOpener = RequireCameraStreamToken
     return FileResponse(p, media_type="model/gltf-binary", headers={"Cache-Control": "private, max-age=86400"})
 
 
-@router.get("/stream/{printer_id}/visual-check")
-async def twin_visual_check(
-    printer_id: int,
-    _: StreamOpener = RequireCameraStreamTokenIfAuthEnabled,
-    x: float | None = None,
-    y: float | None = None,
-    z: float | None = None,
-):
-    """Compara a pose do twin com duas imagens da câmera quando existe uma referência local."""
-    from backend.app.custom.camera_preview import preview_url, read_preview
+@router.post("/{printer_id}/reference")
+async def twin_reference(printer_id: int, _=RequirePrinterPermissionIfAuthEnabled(Permission.PRINTERS_CONTROL)):
+    """Referencia a A1 e manda o cabeçote para o ponto absoluto usado pelo gêmeo."""
+    from backend.app.models.printer import Printer
+    from backend.app.services.printer_manager import printer_manager
 
-    from .visual_route import compare_previews
+    from .reference import A1_MODELS, move_to_reference
 
-    await _printer_or_404(printer_id)
-    profile = data_dir() / "visual" / str(printer_id) / "profile.json"
-    if not profile.is_file() or preview_url(printer_id) is None:
-        raise HTTPException(404, "Visual reference unavailable")
-    if (x, y, z) == (None, None, None):
-        return {"available": True}
-    if any(value is None or not math.isfinite(value) for value in (x, y, z)):
-        raise HTTPException(422, "Expected a finite XYZ pose")
-    if _visual_lock.locked():
-        return {"comparison": "unknown"}
-    async with _visual_lock:
-        first = await read_preview(printer_id)
-        await asyncio.sleep(1.2)
-        second = await read_preview(printer_id)
-        return await asyncio.to_thread(compare_previews, profile, first, second, (x, y, z))
+    if not enabled():
+        raise HTTPException(404, "Not found")
+    async with database.async_session() as db:
+        printer = await db.get(Printer, printer_id)
+        if printer is None:
+            raise HTTPException(404, "Printer not found")
+        if (printer.model or "").strip().upper() not in A1_MODELS:
+            raise HTTPException(400, "Reference movement is only supported on the A1")
+    return {"position": await move_to_reference(printer_manager, printer_id)}
 
 
 @router.get("/{printer_id}/health")
