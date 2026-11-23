@@ -215,6 +215,11 @@ async def get_preview_filaments(
     back to whatever heuristic it has (typically the project_filaments +
     painted-face approach in ``threemf_tools``).
     """
+    from backend.app.custom.a1_slicing import enabled as a1_lock_enabled, is_a1
+    from backend.app.services.slicer_3mf_convert import extract_source_printer_model
+
+    if a1_lock_enabled() and not is_a1(extract_source_printer_model(file_bytes)):
+        return None
     # Hash the file as it was given to us, not as it is sent: the key
     # identifies the source file, and sanitising is deterministic, so folding
     # it in would only make two names for one thing.

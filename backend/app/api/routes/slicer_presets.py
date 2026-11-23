@@ -38,6 +38,7 @@ from backend.app.core.config import settings as app_settings
 from backend.app.core.database import get_db
 from backend.app.core.permissions import Permission
 from backend.app.core.printer_scope import PrinterScope
+from backend.app.custom.a1_slicing import fixed_a1_target
 from backend.app.models.local_preset import LocalPreset
 from backend.app.models.printer import Printer
 from backend.app.models.slot_preset import SlotPresetMapping
@@ -756,6 +757,7 @@ async def list_unified_presets(
     orca_cloud, cloud, local, standard = _enrich_cloud_metadata(orca_cloud, cloud, local, standard)
     stock_aliases = _stock_aliases(cloud, standard)
     standard = _drop_aliased(standard, stock_aliases)
+    fixed_printer = await fixed_a1_target(db)
 
     return UnifiedPresetsResponse(
         orca_cloud=UnifiedPresetsBySlot(**orca_cloud),
@@ -765,6 +767,7 @@ async def list_unified_presets(
         cloud_status=cloud_status,
         orca_cloud_status=orca_cloud_status,
         stock_aliases=stock_aliases,
+        fixed_printer_preset=fixed_printer.preset if fixed_printer is not None else None,
     )
 
 

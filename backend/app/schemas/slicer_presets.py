@@ -102,6 +102,7 @@ class UnifiedPresetsResponse(BaseModel):
     cloud_status: CloudStatus = "ok"
     orca_cloud_status: CloudStatus = "ok"
     stock_aliases: dict[str, PresetRef] = {}
+    fixed_printer_preset: PresetRef | None = None
 
 
 class LoadedSpoolPreset(BaseModel):

@@ -2149,6 +2149,7 @@ export interface UnifiedPresetsResponse {
   // Standard presets that Bambu Cloud's stock list also has are left out of
   // the standard tier (#3386); each "standard:<id>" maps to its cloud twin.
   stock_aliases?: Record<string, PresetRef>;
+  fixed_printer_preset?: PresetRef | null;
 }
 
 // Slicer Pipelines (#1425) — named bundles of preset slots the SliceModal

@@ -1,5 +1,6 @@
 // Textos do fork (inglês). Mesclados no i18n do upstream por ./index.ts.
 const en = {
+  customFixedSlicePrinter: { profile: 'Bambu Lab A1 · {{diameter}} mm nozzle' },
   customModelAppearance: {
     label: 'Model appearance', colored: 'Color', white: 'White', previewColors: 'Preview colors',
   },

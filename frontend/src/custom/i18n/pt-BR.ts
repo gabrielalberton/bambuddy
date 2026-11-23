@@ -1,5 +1,6 @@
 // Textos do fork (pt-BR). Mesclados no i18n do upstream por ./index.ts.
 const ptBR = {
+  customFixedSlicePrinter: { profile: 'Bambu Lab A1 · bico {{diameter}} mm' },
   customModelAppearance: {
     label: 'Aparência do modelo', colored: 'Colorido', white: 'Branco', previewColors: 'Cores de visualização',
   },

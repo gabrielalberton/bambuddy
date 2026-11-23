@@ -17,6 +17,7 @@ import {
 import { useSliceJobTracker } from '../contexts/SliceJobTrackerContext';
 import { useToast } from '../contexts/ToastContext';
 import { useIsWideLayout } from '../hooks/useIsWideLayout';
+import { FixedSlicePrinter, pipelineFitsFixedPrinter } from '../custom/slicing/fixedPrinter';
 import { PlatePickerModal } from './PlatePickerModal';
 import { SliceSpoolPicker } from './SliceSpoolPicker';
 import SlicerSettingsPanel, { type FilamentChoice } from './SlicerSettingsPanel';
@@ -301,7 +302,7 @@ export function SliceModal({ source, onClose, defaultAutoArrange = false }: Slic
   const { trackJob } = useSliceJobTracker();
   const queryClient = useQueryClient();
 
-  const [printerPreset, setPrinterPreset] = useState<PresetRef | null>(null);
+  const [selectedPrinterPreset, setPrinterPreset] = useState<PresetRef | null>(null);
   const [processPreset, setProcessPreset] = useState<PresetRef | null>(null);
   // One filament ref per plate slot, in plate order. For STL / single-plate /
   // single-color sources this is a one-element array; multi-color 3MFs get one
@@ -494,11 +495,13 @@ export function SliceModal({ source, onClose, defaultAutoArrange = false }: Slic
   const presetsQuery = useQuery({
     queryKey: ['slicerPresets'],
     queryFn: () => api.getSlicerPresets(),
-    staleTime: 60_000,
+    staleTime: (query) => query.state.data?.fixed_printer_preset ? 0 : 60_000,
     // Don't fetch presets while the plate picker is on screen — saves a
     // round-trip if the user cancels out of the plate step.
     enabled: !platesQuery.isLoading && !needsPlatePicker,
   });
+  const fixedPrinter = presetsQuery.data?.fixed_printer_preset ?? null;
+  const printerPreset = fixedPrinter ?? selectedPrinterPreset;
 
   // Manual refresh — bypasses the backend's 5-minute cloud cache and 1-hour
   // bundled cache for one call so users who deleted a preset in Bambu
@@ -535,9 +538,10 @@ export function SliceModal({ source, onClose, defaultAutoArrange = false }: Slic
 
   // Selected-printer context for the process / filament filter (#1325).
   const selectedPrinterName = useMemo<string | null>(() => {
+    if (fixedPrinter) return fixedPrinter.id;
     if (!presetsQuery.data || !printerPreset) return null;
     return findPreset(presetsQuery.data, printerPreset, 'printer')?.name ?? null;
-  }, [presetsQuery.data, printerPreset]);
+  }, [presetsQuery.data, printerPreset, fixedPrinter]);
   // Compatibility ground truth: the slicer's own `compatible_printers` list
   // on local-imported presets, plus the @BBL <code> name fallback for cloud
   // / standard presets via the backend Bambu printer-model registry.
@@ -595,10 +599,12 @@ export function SliceModal({ source, onClose, defaultAutoArrange = false }: Slic
   // Each filter only applies while it has something to go on: with nothing
   // online, or no loaded spool matching a profile, the full lists stay.
   const printerFilter = useMemo(() => {
-    if (!onlyConnectedModels || loadedPrinters.length === 0) return null;
+    if (fixedPrinter || !onlyConnectedModels || loadedPrinters.length === 0) return null;
     const models = loadedPrinters.map((p) => p.model);
     return (p: UnifiedPreset) => isConnectedModelPreset(p, models, printerModels, printerParents);
-  }, [onlyConnectedModels, loadedPrinters, printerModels, printerParents]);
+  }, [fixedPrinter, onlyConnectedModels, loadedPrinters, printerModels, printerParents]);
+  const availablePipelines = (pipelinesQuery.data?.pipelines ?? [])
+    .filter(pipeline => pipelineFitsFixedPrinter(pipeline, presetsQuery.data, compatIndex));
   const filamentFilter = useMemo(() => {
     if (!onlyLoadedSpools || loadedFilamentRefs.size === 0) return null;
     return (p: UnifiedPreset) => loadedFilamentRefs.has(toRefValue(p));
@@ -715,14 +721,14 @@ export function SliceModal({ source, onClose, defaultAutoArrange = false }: Slic
   // presets first arrive; later re-renders preserve any manual choice.
   useEffect(() => {
     const data = presetsQuery.data;
-    if (!data) return;
+    if (!data || fixedPrinter) return;
     if (printerPreset == null) {
       setPrinterPreset(
         findPresetByName(data, 'printer', embeddedPrinter) ?? pickDefault(data, 'printer'),
       );
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [presetsQuery.data, embeddedPrinter]);
+  }, [presetsQuery.data, embeddedPrinter, fixedPrinter]);
 
   // With "only online printers" on, an auto-picked printer of a model that
   // isn't online moves to one that is — the file's own printer first, when
@@ -1036,11 +1042,11 @@ export function SliceModal({ source, onClose, defaultAutoArrange = false }: Slic
                 </span>
                 <select
                   value=""
-                  disabled={isEnqueuing || (pipelinesQuery.data?.pipelines.length ?? 0) === 0}
+                  disabled={isEnqueuing || availablePipelines.length === 0}
                   onChange={(e) => {
                     const id = parseInt(e.target.value, 10);
                     if (Number.isNaN(id)) return;
-                    const picked = pipelinesQuery.data?.pipelines.find((p) => p.id === id);
+                    const picked = availablePipelines.find((p) => p.id === id);
                     if (!picked) return;
                     // Apply slot state. The filament list is right-padded from
                     // current state so a pipeline with fewer entries than the
@@ -1048,8 +1054,10 @@ export function SliceModal({ source, onClose, defaultAutoArrange = false }: Slic
                     // A pipeline saved with a stock Bambu Cloud preset gets
                     // the Standard copy the dialog lists instead (#3386).
                     const listed = (ref: PresetRef) => (presetsQuery.data ? listedRef(presetsQuery.data, ref) : ref);
-                    explicitPrinter.current = true;
-                    setPrinterPreset(listed(picked.printer_preset));
+                    if (!fixedPrinter) {
+                      explicitPrinter.current = true;
+                      setPrinterPreset(listed(picked.printer_preset));
+                    }
                     setProcessPreset(listed(picked.process_preset));
                     setBedType(picked.bed_type);
                     setFilamentPresets((current) => {
@@ -1075,11 +1083,11 @@ export function SliceModal({ source, onClose, defaultAutoArrange = false }: Slic
                   aria-label={t('slice.pipelines.applyAria', 'Apply pipeline')}
                 >
                   <option value="">
-                    {(pipelinesQuery.data?.pipelines.length ?? 0) === 0
+                    {availablePipelines.length === 0
                       ? t('slice.pipelines.empty', 'No saved pipelines')
                       : t('slice.pipelines.applyPrompt', 'Apply pipeline…')}
                   </option>
-                  {pipelinesQuery.data?.pipelines.map((p) => (
+                  {availablePipelines.map((p) => (
                     <option key={p.id} value={p.id}>
                       {p.name}
                     </option>
@@ -1155,7 +1163,7 @@ export function SliceModal({ source, onClose, defaultAutoArrange = false }: Slic
                   only when the caller may read printer status at all. */}
               {loadedSpoolsQuery.isSuccess && (
                 <div className="flex flex-col gap-2">
-                  <label className="flex items-start gap-2 text-sm text-bambu-gray cursor-pointer select-none">
+                  {!fixedPrinter && <label className="flex items-start gap-2 text-sm text-bambu-gray cursor-pointer select-none">
                     <input
                       type="checkbox"
                       checked={onlyConnectedModels}
@@ -1172,7 +1180,7 @@ export function SliceModal({ source, onClose, defaultAutoArrange = false }: Slic
                         {t('slice.filters.onlyConnectedModelsHint', 'Printer profiles for the models online right now, at every nozzle size.')}
                       </span>
                     </span>
-                  </label>
+                  </label>}
                   <label className="flex items-start gap-2 text-sm text-bambu-gray cursor-pointer select-none">
                     <input
                       type="checkbox"
@@ -1191,7 +1199,7 @@ export function SliceModal({ source, onClose, defaultAutoArrange = false }: Slic
                       </span>
                     </span>
                   </label>
-                  {(onlyConnectedModels || onlyLoadedSpools) && loadedPrinters.length === 0 && (
+                  {((!fixedPrinter && onlyConnectedModels) || onlyLoadedSpools) && loadedPrinters.length === 0 && (
                     <p className="text-xs text-bambu-gray/70" role="status">
                       {t('slice.filters.noneOnline', 'No printer is online, so every profile is shown.')}
                     </p>
@@ -1203,7 +1211,7 @@ export function SliceModal({ source, onClose, defaultAutoArrange = false }: Slic
                   )}
                 </div>
               )}
-              <PresetDropdown
+              {fixedPrinter ? <FixedSlicePrinter preset={fixedPrinter} /> : <PresetDropdown
                 label={t('slice.printer')}
                 slot="printer"
                 data={sortedPresets ?? presetsQuery.data}
@@ -1219,7 +1227,7 @@ export function SliceModal({ source, onClose, defaultAutoArrange = false }: Slic
                 // design's target would drop canUseEmbedded and yank the toggle
                 // out from under the user (#2611).
                 disabled={isEnqueuing || useEmbedded}
-              />
+              />}
               {/* "Slice as designed" (#2611): honour the file's embedded
                   settings instead of the picked process/filament. Offered
                   only when the picked printer matches the design's target. */}

@@ -4387,6 +4387,7 @@ async def _run_slicer_with_fallback(
     dispatcher.
     """
     from backend.app.api.routes.settings import get_setting
+    from backend.app.custom.a1_slicing import fixed_a1_target
     from backend.app.services.preset_resolver import resolve_preset_ref
     from backend.app.services.slicer_api import (
         SlicerApiServerError,
@@ -4396,6 +4397,11 @@ async def _run_slicer_with_fallback(
         SlicerTimeoutError,
         get_stall_timeout_seconds,
     )
+
+    fixed_printer = await fixed_a1_target(db)
+    allow_embedded = fixed_printer is None or fixed_printer.can_use_embedded(model_bytes, model_filename)
+    if fixed_printer is not None:
+        request = fixed_printer.apply(request, allow_embedded)
 
     user: User | None = None
     presets: dict[str, str] = {}
@@ -4812,7 +4818,7 @@ async def _run_slicer_with_fallback(
                 # (e.g. re-slicing an H2D model for an X1C: the object is off
                 # the smaller bed). Surface the slicer's reason instead.
                 raise HTTPException(status_code=400, detail=rejection) from exc
-            if not is_3mf or embedded_mode:
+            if not is_3mf or embedded_mode or not allow_embedded:
                 # embedded_mode already sliced with the file's own settings —
                 # there is nothing to fall back TO, so surface the server
                 # error (the outer handler turns it into a 502) instead of
@@ -4907,6 +4913,8 @@ async def _run_slicer_with_fallback(
                 unresolved_filament_message(unresolved, [ref.id for ref in request.filament_presets]),
             )
 
+    if fixed_printer is not None:
+        fixed_printer.validate_output(result.content, export_3mf=request.export_3mf)
     return result, used_embedded_settings
 
 

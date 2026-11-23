@@ -525,3 +525,16 @@ Ver [prévia e perfil leve](docs/camera-previa.md).
 | `frontend/src/pages/ArchivesPage.tsx` | inicialização da vista, consulta e bloco do registro de impressão | Usa a consulta combinada e os componentes em `custom/printHistory/`. Os ganchos também ligam a navegação, removem as ações de arquivo da vista de histórico e reutilizam paginação, colunas e edição de registro. São mais de dez linhas ao todo para manter essas operações no componente existente. |
 | `frontend/src/api/client.ts` | `getPrintLog`, `PrintLogEntry` | Reaproveita o cliente autenticado e os filtros do registro de impressão. |
 | `frontend/src/hooks/useWebSocket.ts` | fim de impressão, atualizações do arquivo e falha da fila | Atualiza a consulta de histórico após eventos de impressão. |
+
+## Fatiamento fixo na A1
+
+- `BAMBUDDY_CUSTOM_A1_SLICING=1` usa o perfil Bambu Lab A1 do fatiador com o diâmetro informado pela A1. Sem leitura do bico, vale o padrão de 0,4 mm. O modelo A1 Mini é distinto. O diálogo exibe o perfil em leitura e usa sua compatibilidade para processo, filamento e pipelines.
+- O servidor substitui o perfil de máquina enviado por qualquer cliente. As configurações embutidas só entram no fatiamento e na recuperação de falhas quando o 3MF identifica a A1 com o mesmo bico. Confere o perfil do resultado antes que ele seja salvo na biblioteca ou em Impressos, inclusive quando vem de um pipeline.
+- A análise preliminar dos filamentos de projetos para outras impressoras lê os slots do projeto. O fatiamento efetivo aplica o perfil da A1. A opção é configurada no servidor para valer também para clientes com a interface antiga em cache.
+
+| Arquivo | Âncora | Efeito |
+|---|---|---|
+| `backend/app/api/routes/library.py` | `_run_slicer_with_fallback` | Aplica e valida o alvo em `backend/app/custom/a1_slicing.py` no caminho usado por biblioteca, arquivos e pipelines. |
+| `backend/app/api/routes/slicer_presets.py` e `backend/app/schemas/slicer_presets.py` | listagem e resposta de presets | Informa à UI o perfil fixado pelo servidor. |
+| `backend/app/services/slice_preview.py` | entrada de `get_preview_filaments` | Usa os metadados de projetos para outras impressoras. |
+| `frontend/src/components/SliceModal.tsx` e `frontend/src/api/client.ts` | estado do preset, filtro, pipeline e campo de máquina | Usa o perfil fixo em todos os caminhos que antes podiam escolher outro, com componente em `custom/slicing/fixedPrinter.tsx`. Os ganchos no modal também removem o filtro de impressora e preservam as escolhas de processo e filamento compatíveis. |
