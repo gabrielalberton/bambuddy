@@ -1,6 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { RotateCw, Video, X } from 'lucide-react';
-import { withStreamToken } from '../../api/client';
+import { api, withStreamToken } from '../../api/client';
+import { ChamberLight } from '../../components/icons/ChamberLight';
+import { useAuth } from '../../contexts/AuthContext';
+import { useToast } from '../../contexts/ToastContext';
 import { useStreamImgRef } from '../../hooks/useStreamImgRef';
 
 function nativeCameraEnabled() {
@@ -62,9 +67,12 @@ function NativeCameraDialog({ printerId, onClose }: { printerId: number; onClose
     >
       <div className="flex items-center justify-between pl-4">
         <h2 className="text-sm font-medium">Câmera nativa da A1</h2>
-        <button type="button" onClick={onClose} aria-label="Fechar câmera" className="grid size-11 place-items-center">
-          <X className="size-5" aria-hidden="true" />
-        </button>
+        <div className="flex">
+          <NativeCameraLightButton printerId={printerId} />
+          <button type="button" onClick={onClose} aria-label="Fechar câmera" className="grid size-11 place-items-center">
+            <X className="size-5" aria-hidden="true" />
+          </button>
+        </div>
       </div>
       <div className="relative grid min-h-32 place-items-center bg-black">
         <img key={attempt} ref={stream} alt="Vídeo da câmera nativa" onError={() => setFailed(true)}
@@ -81,5 +89,49 @@ function NativeCameraDialog({ printerId, onClose }: { printerId: number; onClose
         )}
       </div>
     </dialog>
+  );
+}
+
+function NativeCameraLightButton({ printerId }: { printerId: number }) {
+  const { t } = useTranslation();
+  const { hasPermission } = useAuth();
+  const { showToast } = useToast();
+  const queryClient = useQueryClient();
+  const canControl = hasPermission('printers:control');
+  const queryKey = ['printerStatus', printerId];
+  const { data: status } = useQuery({
+    queryKey,
+    queryFn: () => api.getPrinterStatus(printerId),
+    enabled: canControl,
+    refetchInterval: 30_000,
+  });
+  const light = useMutation({
+    mutationFn: async (on: boolean) => {
+      const result = await api.setChamberLight(printerId, on);
+      if (!result.success) throw new Error(result.message);
+    },
+    onSuccess: (_, on) => {
+      queryClient.setQueryData<typeof status>(queryKey, (current) =>
+        current ? { ...current, chamber_light: on } : current,
+      );
+    },
+    onError: (error) => showToast(error.message, 'error'),
+  });
+  if (!canControl) return null;
+
+  const on = status?.chamber_light ?? false;
+  const action = t(on ? 'printers.chamberLightOff' : 'printers.chamberLightOn');
+  return (
+    <button
+      type="button"
+      aria-label={t('camera.chamberLight')}
+      aria-pressed={on}
+      title={action}
+      disabled={!status?.connected || light.isPending}
+      onClick={() => light.mutate(!on)}
+      className="grid size-11 place-items-center rounded-lg hover:bg-bambu-dark-tertiary disabled:opacity-50"
+    >
+      <ChamberLight on={on} className="size-5" />
+    </button>
   );
 }

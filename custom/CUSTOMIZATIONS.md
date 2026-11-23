@@ -544,6 +544,7 @@ Ver [prévia e perfil leve](docs/camera-previa.md).
 No menu ⋮ do cartão da A1, **Câmera nativa** abre um modal somente sob demanda para quem tem acesso à câmera
 e já tem a câmera externa habilitada. O stream usa o token e a autorização por impressora do Bambuddy.
 A seleção vale só para esse modal. O detector da mesa e o stream padrão continuam usando a configuração existente.
+O cabeçalho do modal oferece o controle manual da luz da câmara a usuários com `printers:control`, pela API existente.
 
 | Gancho upstream | Âncora | Efeito |
 |---|---|---|
