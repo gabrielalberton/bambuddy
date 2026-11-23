@@ -23,7 +23,7 @@ describe('PrinterPrefsChips', () => {
     fetchMock.mockReset();
     vi.stubGlobal('fetch', fetchMock);
     fetchMock.mockImplementation((url: string, init?: RequestInit) => {
-      if (url.endsWith('/prefs')) return ok({ default_speed: 4, speed_level: 2, nozzle_diameter: '0.4', nozzle_options: ['0.2', '0.4'], apply_from_layer: 2 });
+      if (url.endsWith('/prefs')) return ok({ default_speed: 4, speed_level: 2, speed_percent: 100, ultra_percent: 208, nozzle_diameter: '0.4', nozzle_options: ['0.2', '0.4'], apply_from_layer: 2 });
       if (url.includes('/nozzle')) return ok({ nozzle_diameter: '0.2', method: init?.method });
       return ok({ applied_now: false });
     });
@@ -32,7 +32,20 @@ describe('PrinterPrefsChips', () => {
   it('mostra o bico e, parada, o padrão da próxima impressão', async () => {
     renderChips();
     expect(screen.getByTestId('custom-nozzle-chip').textContent).toContain('0.4 mm');
-    await waitFor(() => expect(screen.getByTestId('custom-speed-chip').textContent).toMatch(/ludicrous|Ludicrous|printers.speed.ludicrous/));
+    await waitFor(() => expect(screen.getByTestId('custom-speed-chip').textContent).toMatch(/Super-fast|Super-rápido|custom.prefs.speedMode4/));
+  });
+
+  it('mostra um percentual personalizado informado pela impressora', async () => {
+    fetchMock.mockImplementation(() => ok({ speed_level: 2, speed_percent: 183, ultra_percent: 208 }));
+    renderChips({ isPrinting: true });
+    await waitFor(() => expect(screen.getByTestId('custom-speed-chip').textContent).toMatch(/Custom|Personalizado|custom.prefs.speedCustom/));
+  });
+
+  it('permite escolher o modo ultra-rápido', async () => {
+    renderChips();
+    fireEvent.click(screen.getByTestId('custom-speed-chip'));
+    fireEvent.click(await screen.findByText(/Ultra-fast|Ultra-rápido|custom.prefs.speedMode5/));
+    await waitFor(() => expect(fetchMock.mock.calls.some(([url]) => String(url).includes('/1/speed?mode=5'))).toBe(true));
   });
 
   it('troca o bico para 0.2', async () => {

@@ -64,3 +64,11 @@ def test_ja_no_modo_nao_reenvia():
 def test_prefs_persistem():
     prefs.save_prefs({"1": {"default_speed": 3}})
     assert prefs.load_prefs() == {"1": {"default_speed": 3}}
+
+
+def test_ultra_usa_multiplicador_e_telemetria_exibe_valor_personalizado():
+    c = FakeClient(layer_num=2, raw_data={"spd_mag": "183"})
+    c.send_gcode = lambda command: c.sent.append(command) or True
+    assert prefs._reported_percent(c.state) == 183
+    assert prefs.apply_once(1, c, prefs.ULTRA_MODE)
+    assert c.sent == ["M220 S208\n"]

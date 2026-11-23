@@ -3,7 +3,7 @@
 - ``POST /custom/printers/{id}/nozzle?diameter=0.2|0.4``: configura o bico na impressora por MQTT LAN
   (``set_accessories``). A A1 não tem sensor de bico: vale o que o dono diz que montou.
   Recusa durante uma impressão.
-- ``PUT /custom/printers/{id}/speed?mode=1..4``: com impressão rodando, troca já; sempre grava como
+- ``PUT /custom/printers/{id}/speed?mode=1..4|5``: com impressão rodando, troca já; sempre grava como
   padrão. O padrão é aplicado a cada impressão nova a partir da camada 2 (a 1ª camada fica no modo do
   arquivo), por um vigia em segundo plano.
 - ``GET /custom/printers/{id}/prefs``: padrão gravado, bico e modo atuais.
@@ -27,7 +27,11 @@ log = logging.getLogger("custom.printer_prefs")
 router = APIRouter(prefix="/custom/printers", tags=["custom"])
 
 NOZZLE_OPTIONS = ("0.2", "0.4")
-SPEED_MODES = (1, 2, 3, 4)
+NATIVE_SPEEDS = {1: 50, 2: 100, 3: 124, 4: 166}
+ULTRA_MODE = 5
+# Referência do ensaio: 25 mm³/s desejados sobre o perfil de PLA de 12 mm³/s.
+ULTRA_PERCENT = 208
+SPEED_MODES = (*NATIVE_SPEEDS, ULTRA_MODE)
 APPLY_FROM_LAYER = 2
 POLL_SECONDS = 10
 BUSY_STATES = {"RUNNING", "PAUSE", "PREPARE", "SLICING"}
@@ -72,6 +76,21 @@ def _current_nozzle(client) -> str:
     return str(getattr(nozzles[0], "nozzle_diameter", "") or "") if nozzles else ""
 
 
+def _reported_percent(state) -> int | None:
+    raw = getattr(state, "raw_data", None) or {}
+    try:
+        percent = int(raw.get("spd_mag"))
+    except (TypeError, ValueError):
+        return None
+    return percent if percent > 0 else None
+
+
+def _send_speed(client, mode: int) -> bool:
+    if mode == ULTRA_MODE:
+        return bool(client.send_gcode(f"M220 S{ULTRA_PERCENT}\n"))
+    return bool(client.set_print_speed(mode))
+
+
 @router.get("/{printer_id}/prefs")
 async def get_prefs(printer_id: int, _=RequirePrinterPermissionIfAuthEnabled(Permission.PRINTERS_READ)):
     ensure_applier()
@@ -82,6 +101,8 @@ async def get_prefs(printer_id: int, _=RequirePrinterPermissionIfAuthEnabled(Per
     return {
         "default_speed": _printer_prefs(printer_id).get("default_speed"),
         "speed_level": getattr(state, "speed_level", None),
+        "speed_percent": _reported_percent(state),
+        "ultra_percent": ULTRA_PERCENT,
         "nozzle_diameter": _current_nozzle(client) if client else "",
         "nozzle_options": list(NOZZLE_OPTIONS),
         "apply_from_layer": APPLY_FROM_LAYER,
@@ -91,7 +112,7 @@ async def get_prefs(printer_id: int, _=RequirePrinterPermissionIfAuthEnabled(Per
 @router.put("/{printer_id}/speed")
 async def set_speed(
     printer_id: int,
-    mode: int = Query(..., ge=1, le=4),
+    mode: int = Query(..., ge=1, le=ULTRA_MODE),
     _=RequirePrinterPermissionIfAuthEnabled(Permission.PRINTERS_CONTROL),
 ):
     ensure_applier()
@@ -103,8 +124,9 @@ async def set_speed(
 
     client = printer_manager.get_client(printer_id)
     if client is not None and getattr(client.state, "state", "") in ("RUNNING", "PAUSE"):
-        applied_now = bool(client.set_print_speed(mode))
-        _applied[printer_id] = _job_key(client.state)
+        applied_now = _send_speed(client, mode)
+        if applied_now:
+            _applied[printer_id] = _job_key(client.state)
     return {"success": True, "default_speed": mode, "applied_now": applied_now}
 
 
@@ -164,10 +186,16 @@ def apply_once(printer_id: int, client, default_speed: int | None) -> bool:
     key = _job_key(state)
     if _applied.get(printer_id) == key or (getattr(state, "layer_num", 0) or 0) < APPLY_FROM_LAYER:
         return False
-    _applied[printer_id] = key
-    if getattr(state, "speed_level", None) == default_speed:
+    expected = ULTRA_PERCENT if default_speed == ULTRA_MODE else NATIVE_SPEEDS[default_speed]
+    reported = _reported_percent(state)
+    if reported == expected or (
+        reported is None and default_speed in NATIVE_SPEEDS and getattr(state, "speed_level", None) == default_speed
+    ):
+        _applied[printer_id] = key
         return False
-    sent = bool(client.set_print_speed(default_speed))
+    sent = _send_speed(client, default_speed)
+    if sent:
+        _applied[printer_id] = key
     log.info("printer %s: velocidade padrão %s aplicada (camada %s)", printer_id, default_speed, state.layer_num)
     return sent
 

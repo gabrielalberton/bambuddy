@@ -50,6 +50,12 @@ const en = {
   },
   custom: {
     prefs: {
+      speedMode1: 'Silent ({{percent}}%)',
+      speedMode2: 'Normal ({{percent}}%)',
+      speedMode3: 'Fast ({{percent}}%)',
+      speedMode4: 'Super-fast ({{percent}}%)',
+      speedMode5: 'Ultra-fast ({{percent}}%)',
+      speedCustom: 'Custom ({{percent}}%)',
       nozzleTitle: 'Configured nozzle (tap to change)',
       nozzleHint: 'Which nozzle is installed?',
       nozzleBusy: 'The nozzle cannot be changed while printing',

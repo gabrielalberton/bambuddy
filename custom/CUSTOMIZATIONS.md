@@ -410,7 +410,7 @@ material, `KValueLine` (opcional) e trilha da barra por último.
 
 - Backend `backend/app/custom/printer_prefs/router.py`, registrado em `api.py`:
   - `GET /custom/printers/{id}/prefs`;
-  - `PUT /custom/printers/{id}/speed?mode=1..4`: troca já se estiver imprimindo e sempre grava como padrão em `data/custom/printer_prefs.json`;
+  - `PUT /custom/printers/{id}/speed?mode=1..5`: troca já se estiver imprimindo e sempre grava como padrão em `data/custom/printer_prefs.json`;
   - `POST /custom/printers/{id}/nozzle?diameter=0.2|0.4`: MQTT `set_accessories`; responde 409 durante a impressão.
   - Um vigia (iniciado pelo `StartApplierMiddleware` no lifespan, ou no 1º GET) aplica a velocidade padrão uma vez por impressão, a partir da camada 2.
 - Frontend `custom/printer/PrinterPrefsChips.tsx`, com chips "⌀ 0.4 mm" e "Velocidade" na linha de controles do card compacto.
@@ -418,7 +418,8 @@ material, `KValueLine` (opcional) e trilha da barra por último.
   - import;
   - 1 linha depois do `QueueChip`;
   - o botão de velocidade do upstream fica só fora do modo compacto (`!compactCard(single)`).
-- Textos em `custom/i18n` (`custom.prefs.*`).
+- Textos em `custom/i18n` (`custom.prefs.*`). O CSS do card compacto mantém os quatro controles na mesma linha.
+- Ultra-rápido usa `M220 S208` (25 mm³/s de referência sobre 12 mm³/s). O chip em impressão mostra `spd_mag` quando há telemetria, inclusive percentuais fora da lista. O gancho em `bambu_mqtt.py` preserva `spd_mag` em relatórios parciais sem mudança de modo.
 - Testes: `backend/tests/custom/test_printer_prefs.py` e `custom/__tests__/printerPrefsChips.test.tsx`.
 
 ## Biblioteca organizada por modelo (`custom(library-org)`, 2026-11-18)

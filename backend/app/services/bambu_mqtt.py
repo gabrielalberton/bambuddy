@@ -5992,6 +5992,9 @@ class BambuMQTTClient:
         if "vt_tray" in data and isinstance(data["vt_tray"], dict):
             data["vt_tray"] = [data["vt_tray"]]
 
+        # custom(printer-prefs): preserve the actual percentage across partial pushes.
+        if "spd_mag" not in data and "spd_lvl" not in data and "spd_mag" in self.state.raw_data:
+            data["spd_mag"] = self.state.raw_data["spd_mag"]
         self.state.raw_data = data
 
         # Restore preserved fields BEFORE any work that may release the GIL

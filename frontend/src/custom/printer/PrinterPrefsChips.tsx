@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CircleDot, Gauge } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import './compactCard.css';
 import { getAuthToken } from '../../api/client';
 
 /**
@@ -14,6 +15,8 @@ import { getAuthToken } from '../../api/client';
 interface Prefs {
   default_speed: number | null;
   speed_level: number | null;
+  speed_percent?: number | null;
+  ultra_percent?: number;
   nozzle_diameter: string;
   nozzle_options: string[];
   apply_from_layer: number;
@@ -37,7 +40,8 @@ export const printerPrefsApi = {
   setNozzle: (id: number, diameter: string) => call<{ nozzle_diameter: string }>(`/${id}/nozzle?diameter=${diameter}`, { method: 'POST' }),
 };
 
-const SPEED_KEYS: Record<number, string> = { 1: 'silent', 2: 'standard', 3: 'sport', 4: 'ludicrous' };
+const NATIVE_SPEEDS: Record<number, number> = { 1: 50, 2: 100, 3: 124, 4: 166 };
+const ULTRA_MODE = 5;
 
 function norm(d: string | number | null | undefined): string {
   const n = Number(d);
@@ -65,17 +69,24 @@ export function PrinterPrefsChips({
   const qc = useQueryClient();
   const [open, setOpen] = useState<'nozzle' | 'speed' | null>(null);
   const key = ['customPrinterPrefs', printerId];
-  const { data } = useQuery({ queryKey: key, queryFn: () => printerPrefsApi.get(printerId), refetchInterval: 30_000 });
+  const { data } = useQuery({ queryKey: key, queryFn: () => printerPrefsApi.get(printerId), refetchInterval: isPrinting ? 5_000 : 30_000 });
+
+  const speedOptions = { ...NATIVE_SPEEDS, ...(data?.ultra_percent ? { [ULTRA_MODE]: data.ultra_percent } : {}) };
+  const speedLabelFor = (percent: number) => {
+    const mode = Object.keys(speedOptions).find((key) => speedOptions[Number(key)] === percent);
+    return t(mode ? `custom.prefs.speedMode${mode}` : 'custom.prefs.speedCustom', { percent });
+  };
 
   const speedMut = useMutation({
     mutationFn: (mode: number) => printerPrefsApi.setSpeed(printerId, mode),
     onSuccess: (res, mode) => {
       qc.setQueryData(key, (old: Prefs | undefined) => (old ? { ...old, default_speed: mode } : old));
+      qc.invalidateQueries({ queryKey: key });
       qc.invalidateQueries({ queryKey: ['printerStatus', printerId] });
       onToast?.(
         res.applied_now
-          ? t('custom.prefs.speedNow', { mode: t(`printers.speed.${SPEED_KEYS[mode]}`) })
-          : t('custom.prefs.speedNext', { mode: t(`printers.speed.${SPEED_KEYS[mode]}`) }),
+          ? t('custom.prefs.speedNow', { mode: speedLabelFor(speedOptions[mode]) })
+          : t('custom.prefs.speedNext', { mode: speedLabelFor(speedOptions[mode]) }),
         'success',
       );
     },
@@ -95,11 +106,15 @@ export function PrinterPrefsChips({
   const options = data?.nozzle_options ?? ['0.2', '0.4'];
   // Imprimindo, mostra o modo real; parada, o padrão que vai valer na próxima.
   const shownSpeed = isPrinting ? speedLevel ?? data?.speed_level : data?.default_speed ?? speedLevel ?? data?.speed_level;
-  const speedLabel = shownSpeed && SPEED_KEYS[shownSpeed] ? t(`printers.speed.${SPEED_KEYS[shownSpeed]}`) : '—';
+  const reportedPercent = data?.speed_level === shownSpeed ? data?.speed_percent : null;
+  const shownPercent = isPrinting
+    ? reportedPercent ?? speedOptions[shownSpeed ?? 0]
+    : speedOptions[shownSpeed ?? 0] ?? reportedPercent;
+  const speedLabel = shownPercent ? speedLabelFor(shownPercent) : '—';
 
   return (
     <>
-      <div className="relative">
+      <div className="relative" data-custom-speed-controls>
         <button
           data-testid="custom-nozzle-chip"
           className={`${chip} bg-emerald-100 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-400`}
@@ -139,13 +154,14 @@ export function PrinterPrefsChips({
       <div className="relative">
         <button
           data-testid="custom-speed-chip"
+          aria-label={speedLabel}
           className={`${chip} bg-amber-100 dark:bg-amber-500/15 text-amber-700 dark:text-amber-400`}
           onClick={() => setOpen(open === 'speed' ? null : 'speed')}
           disabled={!canControl}
           title={isPrinting ? t('printers.speed.title') : t('custom.prefs.speedDefaultTitle')}
         >
           <Gauge className="w-[var(--pc-i4,1rem)] h-[var(--pc-i4,1rem)]" />
-          {speedLabel}
+          <span className="custom-speed-label">{speedLabel}</span>
         </button>
         {open === 'speed' && (
           <>
@@ -154,19 +170,22 @@ export function PrinterPrefsChips({
               <p className="px-3 py-1 text-[11px] text-bambu-gray">
                 {isPrinting ? t('custom.prefs.speedNowHint') : t('custom.prefs.speedNextHint', { layer: data?.apply_from_layer ?? 2 })}
               </p>
-              {[1, 2, 3, 4].map((mode) => (
+              {shownPercent && !Object.values(speedOptions).includes(shownPercent) && (
+                <p className="px-3 py-2 text-sm text-bambu-green">{speedLabel}</p>
+              )}
+              {Object.entries(speedOptions).map(([mode, percent]) => (
                 <button
                   key={mode}
                   disabled={speedMut.isPending}
                   onClick={() => {
                     setOpen(null);
-                    speedMut.mutate(mode);
+                    speedMut.mutate(Number(mode));
                   }}
                   className={`w-full text-left px-3 py-2 text-sm transition-colors ${
-                    shownSpeed === mode ? 'text-bambu-green bg-bambu-green/10' : 'text-white hover:bg-bambu-dark-tertiary'
+                    shownPercent === percent ? 'text-bambu-green bg-bambu-green/10' : 'text-white hover:bg-bambu-dark-tertiary'
                   }`}
                 >
-                  {t(`printers.speed.${SPEED_KEYS[mode]}`)}
+                  {speedLabelFor(percent)}
                 </button>
               ))}
             </div>

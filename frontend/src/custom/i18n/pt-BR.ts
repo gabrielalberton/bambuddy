@@ -52,6 +52,12 @@ const ptBR = {
   },
   custom: {
     prefs: {
+      speedMode1: 'Silencioso ({{percent}}%)',
+      speedMode2: 'Normal ({{percent}}%)',
+      speedMode3: 'Rápido ({{percent}}%)',
+      speedMode4: 'Super-rápido ({{percent}}%)',
+      speedMode5: 'Ultra-rápido ({{percent}}%)',
+      speedCustom: 'Personalizado ({{percent}}%)',
       nozzleTitle: 'Bico configurado (toque para trocar)',
       nozzleHint: 'Qual bico está montado?',
       nozzleBusy: 'Não dá para trocar o bico durante a impressão',
