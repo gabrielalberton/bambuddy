@@ -157,6 +157,17 @@ def _placed_meshes(zf, object_slots, part_slots):
     yield models, placements, min(1.0, FACE_BUDGET / total)
 
 
+def _weld_mesh(points: np.ndarray, faces: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """Connect exactly coincident vertices of this part and filament before decimation."""
+    ids, compact = np.unique(faces, return_inverse=True)
+    vertices, welded = np.unique(points[ids], axis=0, return_inverse=True)
+    indices = welded[compact].reshape(-1, 3).astype(np.int32)
+    a, b, c = indices.T
+    # A face that named a vertex twice by two different indices collapses.
+    valid = (a != b) & (b != c) & (a != c)
+    return vertices, indices[valid]
+
+
 def _cluster_large_mesh(vertices, faces, target):
     """Collapse nearby vertices before quadric simplification of a huge mesh."""
     lower = vertices.min(axis=0)
@@ -197,10 +208,9 @@ def render(source: Path, glb: Path, png: Path):
                 points, faces, painted, _ = models[path][object_id]
                 slots = np.where(painted, painted, default_slot)
                 for slot in np.unique(slots):
-                    selected = faces[slots == slot]
-                    ids, index = np.unique(selected, return_inverse=True)
-                    vertices = points[ids]
-                    indices = index.reshape(-1, 3).astype(np.int32)
+                    # A 3MF can repeat identical positions along seams. If
+                    # the simplifier moves each side separately, gaps appear.
+                    vertices, indices = _weld_mesh(points, faces[slots == slot])
                     target = max(32, int(len(indices) * ratio))
                     if len(indices) > 900_000:
                         vertices, indices = _cluster_large_mesh(vertices, indices, target)

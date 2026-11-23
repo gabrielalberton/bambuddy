@@ -497,6 +497,7 @@ Ver [prévia e perfil leve](docs/camera-previa.md).
 - Ligado no servidor com `BAMBUDDY_CUSTOM_MODEL_PREVIEW=1`. Para desativar no navegador, use `localStorage.setItem('custom.modelPreview', 'off')` no navegador. Projetos com múltiplas placas mantêm a seleção de placas do visualizador original.
 
 - A lista, os cartões e o menu de detalhes usam `archivePreviewTarget` em conjunto. Abrir uma prévia geométrica antiga também salva a miniatura ausente para aquele registro, incluindo cópias que compartilham o mesmo conteúdo.
+- O render conecta vértices de coordenadas idênticas dentro de cada peça e cor antes de simplificar a malha. Assim as junções do 3MF permanecem fechadas na prévia, como nas seis peças do Family Figurine Split. O cache `model-previews-v2` gera novamente as prévias dos arquivos já enviados.
 
 ## Fatiamentos junto ao modelo de origem
 

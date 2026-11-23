@@ -62,7 +62,7 @@ async def _generate(source: Path, destination: Path) -> None:
 
 async def preview_artifacts(source: Path) -> Path:
     digest = await asyncio.to_thread(_digest, source)
-    root = settings.base_dir / "custom" / "model-previews-v1"
+    root = settings.base_dir / "custom" / "model-previews-v2"
     root.mkdir(parents=True, exist_ok=True)
     destination = root / digest
     if (destination / "preview.glb").is_file():
