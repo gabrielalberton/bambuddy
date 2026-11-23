@@ -1,0 +1,85 @@
+import { useEffect, useRef, useState } from 'react';
+import { RotateCw, Video, X } from 'lucide-react';
+import { withStreamToken } from '../../api/client';
+import { useStreamImgRef } from '../../hooks/useStreamImgRef';
+
+function nativeCameraEnabled() {
+  try {
+    return localStorage.getItem('custom.nativeCamera') !== 'off';
+  } catch {
+    return true;
+  }
+}
+
+type Printer = { id: number; model?: string | null; external_camera_enabled?: boolean };
+
+export function useNativeCamera(printer: Printer, allowed: boolean, closeMenu: () => void) {
+  const [open, setOpen] = useState(false);
+  const enabled = allowed && printer.external_camera_enabled
+    && /^(?:bambu lab )?a1(?: mini)?$/i.test(printer.model ?? '')
+    && nativeCameraEnabled();
+
+  return {
+    item: enabled && (
+      <button
+        type="button"
+        className="flex min-h-11 w-full items-center gap-2 rounded-lg px-4 text-left text-sm hover:bg-bambu-dark-tertiary"
+        onClick={() => {
+          closeMenu();
+          setOpen(true);
+        }}
+      >
+        <Video className="h-4 w-4 shrink-0" aria-hidden="true" />
+        Câmera nativa
+      </button>
+    ),
+    dialog: enabled && open && <NativeCameraDialog printerId={printer.id} onClose={() => setOpen(false)} />,
+  };
+}
+
+function NativeCameraDialog({ printerId, onClose }: { printerId: number; onClose: () => void }) {
+  const dialog = useRef<HTMLDialogElement>(null);
+  const image = useRef<HTMLImageElement>(null);
+  const [attempt, setAttempt] = useState(0);
+  const [failed, setFailed] = useState(false);
+  const stream = useStreamImgRef(
+    image,
+    withStreamToken(`/api/v1/printers/${printerId}/camera/stream?native=true&fps=5&t=${attempt}`),
+  );
+
+  useEffect(() => {
+    const modal = dialog.current;
+    modal?.showModal();
+    return () => modal?.close();
+  }, []);
+
+  return (
+    <dialog
+      ref={dialog}
+      aria-label="Câmera nativa da A1"
+      onCancel={onClose}
+      className="m-auto w-[calc(100%_-_2rem)] max-w-xl rounded-xl border border-bambu-dark-tertiary bg-bambu-dark-secondary p-0 text-white backdrop:bg-black/70"
+    >
+      <div className="flex items-center justify-between pl-4">
+        <h2 className="text-sm font-medium">Câmera nativa da A1</h2>
+        <button type="button" onClick={onClose} aria-label="Fechar câmera" className="grid size-11 place-items-center">
+          <X className="size-5" aria-hidden="true" />
+        </button>
+      </div>
+      <div className="relative grid min-h-32 place-items-center bg-black">
+        <img key={attempt} ref={stream} alt="Vídeo da câmera nativa" onError={() => setFailed(true)}
+          className={failed ? 'hidden' : 'max-h-[70dvh] w-full object-contain'} />
+        {failed && (
+          <button type="button" className="flex min-h-11 items-center gap-2 px-3 text-sm"
+            onClick={() => {
+              setFailed(false);
+              setAttempt(attempt + 1);
+            }}>
+            <RotateCw className="size-4" aria-hidden="true" />
+            Tentar novamente
+          </button>
+        )}
+      </div>
+    </dialog>
+  );
+}

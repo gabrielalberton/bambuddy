@@ -33,6 +33,7 @@ from backend.app.core.auth import (
 )
 from backend.app.core.database import get_db
 from backend.app.core.permissions import Permission
+from backend.app.custom.native_camera import use_native_camera
 from backend.app.models.api_key import APIKey
 from backend.app.models.printer import Printer
 from backend.app.models.user import User
@@ -1224,6 +1225,7 @@ async def camera_stream(
     fps: int = 10,
     opener: StreamOpener = RequireCameraStreamTokenIfAuthEnabled,
     viewer: ViewerId = None,
+    native: bool = False,
 ):
     """Stream live video from printer camera as MJPEG.
 
@@ -1258,8 +1260,9 @@ async def camera_stream(
     async with database.async_session() as db:
         printer = await get_printer_or_404(printer_id, db)
 
-    # Check for external camera first
-    if printer.external_camera_enabled and printer.external_camera_url:
+    has_external_camera = bool(printer.external_camera_enabled and printer.external_camera_url)
+    native_preview = has_external_camera and is_chamber_image_model(printer.model) and use_native_camera(native)
+    if has_external_camera and not native_preview:
         # NB: no `import time` / `import uuid` here, and don't reintroduce them.
         # A local import anywhere in this function makes the name function-local
         # for the WHOLE function, so the RTSP/chamber path below — which never
@@ -1379,7 +1382,8 @@ async def camera_stream(
     # attached — otherwise /camera/status would report stream_uptime jumping
     # backward whenever a second viewer joins. The upstream generator's
     # finally clears this entry when the upstream actually ends.
-    _stream_start_times.setdefault(printer_id, time.time())
+    if not native_preview:
+        _stream_start_times.setdefault(printer_id, time.time())
 
     # Fan-out broadcaster (#1089): one upstream connection per printer, shared
     # across all viewers. Most Bambu printers only allow a single concurrent
@@ -1402,9 +1406,10 @@ async def camera_stream(
             access_code=printer.access_code,
             model=printer.model,
             fps=fps,
-            stream_id=upstream_stream_id,
+            # An auxiliary native viewer must never replace buffered frames from the configured camera.
+            stream_id=None if native_preview else upstream_stream_id,
             disconnect_event=disconnect_event,
-            printer_id=printer_id,
+            printer_id=None if native_preview else printer_id,
         )
 
     # Subscribe with a one-shot retry to close a tiny race: the grace-window
@@ -1438,7 +1443,7 @@ async def camera_stream(
     async def _generate():
         # Chamber light while this viewer watches (#1655). Held per viewer, so
         # it goes off once the last one leaves.
-        async with camera_light(printer, wait=False):
+        async with (contextlib.nullcontext() if native_preview else camera_light(printer, wait=False)):
             async for chunk in iter_subscriber(
                 broadcaster,
                 queue,

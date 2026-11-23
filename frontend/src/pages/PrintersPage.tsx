@@ -91,6 +91,7 @@ import { HomingButton } from '../custom/twin/HomingButton';
 import { anchorTwinMotion, hasTwinMovementControls, previewTwinJog, resetTwinMotion } from '../custom/twin/manualMotion';
 import { useSinglePrinter } from '../custom/useSinglePrinter';
 import { InlineCamera } from '../custom/camera/InlineCamera';
+import { useNativeCamera } from '../custom/camera/NativeCamera';
 import { NozzleSizeBadge, QueueChip } from '../custom/printer/CardExtras';
 import { PrinterPrefsChips } from '../custom/printer/PrinterPrefsChips'; // custom(printer-prefs)
 import { compactCard, isPrintingState } from '../custom/printer/compactCard';
@@ -3796,6 +3797,7 @@ function PrinterCard({
     );
   };
 
+  const nativeCamera = useNativeCamera(printer, hasPermission('camera:view'), () => setShowMenu(false));
   const printerActionsMenu = (
     <div ref={printerActionsMenuRef} className="relative flex-shrink-0">
       <Button
@@ -3807,8 +3809,10 @@ function PrinterCard({
       >
         <MoreVertical className="w-[var(--pc-i4,1rem)] h-[var(--pc-i4,1rem)]" />
       </Button>
+      {nativeCamera.dialog}
       {showMenu && (
         <div className="absolute left-0 bottom-full mb-2 w-48 bg-bambu-dark-secondary border border-bambu-dark-tertiary rounded-lg shadow-lg z-20">
+          {nativeCamera.item}
           <button
             className={`w-full px-4 py-2 text-left text-sm flex items-center gap-2 ${
               hasPermission('printers:update')

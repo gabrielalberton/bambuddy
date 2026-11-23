@@ -538,3 +538,17 @@ Ver [prévia e perfil leve](docs/camera-previa.md).
 | `backend/app/api/routes/slicer_presets.py` e `backend/app/schemas/slicer_presets.py` | listagem e resposta de presets | Informa à UI o perfil fixado pelo servidor. |
 | `backend/app/services/slice_preview.py` | entrada de `get_preview_filaments` | Usa os metadados de projetos para outras impressoras. |
 | `frontend/src/components/SliceModal.tsx` e `frontend/src/api/client.ts` | estado do preset, filtro, pipeline e campo de máquina | Usa o perfil fixo em todos os caminhos que antes podiam escolher outro, com componente em `custom/slicing/fixedPrinter.tsx`. Os ganchos no modal também removem o filtro de impressora e preservam as escolhas de processo e filamento compatíveis. |
+
+## Câmera nativa no menu da impressora
+
+No menu ⋮ do cartão da A1, **Câmera nativa** abre um modal somente sob demanda para quem tem acesso à câmera
+e já tem a câmera externa habilitada. O stream usa o token e a autorização por impressora do Bambuddy.
+A seleção vale só para esse modal. O detector da mesa e o stream padrão continuam usando a configuração existente.
+
+| Gancho upstream | Âncora | Efeito |
+|---|---|---|
+| `frontend/src/pages/PrintersPage.tsx` | `printerActionsMenu` | Chama `useNativeCamera` e monta o item e o modal. |
+| `backend/app/api/routes/camera.py` | `camera_stream` | `native=true` escolhe a câmera integrada pela rota de stream existente, com o mesmo token e broadcaster. |
+
+Interruptores: `localStorage['custom.nativeCamera'] = 'off'` oculta o item.
+`BAMBUDDY_CUSTOM_NATIVE_CAMERA=0` desativa a seleção da câmera nativa na API.
