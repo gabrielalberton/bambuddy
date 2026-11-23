@@ -71,7 +71,8 @@ export function PrinterPrefsChips({
   const key = ['customPrinterPrefs', printerId];
   const { data } = useQuery({ queryKey: key, queryFn: () => printerPrefsApi.get(printerId), refetchInterval: isPrinting ? 5_000 : 30_000 });
 
-  const speedOptions = { ...NATIVE_SPEEDS, ...(data?.ultra_percent ? { [ULTRA_MODE]: data.ultra_percent } : {}) };
+  const speedOptions = { ...NATIVE_SPEEDS };
+  if (data?.ultra_percent) speedOptions[ULTRA_MODE] = data.ultra_percent;
   const speedLabelFor = (percent: number) => {
     const mode = Object.keys(speedOptions).find((key) => speedOptions[Number(key)] === percent);
     return t(mode ? `custom.prefs.speedMode${mode}` : 'custom.prefs.speedCustom', { percent });
