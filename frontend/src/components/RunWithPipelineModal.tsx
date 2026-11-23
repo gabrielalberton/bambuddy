@@ -11,6 +11,7 @@ import {
 import { useToast } from '../contexts/ToastContext';
 import { useSliceJobTracker } from '../contexts/SliceJobTrackerContext';
 import { useUiSettings } from '../hooks/useUiSettings';
+import { FixedSlicePrinter, useA1Nozzle } from '../custom/slicing/fixedPrinter';
 
 // Same source-kind shape SliceModal uses, so the same library-file vs archive
 // distinction flows through eligibility-check, run dispatch, AND the progress
@@ -42,6 +43,9 @@ export function RunWithPipelineModal({ source, onClose }: RunWithPipelineModalPr
     queryKey: ['slicer-pipelines'],
     queryFn: () => api.listSlicerPipelines(),
   });
+  const fixedPrinter = list?.fixed_printer_presets;
+  const nozzle = useA1Nozzle(fixedPrinter);
+  const waitingForNozzle = Boolean(fixedPrinter && !nozzle.diameter);
   const { data: printers } = useQuery({
     queryKey: ['printers'],
     queryFn: () => api.getPrinters(),
@@ -59,7 +63,7 @@ export function RunWithPipelineModal({ source, onClose }: RunWithPipelineModalPr
 
   const runMutation = useMutation({
     mutationFn: ({ pipelineId, force }: { pipelineId: number; force: boolean }) =>
-      api.runPipeline(pipelineId, sourceRef, force, copies),
+      api.runPipeline(pipelineId, sourceRef, force, copies, ...(nozzle.diameter ? [nozzle.diameter] : [])),
     onSuccess: (run) => {
       queryClient.invalidateQueries({ queryKey: ['slicer-pipelines'] });
       queryClient.invalidateQueries({ queryKey: ['pipeline-runs'] });
@@ -84,6 +88,7 @@ export function RunWithPipelineModal({ source, onClose }: RunWithPipelineModalPr
   }, {} as Record<number, PrinterType>);
 
   const handlePick = async (pipeline: SlicerPipeline) => {
+    if (waitingForNozzle) return;
     const hasTarget =
       pipeline.target_printer_id ||
       (pipeline.target_kind === 'printer_class' && pipeline.target_model_class);
@@ -151,6 +156,7 @@ export function RunWithPipelineModal({ source, onClose }: RunWithPipelineModalPr
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 space-y-3">
+          {fixedPrinter && <FixedSlicePrinter options={fixedPrinter} value={nozzle.diameter} onChange={nozzle.select} disabled={checkMutation.isPending || runMutation.isPending || Boolean(picked && report)} />}
           {picked && report ? (
             <ConfirmStep
               pipeline={picked}
@@ -166,6 +172,7 @@ export function RunWithPipelineModal({ source, onClose }: RunWithPipelineModalPr
               pipelines={pipelines}
               printerById={printerById}
               loading={pipelinesLoading || checkMutation.isPending}
+              pickDisabled={waitingForNozzle}
               onPick={handlePick}
               copies={copies}
               maxCopies={maxCopies}
@@ -183,6 +190,7 @@ function PickStep({
   pipelines,
   printerById,
   loading,
+  pickDisabled,
   onPick,
   copies,
   maxCopies,
@@ -192,6 +200,7 @@ function PickStep({
   pipelines: SlicerPipeline[];
   printerById: Record<number, { name: string }>;
   loading: boolean;
+  pickDisabled: boolean;
   onPick: (p: SlicerPipeline) => void;
   copies: number;
   maxCopies: number;
@@ -254,7 +263,7 @@ function PickStep({
                 <button
                   type="button"
                   onClick={() => onPick(p)}
-                  disabled={!hasTarget}
+                  disabled={!hasTarget || pickDisabled}
                   className="w-full text-left px-3 py-2 rounded-md border border-bambu-dark-tertiary bg-bambu-dark/40 hover:bg-bambu-dark-tertiary disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   <div className="flex items-center gap-2">

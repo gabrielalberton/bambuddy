@@ -108,6 +108,7 @@ class SliceRequest(BaseModel):
     printer_preset: PresetRef | None = None
     process_preset: PresetRef | None = None
     filament_preset: PresetRef | None = None
+    a1_nozzle_diameter: str | None = None
 
     # Multi-color: one PresetRef per AMS slot the source plate uses. Order is
     # significant — the slicer matches index-by-index against the plate's

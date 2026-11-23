@@ -29,7 +29,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Body, Depends, HTTPException
 from sqlalchemy import delete, desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -49,6 +49,7 @@ from backend.app.core.permissions import Permission
 from backend.app.core.printer_scope import ALL_PRINTERS, PrinterScope, ensure_model_target_allowed
 from backend.app.core.row_visibility import may_reach_row
 from backend.app.core.websocket import ws_manager
+from backend.app.custom.a1_slicing import fixed_a1_target
 from backend.app.models.archive import PrintArchive
 from backend.app.models.library import LibraryFile
 from backend.app.models.pipeline_run import PipelineJob, PipelineRun
@@ -547,6 +548,7 @@ def _make_orchestration_callable(
     copies: int,
     printer_scope: PrinterScope = ALL_PRINTERS,
     review_required: bool = False,
+    a1_nozzle_diameter: str | None = None,
 ):
     """Returns the async callable that ``slice_dispatch.enqueue`` runs as the
     background slice job. Wraps slice + multi-copy enqueue + state update."""
@@ -590,6 +592,7 @@ def _make_orchestration_callable(
                 # Inside the try: a row with a bed type no slicer knows fails
                 # the run instead of leaving it in "slicing" (#3359).
                 slice_request = await _pipeline_slice_request(session, pipeline, creator_user_id)
+                slice_request.a1_nozzle_diameter = a1_nozzle_diameter
                 slice_response = await slice_and_persist(
                     session,
                     model_bytes=model_bytes,
@@ -795,6 +798,7 @@ async def run_pipeline(
         user=actor,
         printer_scope=printer_scope,
     )
+    fixed_a1_target(body.a1_nozzle_diameter)
 
     # The permission gate answers an API-keyed request with current_user=None,
     # so a pipeline built on Bambu/Orca Cloud presets would have nobody whose
@@ -879,6 +883,7 @@ async def run_pipeline(
         copies=body.copies,
         printer_scope=printer_scope,
         review_required=review_required,
+        a1_nozzle_diameter=body.a1_nozzle_diameter,
     )
     slice_job = await slice_dispatch.enqueue(
         kind="library_file" if src_kind == "library_file" else "archive",
@@ -1126,6 +1131,7 @@ async def retry_failed(
     review_required: bool = QueueReviewRequired,
     db: AsyncSession = Depends(get_db, scope="function"),
     actor: User | ApiKeyActor | None = RequestActor,
+    a1_nozzle_diameter: str | None = Body(default=None, embed=True),
 ):
     """Create a new run with copies = (failed + cancelled count) from the
     parent. Same pipeline, same source. Eligibility re-checked at run time
@@ -1158,6 +1164,7 @@ async def retry_failed(
     body = PipelineRunCreateRequest(
         source_library_file_id=parent.source_library_file_id,
         source_archive_id=parent.source_archive_id,
+        a1_nozzle_diameter=a1_nozzle_diameter,
         copies=fail_count,
         force=True,  # operator already accepted eligibility on the parent
     )

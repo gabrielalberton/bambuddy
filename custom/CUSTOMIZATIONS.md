@@ -528,16 +528,17 @@ Ver [prévia e perfil leve](docs/camera-previa.md).
 
 ## Fatiamento fixo na A1
 
-- `BAMBUDDY_CUSTOM_A1_SLICING=1` usa o perfil Bambu Lab A1 do fatiador com o diâmetro informado pela A1. Sem leitura do bico, vale o padrão de 0,4 mm. O modelo A1 Mini é distinto. O diálogo exibe o perfil em leitura e usa sua compatibilidade para processo, filamento e pipelines.
-- O servidor substitui o perfil de máquina enviado por qualquer cliente. As configurações embutidas só entram no fatiamento e na recuperação de falhas quando o 3MF identifica a A1 com o mesmo bico. Confere o perfil do resultado antes que ele seja salvo na biblioteca ou em Impressos, inclusive quando vem de um pipeline.
+- `BAMBUDDY_CUSTOM_A1_SLICING=1` fixa o modelo na Bambu Lab A1 e exige escolher 0,2 ou 0,4 mm toda vez que se fatia. O diâmetro da operação seleciona o perfil oficial e a compatibilidade de processo, filamento e pipelines.
+- O servidor exige `a1_nozzle_diameter` antes de criar o trabalho e monta o perfil de máquina. Valida o resultado antes de gravá-lo e usa as configurações embutidas ou de recuperação somente quando o 3MF já identifica o mesmo modelo e bico. A escolha vale para o próximo fatiamento, inclusive na execução e nas novas tentativas de pipelines.
 - A análise preliminar dos filamentos de projetos para outras impressoras lê os slots do projeto. O fatiamento efetivo aplica o perfil da A1. A opção é configurada no servidor para valer também para clientes com a interface antiga em cache.
 
 | Arquivo | Âncora | Efeito |
 |---|---|---|
-| `backend/app/api/routes/library.py` | `_run_slicer_with_fallback` | Aplica e valida o alvo em `backend/app/custom/a1_slicing.py` no caminho usado por biblioteca, arquivos e pipelines. |
-| `backend/app/api/routes/slicer_presets.py` e `backend/app/schemas/slicer_presets.py` | listagem e resposta de presets | Informa à UI o perfil fixado pelo servidor. |
+| `backend/app/api/routes/library.py` e `archives.py` | rotas de fatiamento e `_run_slicer_with_fallback` | Exige o diâmetro nos endpoints e valida o alvo em `backend/app/custom/a1_slicing.py`. Impressos registra o bico encontrado no 3MF novo. |
+| `backend/app/api/routes/slicer_presets.py`, `slicer_pipelines.py` e schemas correspondentes | listagens | Expõem os perfis de máquina permitidos por diâmetro. |
+| `backend/app/api/routes/pipeline_runs.py` e `backend/app/schemas/{pipeline_run,slicer}.py` | criação, nova tentativa e requisição de fatiamento | Validam o valor explícito antes de enfileirar e repassam a escolha ao trabalho. |
 | `backend/app/services/slice_preview.py` | entrada de `get_preview_filaments` | Usa os metadados de projetos para outras impressoras. |
-| `frontend/src/components/SliceModal.tsx` e `frontend/src/api/client.ts` | estado do preset, filtro, pipeline e campo de máquina | Usa o perfil fixo em todos os caminhos que antes podiam escolher outro, com componente em `custom/slicing/fixedPrinter.tsx`. Os ganchos no modal também removem o filtro de impressora e preservam as escolhas de processo e filamento compatíveis. |
+| `frontend/src/components/SliceModal.tsx`, `RunWithPipelineModal.tsx`, `pages/PipelineRunsPage.tsx` e `api/client.ts` | estado do preset, envio e nova tentativa | Montam o seletor de bico em `custom/slicing/` e usam a escolha para habilitar a ação e selecionar os perfis compatíveis. `SliceModal` toca mais de dez linhas porque o perfil alimenta os efeitos de seleção, o corpo da requisição e o filtro de pipelines. |
 
 ## Câmera nativa no menu da impressora
 

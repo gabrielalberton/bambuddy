@@ -4398,7 +4398,7 @@ async def _run_slicer_with_fallback(
         get_stall_timeout_seconds,
     )
 
-    fixed_printer = await fixed_a1_target(db)
+    fixed_printer = fixed_a1_target(request.a1_nozzle_diameter)
     allow_embedded = fixed_printer is None or fixed_printer.can_use_embedded(model_bytes, model_filename)
     if fixed_printer is not None:
         request = fixed_printer.apply(request, allow_embedded)
@@ -5312,7 +5312,7 @@ async def slice_and_persist_as_archive(
         filament_type=new_filament_type,
         filament_color=new_filament_color,
         layer_height=source_archive.layer_height,
-        nozzle_diameter=source_archive.nozzle_diameter,
+        nozzle_diameter=parsed_metadata.get("nozzle_diameter") or source_archive.nozzle_diameter,
         # The re-sliced output is for whatever printer the user just picked,
         # not the source archive's printer — read the model the slicer baked
         # into the new 3MF, falling back to the source only if it's absent.
@@ -5369,6 +5369,7 @@ async def slice_library_file(
     slice runs in the background, the caller polls `GET /slice-jobs/{id}`.
     """
     from backend.app.core.database import async_session
+    from backend.app.custom.a1_slicing import fixed_a1_target
     from backend.app.services.slice_dispatch import (
         http_exception_to_job_error,
         slice_dispatch,
@@ -5384,6 +5385,7 @@ async def slice_library_file(
     # owner (RequestActor); only auth off keeps can_read_all=True.
     can_read_all = actor is None or actor.has_permission(Permission.LIBRARY_READ_ALL.value)
     lib_file = _ensure_library_file_visible(lib_file, actor, can_read_all)
+    fixed_a1_target(request.a1_nozzle_diameter)
 
     src_lower = (lib_file.filename or "").lower()
     if src_lower.endswith(".step") or src_lower.endswith(".stp"):

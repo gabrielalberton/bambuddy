@@ -8,18 +8,13 @@ import re
 import zipfile
 from dataclasses import dataclass
 from io import BytesIO
-from typing import TYPE_CHECKING
 
 from fastapi import HTTPException
-from sqlalchemy import select
 
-from backend.app.models.printer import Printer
+from backend.app.custom.printer_prefs.router import NOZZLE_OPTIONS
 from backend.app.schemas.slicer import PresetRef, SliceRequest
 from backend.app.utils.printer_models import normalize_printer_model, normalize_printer_model_id
 from backend.app.utils.slicer_strings import first_slicer_string
-
-if TYPE_CHECKING:
-    from sqlalchemy.ext.asyncio import AsyncSession
 
 _PROJECT_SETTINGS = "Metadata/project_settings.config"
 _PLATE_GCODE = re.compile(r"Metadata/plate_\d+\.gcode", re.IGNORECASE)
@@ -126,15 +121,16 @@ class A1SliceTarget:
         )
 
 
-async def fixed_a1_target(db: AsyncSession) -> A1SliceTarget | None:
+def fixed_a1_presets() -> dict[str, PresetRef] | None:
     if not enabled():
         return None
+    return {diameter: A1SliceTarget(diameter).preset for diameter in NOZZLE_OPTIONS}
 
-    from backend.app.services.printer_manager import printer_manager
-    from backend.app.services.slot_nozzle import DEFAULT_NOZZLE_DIAMETER, nozzle_diameter_for_extruder
 
-    printers = await db.execute(select(Printer.id, Printer.model).where(Printer.is_active).order_by(Printer.id))
-    printer_id = next((row.id for row in printers if is_a1(row.model)), None)
-    status = printer_manager.get_status(printer_id) if printer_id is not None else None
-    diameter = _nozzle_diameter(nozzle_diameter_for_extruder(status, None, "A1"))
-    return A1SliceTarget(diameter or DEFAULT_NOZZLE_DIAMETER)
+def fixed_a1_target(diameter: str | None) -> A1SliceTarget | None:
+    if not enabled():
+        return None
+    if diameter is None or diameter not in NOZZLE_OPTIONS:
+        options = " ou ".join(f"{size.replace('.', ',')} mm" for size in NOZZLE_OPTIONS)
+        raise HTTPException(422, f"Escolha o bico de {options} da Bambu Lab A1 para fatiar.")
+    return A1SliceTarget(diameter)

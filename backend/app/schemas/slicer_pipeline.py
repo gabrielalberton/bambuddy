@@ -100,3 +100,4 @@ class SlicerPipelineListResponse(BaseModel):
     surfaced in PR B+ (e.g. a ``meta`` field for last-run timestamps)."""
 
     pipelines: list[SlicerPipelineResponse] = []
+    fixed_printer_presets: dict[str, PresetRef] | None = None

@@ -5702,6 +5702,7 @@ async def slice_archive(
     """
     from backend.app.api.routes.library import guard_nozzle_class_reslice, slice_and_persist_as_archive
     from backend.app.core.database import async_session
+    from backend.app.custom.a1_slicing import fixed_a1_target
     from backend.app.services.slice_dispatch import (
         http_exception_to_job_error,
         slice_dispatch,
@@ -5719,6 +5720,7 @@ async def slice_archive(
     from backend.app.api.routes.print_queue import _assert_can_queue_archive
 
     await _assert_can_queue_archive(archive, actor, printer_scope)
+    fixed_a1_target(request.a1_nozzle_diameter)
 
     src_relative = archive.source_3mf_path or archive.file_path
     if not src_relative:

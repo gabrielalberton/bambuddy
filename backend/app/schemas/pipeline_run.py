@@ -88,6 +88,7 @@ class PipelineRunCreateRequest(BaseModel):
 
     source_library_file_id: int | None = None
     source_archive_id: int | None = None
+    a1_nozzle_diameter: str | None = None
     copies: int = Field(default=1, ge=1, le=1000)
     force: bool = Field(
         default=False,

@@ -2028,6 +2028,7 @@ export interface SliceRequest {
   printer_preset?: PresetRef;
   process_preset?: PresetRef;
   filament_preset?: PresetRef;
+  a1_nozzle_diameter?: string;
   // Multi-color: one PresetRef per plate slot, in plate order. Always
   // preferred over the singular `filament_preset` when both are sent; the
   // backend validator promotes a singular into a one-element list when this
@@ -2149,7 +2150,7 @@ export interface UnifiedPresetsResponse {
   // Standard presets that Bambu Cloud's stock list also has are left out of
   // the standard tier (#3386); each "standard:<id>" maps to its cloud twin.
   stock_aliases?: Record<string, PresetRef>;
-  fixed_printer_preset?: PresetRef | null;
+  fixed_printer_presets?: Record<string, PresetRef> | null;
 }
 
 // Slicer Pipelines (#1425) — named bundles of preset slots the SliceModal
@@ -2190,6 +2191,7 @@ export type SlicerPipelineUpdateRequest = Partial<SlicerPipelineCreateRequest> &
 };
 export interface SlicerPipelinesListResponse {
   pipelines: SlicerPipeline[];
+  fixed_printer_presets?: Record<string, PresetRef> | null;
 }
 
 // Slicer Pipeline runs (#1425 PR B + PR C)
@@ -8580,6 +8582,7 @@ export const api = {
     source: { kind: 'libraryFile'; id: number } | { kind: 'archive'; id: number },
     force = false,
     copies = 1,
+    a1NozzleDiameter?: string,
   ) =>
     request<PipelineRun>(`/slicer-pipelines/${pipelineId}/run`, {
       method: 'POST',
@@ -8589,6 +8592,7 @@ export const api = {
           : { source_archive_id: source.id }),
         force,
         copies,
+        a1_nozzle_diameter: a1NozzleDiameter,
       }),
     }),
   listPipelineRuns: (pipelineId: number, limit = 5) =>
@@ -8623,8 +8627,11 @@ export const api = {
     request<{ deleted: number }>('/pipeline-runs/clear', { method: 'POST' }),
   cancelPipelineRun: (runId: number) =>
     request<PipelineRun>(`/pipeline-runs/${runId}/cancel`, { method: 'POST' }),
-  retryFailedPipelineRun: (runId: number) =>
-    request<PipelineRun>(`/pipeline-runs/${runId}/retry-failed`, { method: 'POST' }),
+  retryFailedPipelineRun: (runId: number, a1NozzleDiameter?: string) =>
+    request<PipelineRun>(`/pipeline-runs/${runId}/retry-failed`, {
+      method: 'POST',
+      ...(a1NozzleDiameter ? { body: JSON.stringify({ a1_nozzle_diameter: a1NozzleDiameter }) } : {}),
+    }),
 
   // Canonical Bambu printer-model registry — "Bambu Lab <model>" → short code.
   // Single source of truth shared with backend (PRINTER_MODEL_MAP); the

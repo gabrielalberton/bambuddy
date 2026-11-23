@@ -18,6 +18,7 @@ from backend.app.core.auth import RequirePermissionIfAuthEnabled
 from backend.app.core.database import get_db
 from backend.app.core.permissions import Permission
 from backend.app.core.printer_scope import ensure_printers_exist
+from backend.app.custom.a1_slicing import fixed_a1_presets
 from backend.app.models.slicer_pipeline import SlicerPipeline
 from backend.app.models.user import User
 from backend.app.schemas.slicer import PresetRef
@@ -73,7 +74,7 @@ async def list_pipelines(
         select(SlicerPipeline).where(SlicerPipeline.is_deleted.is_(False)).order_by(SlicerPipeline.id.desc())
     )
     rows = result.scalars().all()
-    return SlicerPipelineListResponse(pipelines=[_to_response(r) for r in rows])
+    return SlicerPipelineListResponse(pipelines=[_to_response(r) for r in rows], fixed_printer_presets=fixed_a1_presets())
 
 
 @router.post("/", response_model=SlicerPipelineResponse, status_code=201)

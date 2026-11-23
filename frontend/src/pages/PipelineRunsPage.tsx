@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { api, type PipelineRun, type Printer, type SlicerPipeline } from '../api/client';
 import { useToast } from '../contexts/ToastContext';
+import { RetryPipelineNozzleDialog } from '../custom/slicing/RetryPipelineNozzleDialog';
 
 type DropdownOption = { value: string; label: string; group?: string };
 
@@ -55,6 +56,7 @@ export function PipelineRunsView() {
   const [offset, setOffset] = useState(0);
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
   const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const [retryRunId, setRetryRunId] = useState<number | null>(null);
 
   const { data: pipelines } = useQuery({
     queryKey: ['slicer-pipelines'],
@@ -106,8 +108,10 @@ export function PipelineRunsView() {
   });
 
   const retryMutation = useMutation({
-    mutationFn: (runId: number) => api.retryFailedPipelineRun(runId),
+    mutationFn: ({ runId, diameter }: { runId: number; diameter?: string }) =>
+      api.retryFailedPipelineRun(runId, ...(diameter ? [diameter] : [])),
     onSuccess: () => {
+      setRetryRunId(null);
       queryClient.invalidateQueries({ queryKey: ['pipeline-runs-all'] });
       showToast(t('pipelineRuns.toast.retryStarted', 'Retry started'), 'success');
     },
@@ -351,7 +355,7 @@ export function PipelineRunsView() {
               expanded={expanded.has(run.id)}
               onToggle={() => toggle(run.id)}
               onCancel={() => cancelMutation.mutate(run.id)}
-              onRetry={() => retryMutation.mutate(run.id)}
+              onRetry={() => pipelines?.fixed_printer_presets ? setRetryRunId(run.id) : retryMutation.mutate({ runId: run.id })}
               cancelling={cancelMutation.isPending}
               retrying={retryMutation.isPending}
             />
@@ -359,6 +363,10 @@ export function PipelineRunsView() {
         </div>
       )}
 
+      {retryRunId !== null && pipelines?.fixed_printer_presets && (
+        <RetryPipelineNozzleDialog options={pipelines.fixed_printer_presets} pending={retryMutation.isPending}
+          onClose={() => setRetryRunId(null)} onRetry={(diameter) => retryMutation.mutate({ runId: retryRunId, diameter })} />
+      )}
       {!isLoading && total > PAGE_LIMIT && (
         <div className="flex items-center justify-between mt-4 text-sm">
           <button
