@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import math
 import os
 import pathlib
 import time
@@ -37,6 +38,7 @@ router = APIRouter(prefix="/custom/twin", tags=["custom-twin"])
 
 RECHECK_SECONDS = 30.0
 HEARTBEAT_SECONDS = 12.0
+_visual_lock = asyncio.Lock()
 
 
 def enabled() -> bool:
@@ -113,6 +115,36 @@ async def twin_model(printer_id: int, _: StreamOpener = RequireCameraStreamToken
     if not p.is_file():
         raise HTTPException(404, "No A1 model installed")
     return FileResponse(p, media_type="model/gltf-binary", headers={"Cache-Control": "private, max-age=86400"})
+
+
+@router.get("/stream/{printer_id}/visual-check")
+async def twin_visual_check(
+    printer_id: int,
+    _: StreamOpener = RequireCameraStreamTokenIfAuthEnabled,
+    x: float | None = None,
+    y: float | None = None,
+    z: float | None = None,
+):
+    """Compara a pose do twin com duas imagens da câmera quando existe uma referência local."""
+    from backend.app.custom.camera_preview import preview_url, read_preview
+
+    from .visual_route import compare_previews
+
+    await _printer_or_404(printer_id)
+    profile = data_dir() / "visual" / str(printer_id) / "profile.json"
+    if not profile.is_file() or preview_url(printer_id) is None:
+        raise HTTPException(404, "Visual reference unavailable")
+    if (x, y, z) == (None, None, None):
+        return {"available": True}
+    if any(value is None or not math.isfinite(value) for value in (x, y, z)):
+        raise HTTPException(422, "Expected a finite XYZ pose")
+    if _visual_lock.locked():
+        return {"comparison": "unknown"}
+    async with _visual_lock:
+        first = await read_preview(printer_id)
+        await asyncio.sleep(1.2)
+        second = await read_preview(printer_id)
+        return await asyncio.to_thread(compare_previews, profile, first, second, (x, y, z))
 
 
 @router.get("/{printer_id}/health")

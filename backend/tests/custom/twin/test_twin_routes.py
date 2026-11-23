@@ -52,7 +52,7 @@ async def _camera_token(client: AsyncClient, jwt: str) -> str:
 def test_routes_are_get_only_and_before_spa_catch_all():
     paths = [getattr(r, "path", "") for r in app.router.routes]
     twin = [r for r in app.router.routes if getattr(r, "path", "").startswith(BASE)]
-    assert len(twin) == 4
+    assert len(twin) == 5
     for r in twin:
         assert r.methods <= {"GET", "HEAD"}, r.path
         assert paths.index(r.path) < paths.index("/{full_path:path}")
@@ -83,6 +83,19 @@ async def test_model_glb_optional(async_client: AsyncClient, printer_factory, tm
     assert r.status_code == 200 and r.content.startswith(b"glTF") and r.headers["content-type"] == "model/gltf-binary"
 
 
+async def test_visual_check_is_opt_in_and_validates_pose(async_client, printer_factory, tmp_path, monkeypatch):
+    p = await printer_factory(model="A1")
+    url = f"{BASE}/stream/{p.id}/visual-check"
+    monkeypatch.setenv("BAMBUDDY_CUSTOM_CAMERA_PREVIEW_URL", "http://example.invalid/latest.jpg")
+    assert (await async_client.get(url)).status_code == 404
+    profile = tmp_path / "visual" / str(p.id) / "profile.json"
+    profile.parent.mkdir(parents=True)
+    profile.write_text("{}")
+    assert (await async_client.get(url)).json() == {"available": True}
+    assert (await async_client.get(url, params={"x": 128, "y": 128})).status_code == 422
+    assert (await async_client.get(url, params={"x": "nan", "y": 128, "z": 5})).status_code == 422
+
+
 async def test_job_404_until_ready(async_client: AsyncClient, printer_factory):
     p = await printer_factory(model="A1")
     assert (await async_client.get(f"{BASE}/stream/{p.id}/job/abc")).status_code == 404
@@ -97,7 +110,7 @@ async def test_auth_on_requires_camera_token_or_permission(async_client: AsyncCl
     (tmp_path / "a1.glb").write_bytes(b"glTF")
     admin = await _admin_jwt(async_client)
     # sem nada: 401 em tudo
-    for path in ("stream/{id}/events", "stream/{id}/model.glb", "stream/{id}/job/x", "{id}/health"):
+    for path in ("stream/{id}/events", "stream/{id}/model.glb", "stream/{id}/job/x", "stream/{id}/visual-check", "{id}/health"):
         assert (await async_client.get(f"{BASE}/" + path.format(id=p.id))).status_code == 401, path
     # token lixo
     assert (await async_client.get(f"{BASE}/stream/{p.id}/model.glb?token=lixo")).status_code == 401

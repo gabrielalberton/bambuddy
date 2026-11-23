@@ -14,3 +14,6 @@
 .custom-camera-pair[data-layout='split'] [title='Reset zoom'],
 .custom-camera-pair[data-layout='twin'] [data-pane='camera'] [title^='Zoom'],
 .custom-camera-pair[data-layout='twin'] [data-pane='camera'] [title='Reset zoom'] { display: none; }
+/* No PiP, o controle cabe somente na cena 3D maior. */
+.custom-camera-pair[data-layout='camera'] .custom-twin-visual-check { display: none; }
+.custom-camera-pair[data-layout='twin'] .custom-twin-visual-check { left: 58px; right: auto; align-items: flex-start; }

@@ -36,6 +36,7 @@ export interface TwinStats {
 
 export interface TwinHandle {
   stats: TwinStats;
+  getIdlePose(): { x: number; y: number; z: number } | null;
   dispose(): void;
   debug: unknown;
 }

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { withStreamToken } from '../../api/client';
 import { createTwin, type TwinHandle, type MotionStatus } from './engine/engine.js';
 import { useTwinStrings } from './i18n';
+import { VisualCheck } from './VisualCheck';
 
 const BASE = '/api/v1/custom/twin/stream';
 const stop = (e: { stopPropagation: () => void }) => e.stopPropagation();
@@ -18,6 +19,7 @@ export interface DigitalTwinViewProps {
  */
 export default function DigitalTwinView({ printerId, className = '' }: DigitalTwinViewProps) {
   const ref = useRef<HTMLDivElement | null>(null);
+  const twin = useRef<TwinHandle | null>(null);
   const [failed, setFailed] = useState(false);
   const [motionStatus, setMotionStatus] = useState<MotionStatus>('unknown');
   const s = useTwinStrings();
@@ -39,19 +41,20 @@ export default function DigitalTwinView({ printerId, className = '' }: DigitalTw
         procedural: q.get('twinModel') === 'procedural',
         tuning: { lead: Number(q.get('twinLead')) || 0 },
       });
+      twin.current = handle;
       setFailed(false);
     } catch (e) {
       // sem WebGL (navegador/GPU): avisa no próprio quadro, sem derrubar a tela da câmera
       console.warn('twin indisponível', e);
       setFailed(true);
     }
-    return () => handle?.dispose();
+    return () => { twin.current = null; handle?.dispose(); };
   }, [printerId]);
 
   return (
     <div
       ref={ref}
-      role="img"
+      role="group"
       aria-label={positionLabel && !failed ? `${s.twinLabel}. ${positionLabel}` : s.twinLabel}
       data-testid="digital-twin-view"
       // gestos são do canvas (girar/zoom do twin): não chegam ao pan/zoom da imagem da câmera no quadro em volta
@@ -64,6 +67,7 @@ export default function DigitalTwinView({ printerId, className = '' }: DigitalTw
       onTouchEnd={stop}
       className={`absolute inset-0 overflow-hidden bg-[#171a21] select-none ${className}`}
     >
+      {!failed && <VisualCheck key={printerId} printerId={printerId} twin={twin} />}
       {!failed && positionLabel && (
         <span className="pointer-events-none absolute bottom-2 left-2 rounded bg-black/70 px-2 py-1 text-xs text-white">
           {positionLabel}

@@ -114,6 +114,11 @@ nos eixos à mão. O botão **Movi à mão** marca a posição como desconhecida
 Falhas devolvidas pela API desfazem o avanço correspondente. Novo homing, perda da telemetria ou início de
 impressão descartam a referência manual. Durante a impressão, a pose vem do estimador de G-code.
 
+## Conferência pela câmera
+
+O quadro 3D pode comparar a pose exibida com a câmera enquanto a A1 está parada, quando há um perfil visual local.
+Veja [a comparação sem marcadores](a1-posicao-optica.md#conferência-visual-sem-marcadores).
+
 ## Modelo 3D da A1 (GLB opcional, NUNCA no git)
 
 O STEP da comunidade (MakerWorld "Bambulab A1 CAD step model", vajojajo) tem **licença desconhecida**: o GLB não vai
