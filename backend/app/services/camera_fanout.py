@@ -93,7 +93,7 @@ class MjpegBroadcaster:
     def stopped(self) -> bool:
         return self._stopped
 
-    async def subscribe(self) -> asyncio.Queue[bytes]:
+    async def subscribe(self, *, replay_latest: bool = True) -> asyncio.Queue[bytes]:
         """Add a subscriber and ensure the upstream pump is running."""
         async with self._lock:
             if self._stopped:
@@ -110,7 +110,7 @@ class MjpegBroadcaster:
             # Prime a late joiner with the last frame so it renders instantly
             # (#2521). The very first subscriber has nothing to prime yet — it
             # starts the pump below.
-            if self._last_chunk is not None:
+            if replay_latest and self._last_chunk is not None:
                 try:
                     queue.put_nowait(self._last_chunk)
                 except asyncio.QueueFull:  # pragma: no cover — fresh queue

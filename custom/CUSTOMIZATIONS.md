@@ -544,7 +544,7 @@ Ver [prévia e perfil leve](docs/camera-previa.md).
 
 No menu ⋮ do cartão da A1, **Câmera nativa** abre um modal somente sob demanda para quem tem acesso à câmera
 e já tem a câmera externa habilitada. O stream usa o token e a autorização por impressora do Bambuddy.
-A seleção vale só para esse modal. O detector da mesa e o stream padrão continuam usando a configuração existente.
+O visor padrão usa a câmera configurada no cartão da impressora.
 O cabeçalho do modal oferece o controle manual da luz da câmara a usuários com `printers:control`, pela API existente.
 
 | Gancho upstream | Âncora | Efeito |
@@ -554,3 +554,17 @@ O cabeçalho do modal oferece o controle manual da luz da câmara a usuários co
 
 Interruptores: `localStorage['custom.nativeCamera'] = 'off'` oculta o item.
 `BAMBUDDY_CUSTOM_NATIVE_CAMERA=0` desativa a seleção da câmera nativa na API.
+
+## Detector de mesa pela câmera nativa
+
+- `BAMBUDDY_CUSTOM_NATIVE_PLATE_DETECTION=1` captura os exemplos e faz a verificação manual e automática pela câmera integrada. Registra referências e área de detecção em `plate_calibration/native-camera/`. As calibrações e a área da câmera anterior voltam a valer se desativar a opção. É preciso cadastrar a mesa vazia para a câmera nativa.
+- O servidor abre a câmera antes de acender a luz e libera a luz assim que recebe o primeiro quadro iluminado. A captura observa o brilho e, quando o ambiente já está claro, a confirmação de luz ligada no MQTT. A última captura devolve a luz ao estado anterior, inclusive em caso de erro ou cancelamento. Uma captura seguida de outra aguarda o novo relatório do desligamento antes de verificar a luz. Um visor que já detém a luz mantém seu controle. O detector aguarda um quadro novo do mesmo stream usado pelo visor nativo. A notificação de objetos reutiliza a própria foto da análise.
+
+| Gancho upstream | Âncora | Efeito |
+|---|---|---|
+| `backend/app/services/plate_detection.py` | caminho das referências, captura e análise | Usa as referências da câmera selecionada e chama `backend/app/custom/native_plate_detection.py` para capturar. Aplica o diretório único nas operações de criar, listar, alterar e remover referências. São mais de dez linhas porque o upstream usa o diretório diretamente em cada operação. |
+| `backend/app/services/camera_light.py` e `camera_fanout.py` | `camera_light`, `MjpegBroadcaster.subscribe` | Permitem apagar a luz ao liberar a última captura e aguardar um frame sem repetir o anterior. A gerência de luz fica no serviço existente para compartilhar seus detentores e o controle manual. |
+| `backend/app/services/bambu_mqtt.py` | `lights_report` | Registra a hora do relatório de luz para distinguir a resposta à captura anterior. |
+| `backend/app/main.py` | `on_print_start` | Delega o controle da luz à captura nativa e usa a imagem dela no alerta existente. |
+| `backend/app/api/routes/camera.py`, `printers.py` e `backend/app/schemas/printer.py` | verificação, calibração e atualização da área | Informam o modo ao frontend, retornam a área correspondente e gravam a área nativa sem sobrescrever a anterior. |
+| `frontend/src/pages/PrintersPage.tsx` e `frontend/src/api/client.ts` | modal de calibração e gerenciamento da luz | Usam o controle do servidor no modo nativo e exibem a foto da câmera na primeira calibração. A rolagem usa `ScrollableModalOverlay`. |

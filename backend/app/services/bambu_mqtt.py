@@ -1268,6 +1268,7 @@ class PrinterState:
     speed_level: int = 2
     # Chamber light on/off
     chamber_light: bool = False
+    chamber_light_report_at: float = 0.0
     # Active extruder for dual nozzle (0=right, 1=left) - from device.extruder.info[X].hnow
     active_extruder: int = 0
     # Currently loaded tray (global ID): 254/255 = external spools, 255 = no filament on legacy printers
@@ -5869,6 +5870,7 @@ class BambuMQTTClient:
                                 f"[{self.serial_number}] chamber_light changed: {self.state.chamber_light} -> {new_light_state}"
                             )
                         self.state.chamber_light = new_light_state
+                        self.state.chamber_light_report_at = time.monotonic()
                         break
 
         # Parse nozzle hardware info (single nozzle printers)

@@ -501,6 +501,11 @@ async def update_printer(
                 "Moving this printer to another location changes which groups can access it. Only an admin can do that.",
             )
 
+    from backend.app.custom.native_plate_detection import save_native_plate_roi
+
+    if "plate_detection_roi" in update_data and save_native_plate_roi(printer_id, update_data["plate_detection_roi"]):
+        update_data.pop("plate_detection_roi")
+
     # Handle nested ROI object - flatten to individual columns
     if "plate_detection_roi" in update_data:
         roi = update_data.pop("plate_detection_roi")

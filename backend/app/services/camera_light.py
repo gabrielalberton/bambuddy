@@ -47,8 +47,11 @@ _MODES = frozenset({"off", "all", "selected"})
 # A light we switched on can still read as off until the printer reports back.
 # Within this window we trust our own command instead of sending another.
 _REPORT_LAG_SECONDS = 5.0
+_FLASH_OFF_REPORT_TIMEOUT_SECONDS = 7.0
 
 _holders: dict[int, int] = {}
+_flash_owned: set[int] = set()
+_flash_off_at: dict[int, float] = {}
 _lit_at: dict[int, float] = {}  # printers whose light we turned on, and when
 _off_tasks: dict[int, asyncio.Task] = {}
 _settings_cache: tuple[float, str, float] | None = None  # (read at, mode, delay)
@@ -103,13 +106,40 @@ def _get_client(printer_id: int):
     return printer_manager.get_client(printer_id)
 
 
+def chamber_light_is_on(printer_id: int) -> bool:
+    client = _get_client(printer_id)
+    return bool(client and client.state and client.state.connected and client.state.chamber_light)
+
+
+async def wait_for_previous_flash(printer_id: int) -> bool:
+    """Wait for a fresh report that the previous flash was turned off."""
+    off_at = _flash_off_at.get(printer_id)
+    if off_at is None:
+        return True
+    while _flash_off_at.get(printer_id) == off_at:
+        client = _get_client(printer_id)
+        state = client.state if client is not None else None
+        if state is None or not state.connected:
+            return False
+        if state.chamber_light_report_at >= off_at and not state.chamber_light:
+            _flash_off_at.pop(printer_id, None)
+            return True
+        remaining = off_at + _FLASH_OFF_REPORT_TIMEOUT_SECONDS - time.monotonic()
+        if remaining <= 0:
+            # A physical light switch can follow our off command. A fresh on
+            # report lets the next capture use that light without owning it.
+            return state.chamber_light_report_at >= off_at
+        await asyncio.sleep(min(0.1, remaining))
+    return True
+
+
 def _cancel_off(printer_id: int) -> None:
     task = _off_tasks.pop(printer_id, None)
     if task is not None and not task.done():
         task.cancel()
 
 
-def _acquire(printer_id: int) -> float | None:
+def _acquire(printer_id: int, *, flash: bool = False) -> float | None:
     """Hold the light. Returns when it was turned on, or None if it was already on.
 
     The hold is counted before anything can fail, so the caller always releases.
@@ -117,11 +147,15 @@ def _acquire(printer_id: int) -> float | None:
     _holders[printer_id] = _holders.get(printer_id, 0) + 1
     _cancel_off(printer_id)
 
+    if not flash:
+        _flash_owned.discard(printer_id)
     client = _get_client(printer_id)
-    if client is None or client.state is None or client.state.chamber_light:
+    if client is None or client.state is None:
         return None
 
     lit_at = _lit_at.get(printer_id)
+    if client.state.chamber_light:
+        return lit_at if flash and printer_id in _flash_owned else None
     if lit_at is not None and time.monotonic() - lit_at < _REPORT_LAG_SECONDS:
         return lit_at  # our "on" hasn't been reported yet
 
@@ -130,6 +164,8 @@ def _acquire(printer_id: int) -> float | None:
     logger.info("[CAMERA-LIGHT] Turned on chamber light for printer %s", printer_id)
     now = time.monotonic()
     _lit_at[printer_id] = now
+    if flash and _holders[printer_id] == 1:
+        _flash_owned.add(printer_id)
     return now
 
 
@@ -141,6 +177,9 @@ def _release(printer_id: int) -> None:
     _holders.pop(printer_id, None)
     if printer_id in _lit_at:
         _cancel_off(printer_id)
+        if printer_id in _flash_owned:
+            _turn_off(printer_id)
+            return
         try:
             _off_tasks[printer_id] = asyncio.create_task(_turn_off_later(printer_id))
         except RuntimeError:
@@ -155,13 +194,22 @@ async def _turn_off_later(printer_id: int) -> None:
     except asyncio.CancelledError:
         return
     _off_tasks.pop(printer_id, None)
+    _turn_off(printer_id)
+
+
+def _turn_off(printer_id: int) -> None:
     if _holders.get(printer_id) or _lit_at.pop(printer_id, None) is None:
         return
+    flash = printer_id in _flash_owned
+    _flash_owned.discard(printer_id)
     client = _get_client(printer_id)
     if client is None:
         return
     try:
+        off_at = time.monotonic() if flash else None
         if client.set_chamber_light(False):
+            if off_at is not None:
+                _flash_off_at[printer_id] = off_at
             logger.info("[CAMERA-LIGHT] Turned chamber light back off for printer %s", printer_id)
     except Exception as e:
         logger.warning("[CAMERA-LIGHT] Failed to turn chamber light off for printer %s: %s", printer_id, e)
@@ -170,13 +218,15 @@ async def _turn_off_later(printer_id: int) -> None:
 def hand_back(printer_id: int) -> None:
     """The user switched the light: it is theirs now, so never turn it off."""
     _lit_at.pop(printer_id, None)
+    _flash_owned.discard(printer_id)
+    _flash_off_at.pop(printer_id, None)
     _cancel_off(printer_id)
 
 
 @asynccontextmanager
 async def camera_light(
-    printer, *, wait: bool = True, any_mode: bool = False, settle: float | None = None
-) -> AsyncIterator[None]:
+    printer, *, wait: bool = True, any_mode: bool = False, settle: float | None = None, flash: bool = False
+) -> AsyncIterator[float | None]:
     """Keep the printer's chamber light on while the camera is in use.
 
     ``wait`` makes a snapshot wait the ``camera_light_delay`` setting after
@@ -187,11 +237,15 @@ async def camera_light(
     replaces the delay setting: the plate check needs a lit plate on every
     printer, and holding the light here rather than switching it itself keeps
     it from switching the light off under a viewer who came meanwhile (SP-C11).
+
+    A flash reports when it requested the light, so the capture can wait for
+    the first illuminated frame. It skips the off grace if only flashes held
+    the light.
     """
     if printer is None:
         yield
         return
-    mode, delay = await _light_settings()
+    mode, delay = ("all", 0.0) if any_mode and not wait else await _light_settings()
     if settle is not None:
         delay = settle
     if not any_mode and (
@@ -203,7 +257,7 @@ async def camera_light(
     printer_id = printer.id
     try:
         try:
-            lit_at = _acquire(printer_id)
+            lit_at = _acquire(printer_id, flash=flash)
         except Exception as e:
             # A light we can't switch must never cost the picture.
             logger.warning("[CAMERA-LIGHT] Failed to turn chamber light on for printer %s: %s", printer_id, e)
@@ -212,6 +266,6 @@ async def camera_light(
             remaining = delay - (time.monotonic() - lit_at)
             if remaining > 0:
                 await asyncio.sleep(remaining)
-        yield
+        yield lit_at if flash else None
     finally:
         _release(printer_id)

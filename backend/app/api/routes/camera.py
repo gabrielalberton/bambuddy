@@ -34,6 +34,7 @@ from backend.app.core.auth import (
 from backend.app.core.database import get_db
 from backend.app.core.permissions import Permission
 from backend.app.custom.native_camera import use_native_camera
+from backend.app.custom.native_plate_detection import native_plate_check_enabled, native_plate_roi
 from backend.app.models.api_key import APIKey
 from backend.app.models.printer import Printer
 from backend.app.models.user import User
@@ -1951,7 +1952,7 @@ async def check_plate_empty(
     # Check chamber light status
     light_warning = False
     state = printer_manager.get_status(printer_id)
-    if state and not state.chamber_light:
+    if not native_plate_check_enabled() and state and not state.chamber_light:
         light_warning = True
 
     from backend.app.services.plate_detection import PlateDetector
@@ -1995,6 +1996,7 @@ async def check_plate_empty(
     response["light_warning"] = light_warning
     response["reference_count"] = ref_count
     response["max_references"] = detector.MAX_REFERENCES
+    roi = native_plate_roi(printer_id, roi)
     # Include current ROI in response
     if roi:
         response["roi"] = {"x": roi[0], "y": roi[1], "w": roi[2], "h": roi[3]}
@@ -2067,7 +2069,7 @@ async def calibrate_plate_detection(
 
     # Check chamber light - warn but don't block
     state = printer_manager.get_status(printer_id)
-    light_warning = state and not state.chamber_light
+    light_warning = not native_plate_check_enabled() and state and not state.chamber_light
 
     success, message, index = await calibrate_plate(
         printer_id=printer.id,

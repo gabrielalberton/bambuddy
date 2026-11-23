@@ -488,6 +488,7 @@ export interface Printer {
   camera_rotation: number;  // 0, 90, 180, 270 degrees
   camera_light_auto: boolean;  // picked for the chamber light when camera_light_mode is 'selected' (#1655)
   plate_detection_enabled: boolean;  // Check plate before print
+  native_plate_detection?: boolean;
   plate_detection_roi?: PlateDetectionROI;  // ROI for plate detection
   wear_cost_per_hour: number | null;  // Wear cost per printing hour (#694)
   wled_config: WLEDConfig | null;

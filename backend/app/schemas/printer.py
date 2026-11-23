@@ -3,6 +3,7 @@ from urllib.parse import urlparse
 
 from pydantic import BaseModel, Field, field_serializer, field_validator, model_validator
 
+from backend.app.custom.native_plate_detection import native_plate_check_enabled
 from backend.app.schemas.not_null import IgnoresNullForRequiredColumns
 from backend.app.schemas.printer_location import normalize_location_name
 
@@ -211,6 +212,7 @@ class PrinterResponse(PrinterBase):
     camera_rotation: int = 0  # 0, 90, 180, 270 degrees
     camera_light_auto: bool = False  # #1655
     plate_detection_enabled: bool = False
+    native_plate_detection: bool = Field(default_factory=native_plate_check_enabled)
     plate_detection_roi: PlateDetectionROI | None = None
     created_at: datetime
     updated_at: datetime

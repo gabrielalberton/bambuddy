@@ -1,6 +1,7 @@
 // Textos do fork (inglês). Mesclados no i18n do upstream por ./index.ts.
 const en = {
   customFixedSlicePrinter: { chooseNozzle: 'Choose the nozzle' },
+  customNativePlate: { title: 'Build plate check', preview: 'Native camera', calibrate: 'Save empty plate reference' },
   customModelAppearance: {
     label: 'Model appearance', colored: 'Color', white: 'White', previewColors: 'Preview colors',
   },

@@ -92,6 +92,7 @@ import { anchorTwinMotion, hasTwinMovementControls, previewTwinJog, resetTwinMot
 import { useSinglePrinter } from '../custom/useSinglePrinter';
 import { InlineCamera } from '../custom/camera/InlineCamera';
 import { useNativeCamera } from '../custom/camera/NativeCamera';
+import { ScrollableModalOverlay } from '../custom/dialogs/ScrollableModalOverlay';
 import { NozzleSizeBadge, QueueChip } from '../custom/printer/CardExtras';
 import { PrinterPrefsChips } from '../custom/printer/PrinterPrefsChips'; // custom(printer-prefs)
 import { compactCard, isPrintingState } from '../custom/printer/compactCard';
@@ -3371,7 +3372,7 @@ function PrinterCard({
     setPlateCheckResult(null);
 
     // Auto-turn on light if it's off
-    const lightWasOff = status?.chamber_light === false;
+    const lightWasOff = !printer.native_plate_detection && status?.chamber_light === false;
     setPlateCheckLightWasOff(lightWasOff);
     if (lightWasOff) {
       await api.setChamberLight(printer.id, true);
@@ -7072,7 +7073,7 @@ function PrinterCard({
 
       {/* Plate Check Result Modal */}
       {plateCheckResult && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => closePlateCheckModal()}>
+        <ScrollableModalOverlay className="bg-black/50" role="dialog" aria-modal="true" aria-label={t('customNativePlate.title')} onClick={() => closePlateCheckModal()}>
           <div className="bg-bambu-dark-secondary border border-bambu-dark-tertiary rounded-xl shadow-2xl max-w-lg w-full" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between p-4 border-b border-bambu-dark-tertiary">
               <div className="flex items-center gap-2">
@@ -7086,7 +7087,7 @@ function PrinterCard({
                   <XCircle className="w-[var(--pc-i5,1.25rem)] h-[var(--pc-i5,1.25rem)] text-yellow-500" />
                 )}
                 <h2 className="text-lg font-semibold text-white">
-                  Build Plate Check
+                  {t('customNativePlate.title')}
                 </h2>
                 {plateCheckResult.reference_count !== undefined && plateCheckResult.max_references && (
                   <span className="text-xs text-bambu-gray bg-bambu-dark-tertiary px-2 py-1 rounded">
@@ -7114,6 +7115,10 @@ function PrinterCard({
                     <p>{t('printers.plateDetection.calibrationDescription')}</p>
                     <p dangerouslySetInnerHTML={{ __html: t('printers.plateDetection.calibrationTip') }} />
                   </div>
+                  {printer.native_plate_detection && plateCheckResult.debug_image_url && (
+                    <img src={plateCheckResult.debug_image_url} alt={t('customNativePlate.preview')}
+                      className="w-full rounded-lg border border-bambu-dark-tertiary" />
+                  )}
                 </>
               ) : plateCheckResult.failure_reason ? (
                 <div className="p-3 rounded-lg bg-bambu-dark-tertiary border border-bambu-dark-tertiary">
@@ -7330,7 +7335,7 @@ function PrinterCard({
                         Calibrating...
                       </>
                     ) : (
-                      'Calibrate Empty Plate'
+                      printer.native_plate_detection ? t('customNativePlate.calibrate') : 'Calibrate Empty Plate'
                     )}
                   </Button>
                 </>
@@ -7346,7 +7351,7 @@ function PrinterCard({
               )}
             </div>
           </div>
-        </div>
+        </ScrollableModalOverlay>
       )}
 
       {/* Power On Confirmation */}

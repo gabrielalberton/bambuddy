@@ -5105,6 +5105,7 @@ async def on_print_start(printer_id: int, data: dict):
             # archive lookups below re-acquire a fresh connection on next execute.
             await db.commit()
             try:
+                from backend.app.custom.native_plate_detection import native_plate_check_enabled
                 from backend.app.services.plate_detection import check_plate_empty
 
                 # Build ROI tuple from printer settings if available
@@ -5130,7 +5131,8 @@ async def on_print_start(printer_id: int, data: dict):
                 plate_photo_data = None
                 objects_detected = False
                 check_failure: str | None = None
-                async with camera_light(printer, any_mode=True, settle=2.5):
+                native_check = native_plate_check_enabled()
+                async with camera_light(None if native_check else printer, any_mode=True, settle=2.5):
                     logger.info("[PLATE CHECK] Running plate detection for printer %s", printer_id)
                     plate_result = await check_plate_empty(
                         printer_id=printer_id,
@@ -5138,7 +5140,7 @@ async def on_print_start(printer_id: int, data: dict):
                         access_code=printer.access_code,
                         model=printer.model,
                         include_debug_image=False,
-                        external_camera_url=printer.external_camera_url,
+                        external_camera_url=printer.external_camera_url if printer.external_camera_enabled else None,
                         external_camera_type=printer.external_camera_type,
                         use_external=printer.external_camera_enabled,
                         roi=roi,
@@ -5165,7 +5167,10 @@ async def on_print_start(printer_id: int, data: dict):
                         # Snapshot while the light's still on — restoring it first
                         # would leave the notification with a dark photo.
                         try:
-                            plate_photo_data = await _capture_snapshot_for_notification(printer_id, printer, logger)
+                            if native_check:
+                                plate_photo_data = plate_result.captured_frame
+                            else:
+                                plate_photo_data = await _capture_snapshot_for_notification(printer_id, printer, logger)
                         except Exception as snap_err:
                             logger.warning(
                                 "[PLATE CHECK] Failed to capture snapshot for printer %s: %s", printer_id, snap_err

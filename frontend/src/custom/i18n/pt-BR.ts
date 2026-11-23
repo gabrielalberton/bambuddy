@@ -1,6 +1,7 @@
 // Textos do fork (pt-BR). Mesclados no i18n do upstream por ./index.ts.
 const ptBR = {
   customFixedSlicePrinter: { chooseNozzle: 'Escolha o bico' },
+  customNativePlate: { title: 'Verificação da mesa', preview: 'Câmera nativa', calibrate: 'Salvar referência da mesa vazia' },
   customModelAppearance: {
     label: 'Aparência do modelo', colored: 'Colorido', white: 'Branco', previewColors: 'Cores de visualização',
   },
