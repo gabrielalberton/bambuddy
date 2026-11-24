@@ -212,10 +212,13 @@ export function H264Live({ printerId }: { printerId: number }) {
         pendingBytes = 0;
         append(all);
       }
-      if (sb.updating || !sb.buffered.length) return;
-      const { removeUpTo, seekTo, rate } = liveAdjust(sb.buffered.start(0), sb.buffered.end(sb.buffered.length - 1), video.currentTime);
+      // Ajusta o ritmo a cada fragmento, mesmo com outro append em andamento (página ocupada acumula fila);
+      // só a limpeza do buffer espera o SourceBuffer ficar livre.
+      if (!sb.buffered.length) return;
+      const start0 = sb.buffered.start(0);
+      const { removeUpTo, seekTo, rate } = liveAdjust(start0, sb.buffered.end(sb.buffered.length - 1), video.currentTime);
       try {
-        if (removeUpTo !== null) sb.remove(sb.buffered.start(0), removeUpTo);
+        if (removeUpTo !== null && !sb.updating) sb.remove(start0, removeUpTo);
         if (seekTo !== null) video.currentTime = seekTo;
         video.playbackRate = rate;
       } catch {
@@ -328,6 +331,10 @@ export function H264Live({ printerId }: { printerId: number }) {
     zIndex: -1,
     ...(layout.box ?? { left: 0, top: 0, width: '100%', height: '100%' }),
     transform: layout.box ? layout.transform || undefined : undefined,
+    // o preflight do Tailwind põe `max-width: 100%; height: auto` em <video>: com a câmera deitada (90/270) o
+    // retângulo sem rotação é mais largo que o quadro e seria espremido (o <img> do upstream também recebe `none`)
+    maxWidth: 'none',
+    maxHeight: 'none',
     objectFit: 'contain',
     background: 'transparent',
     pointerEvents: 'none',

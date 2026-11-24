@@ -45,6 +45,7 @@ describe('h264: partes puras', () => {
     expect(late.seekTo).toBe(19.5);
     expect(late.rate).toBeCloseTo(0.5);
     expect(liveAdjust(0, 2.5, 0).rate).toBe(2.5);
+    expect(liveAdjust(0, 0.1, 0).rate).toBe(0.5); // abertura: no máximo meia velocidade
   });
 
   it('espera mais a cada falha seguida', () => {

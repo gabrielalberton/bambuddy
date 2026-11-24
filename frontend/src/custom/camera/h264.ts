@@ -66,7 +66,8 @@ export function retryDelayMs(failures: number): number {
 
 /**
  * Mantém o vídeo perto do vivo, como o player do go2rtc: guarda só os últimos 5 s, pula para o começo da janela se
- * ficou para trás e ajusta a velocidade pelo atraso (ritmo 1 com ~1 s de folga). Atraso grande: pula para perto do fim.
+ * ficou para trás e ajusta a velocidade pelo atraso (ritmo 1 com ~1 s de folga, nunca abaixo de 0,5x para a abertura não
+ * parecer câmera lenta). Atraso grande: pula para perto do fim.
  */
 export function liveAdjust(start0: number, end: number, current: number) {
   const keepFrom = end - 5;
@@ -75,7 +76,7 @@ export function liveAdjust(start0: number, end: number, current: number) {
   if (end - current > 3) seekTo = end - 0.5;
   else if (current < keepFrom) seekTo = keepFrom;
   const gap = end - (seekTo ?? current);
-  const rate = Math.min(Math.max(gap, 0.1), 4);
+  const rate = Math.min(Math.max(gap, 0.5), 4);
   return { removeUpTo, seekTo, rate };
 }
 
