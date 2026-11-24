@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from 'react';
+import { useH264Active } from '../camera/h264';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../api/client';
 import { isTwinEnabled, isTwinModel } from './twinFlags';
@@ -65,8 +66,10 @@ export function useTwinAvailable(printerId: number): boolean {
   return isTwinModel(p?.model);
 }
 
-/** Compatibility hook: the camera now remains live even while 3D is the main view. */
+/**
+ * Gancho do upstream que pausa a checagem de travamento do MJPEG (CameraPage/EmbeddedCameraViewer). O 3D não pausa
+ * mais a câmera; quem pausa é o vídeo H.264 (custom/camera/H264Live.tsx), que para o MJPEG de propósito.
+ */
 export function useTwinActive(printerId: number): boolean {
-  void printerId;
-  return false;
+  return useH264Active(printerId);
 }

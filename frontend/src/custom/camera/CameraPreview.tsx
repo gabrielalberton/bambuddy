@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { withStreamToken } from '../../api/client';
 import { cameraPreviewEnabled } from './previewFlags';
+import { STREAM_IMG_SELECTOR } from './h264';
 import { displayedAspect, fitRect, rememberCameraAspect, rotationFromTransform } from './cameraAspect';
 
 /** Intervalo entre imagens da prévia (o Frigate atualiza a ~3 fps). */
@@ -11,7 +12,6 @@ const WATCH_INTERVAL_MS = 120;
 const FADE_MS = 250;
 const MAX_FAILURES = 3;
 
-const STREAM_IMG_SELECTOR = 'img[src*="/camera/stream"]';
 /** Tamanho mínimo para considerar um ancestral como "o quadro" (antes do 1º quadro o contêiner do <img> pode ter 0 px). */
 const MIN_FRAME_PX = 120;
 

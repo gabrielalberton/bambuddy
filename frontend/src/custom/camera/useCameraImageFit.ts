@@ -1,12 +1,13 @@
 import { useEffect, type RefObject } from 'react';
 import { displayedAspect, fitRect, rotationFromTransform } from './cameraAspect';
+import { STREAM_IMG_SELECTOR } from './h264';
 
 /** Size the unrotated image explicitly; max-size alone allows flex to shrink it before CSS rotation. */
 export function useCameraImageFit(root: RefObject<HTMLElement | null>) {
   useEffect(() => {
     let last = '';
     const fit = () => {
-      const img = root.current?.querySelector<HTMLImageElement>('img[alt="Camera stream"], img[src*="/camera/stream"]');
+      const img = root.current?.querySelector<HTMLImageElement>(`img[alt="Camera stream"], ${STREAM_IMG_SELECTOR}`);
       const box = img?.parentElement;
       if (!img || !box) return;
       const rotation = rotationFromTransform(img.style.transform);

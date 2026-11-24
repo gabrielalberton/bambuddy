@@ -1,6 +1,7 @@
 import { lazy, Suspense, useRef, useState, type ReactNode } from 'react';
 import { ArrowLeft } from 'lucide-react';
 import { CameraPreview } from '../camera/CameraPreview';
+import { H264Live } from '../camera/H264Live';
 import { FillParentHeight } from '../camera/FillParentHeight';
 import { useCameraImageFit } from '../camera/useCameraImageFit';
 import { useTwinAvailable } from './useTwinView';
@@ -30,6 +31,7 @@ export function CameraOrTwin({ printerId, className = 'relative w-full h-full', 
       <div className="custom-camera-pane" data-pane="camera">
         {children}
         <CameraPreview printerId={printerId} />
+        <H264Live printerId={printerId} />
         {main !== 'camera' && <button type="button" className="custom-pane-select" aria-label={main ? 'Ampliar câmera e trocar com 3D' : 'Ampliar câmera'} onClick={select('camera')}><span>Câmera</span></button>}
       </div>
       <div className="custom-camera-pane" data-pane="twin">
@@ -40,6 +42,6 @@ export function CameraOrTwin({ printerId, className = 'relative w-full h-full', 
       </div>
       {main && <button type="button" className="custom-pair-back" aria-label="Voltar às duas visualizações" onClick={(e) => { e.stopPropagation(); setMain(null); }}><ArrowLeft className="h-5 w-5" /></button>}
     </div>
-  ) : <>{children}<CameraPreview printerId={printerId} /></>;
+  ) : <>{children}<CameraPreview printerId={printerId} /><H264Live printerId={printerId} /></>;
   return <div ref={root} className="contents">{switchPlacement === 'viewport' ? <FillParentHeight>{content}</FillParentHeight> : content}</div>;
 }

@@ -490,6 +490,19 @@ mesmo tratamento tanto no Gerenciador de Arquivos quanto na página Impressoras.
 
 Ver [prévia e perfil leve](docs/camera-previa.md).
 
+## Vídeo ao vivo em H.264 (`custom(camera)`, 2026-11-24)
+
+Resolução cheia a 10 fps com ~1,5 Mbps: o H.264 do go2rtc toca num `<video>` no lugar do MJPEG do upstream (que só
+abre nos primeiros segundos e fica de reserva). Detalhes e medições: [camera-h264](docs/camera-h264.md).
+
+- Interruptores: `BAMBUDDY_CUSTOM_H264_WS_URL` (sem ela, 4404 e tudo fica no MJPEG); `localStorage['custom.h264']`.
+- Código nosso: `backend/app/custom/camera_h264.py` (WebSocket), `backend/app/custom/api.py` (+4),
+  `frontend/src/custom/camera/H264Live.tsx` e `h264.ts`, `CameraOrTwin.tsx` (monta o player), `useTwinView.ts`
+  (`useTwinActive` = `useH264Active`), seletor compartilhado em `CameraPreview.tsx` e `useCameraImageFit.ts`; testes
+  `backend/tests/custom/test_camera_h264.py` e `frontend/src/custom/__tests__/cameraH264.test.tsx`.
+- Upstream: **nenhuma linha nova** (ganchos do twin em `CameraPage.tsx`/`EmbeddedCameraViewer.tsx`). Depende do `src`
+  com `/camera/stream`, do `useStreamImgRef` e da checagem de travamento condicionada a `twinActive`.
+
 ## Prévia colorida de 3MF sem fatiamento
 
 - `backend/app/custom/model_preview/` gera miniatura e GLB leve do 3MF original em processo limitado, uma renderização por vez. Usa paleta e atribuição de filamentos Bambu/Orca, inclusive `paint_color`. Em triângulos com subdivisão de pintura, a prévia simplificada usa a cor dominante. O 3MF original fica intacto.

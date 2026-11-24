@@ -38,6 +38,10 @@ def install(app: FastAPI) -> list[str]:
 
     app.include_router(camera_preview_router, prefix=app_settings.api_prefix)
     add_public_prefix(app_settings.api_prefix)
+    # Vídeo ao vivo em H.264 via go2rtc (custom/docs/camera-h264.md); WebSocket não passa pelos middlewares HTTP
+    from .camera_h264 import router as camera_h264_router
+
+    app.include_router(camera_h264_router, prefix=app_settings.api_prefix)
     # Bico e velocidade no card (custom/CUSTOMIZATIONS.md, printer-prefs)
     from .printer_prefs.router import StartApplierMiddleware, router as printer_prefs_router
 
