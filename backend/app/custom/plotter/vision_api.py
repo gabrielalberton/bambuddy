@@ -22,7 +22,15 @@ from .vision import PlateTracker
 log = logging.getLogger(__name__)
 _locks = [asyncio.Lock() for _ in range(8)]
 _recent: dict[int, tuple[float, int, dict]] = {}
-REUSE_SECONDS = 0.18
+REUSE_SECONDS = 0.16
+_client: httpx.AsyncClient | None = None
+
+
+def _http() -> httpx.AsyncClient:
+    global _client
+    if _client is None or _client.is_closed:
+        _client = httpx.AsyncClient(timeout=3, follow_redirects=False)
+    return _client
 
 
 def profile_path(printer_id: int) -> Path:
@@ -55,14 +63,13 @@ async def match(printer_id: int) -> dict:
             recent = _recent.get(printer_id)
             if recent and recent[1] == revised and time.monotonic() - recent[0] < REUSE_SECONDS:
                 return recent[2]
-            async with httpx.AsyncClient(timeout=3, follow_redirects=False) as client:
-                async with client.stream("GET", url) as response:
-                    response.raise_for_status()
-                    buffer = bytearray()
-                    async for chunk in response.aiter_bytes():
-                        if len(buffer) + len(chunk) > MAX_BYTES:
-                            raise ValueError("Quadro grande demais.")
-                        buffer.extend(chunk)
+            async with _http().stream("GET", url) as response:
+                response.raise_for_status()
+                buffer = bytearray()
+                async for chunk in response.aiter_bytes():
+                    if len(buffer) + len(chunk) > MAX_BYTES:
+                        raise ValueError("Quadro grande demais.")
+                    buffer.extend(chunk)
             source_at = time.time()
             result = await asyncio.to_thread(_detect, path, revised, bytes(buffer))
         except (ValueError, KeyError, OSError, cv2.error, httpx.HTTPError) as exc:

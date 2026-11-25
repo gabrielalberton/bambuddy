@@ -10,6 +10,9 @@ import cv2
 import numpy as np
 
 
+BLUR_LENGTHS = (1, 5, 9, 17, 25)
+
+
 class PlateTracker:
     def __init__(self, path: Path):
         self.profile = json.loads(path.read_text())
@@ -30,7 +33,11 @@ class PlateTracker:
         self.templates = []
         for ref in self.profile["templates"]:
             patch = np.frombuffer(base64.b64decode(ref["pixels"]), np.uint8).reshape(ref["shape"])
-            self.templates.append((ref["x"], ref["front_offset"], ref["feature"], self.features(patch)))
+            gradient = self.features(patch)
+            variants = [gradient]
+            for length in BLUR_LENGTHS[1:]:
+                variants.append(cv2.blur(gradient, (1, length), borderType=cv2.BORDER_CONSTANT))
+            self.templates.append((ref["x"], ref["front_offset"], ref["feature"], variants))
 
     @staticmethod
     def features(gray: np.ndarray) -> np.ndarray:
@@ -70,22 +77,29 @@ class PlateTracker:
                 return True
         return False
 
-    def _score(self, rectified: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-        gray = cv2.cvtColor(rectified, cv2.COLOR_BGR2GRAY)
-        gradient = self.features(gray)
+    def _score(
+        self, gray: np.ndarray, gradient: np.ndarray, *, motion_blur: bool = False
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        valid_pixels = cv2.integral((gray > 0).astype(np.uint8))
         start, end = self.profile["front_search"]
         candidate_count = end - start + 1
         scores: dict[str, dict[int, np.ndarray]] = {"rim": {}, "logo": {}, "notch": {}}
-        for x, offset, feature, patch in self.templates:
-            h, w = patch.shape
+        for x, offset, feature, variants in self.templates:
+            h, w = variants[0].shape
             patch_start = start + offset
             patch_end = end + offset + h
             a = max(0, patch_start)
             b = min(gray.shape[0], patch_end)
             scan = gradient[a:b, x:x + w]
-            values = cv2.matchTemplate(scan, patch, cv2.TM_CCOEFF_NORMED).ravel()
-            valid = cv2.matchTemplate((gray[a:b, x:x + w] > 0).astype("float32"),
-                                      np.ones((h, w), "float32"), cv2.TM_CCORR).ravel()
+            values = cv2.matchTemplate(scan, variants[0], cv2.TM_CCOEFF_NORMED).ravel()
+            if motion_blur:
+                for patch, length in zip(variants[1:], BLUR_LENGTHS[1:]):
+                    blurred = cv2.matchTemplate(scan, patch, cv2.TM_CCOEFF_NORMED).ravel()
+                    values = np.maximum(values, blurred * (1.0 - 0.007 * length))
+            top = np.arange(a, a + len(values))
+            bottom = top + h
+            valid = valid_pixels[bottom, x + w] - valid_pixels[bottom, x]
+            valid -= valid_pixels[top, x + w] - valid_pixels[top, x]
             values[valid < 0.98 * h * w] = 0
             series = np.zeros(candidate_count, dtype=np.float32)
             i = a - patch_start
@@ -103,7 +117,8 @@ class PlateTracker:
         return profile, edge, logo
 
     def background_scores(self, frame: np.ndarray) -> np.ndarray:
-        profile, _, _ = self._score(self.rectify(frame))
+        gray = cv2.cvtColor(self.rectify(frame), cv2.COLOR_BGR2GRAY)
+        profile, _, _ = self._score(gray, self.features(gray))
         return profile
 
     def _front_row(self, rectified: np.ndarray, prior: float) -> float:
@@ -130,28 +145,71 @@ class PlateTracker:
             return prior
         return float(ys[peak])
 
+    def _bright_surface_end(self, gray: np.ndarray, candidates: np.ndarray) -> np.ndarray:
+        """Suppress a broad light-to-dark boundary inside the plate, such as white paper."""
+        stripe = self.profile.get("front_edge_stripe")
+        if stripe is None:
+            return np.zeros(candidates.size, dtype=bool)
+        row = np.clip(candidates - round(self.profile["usable_front_offset"]), 20, len(gray) - 25)
+        x0, _ = stripe
+        line = np.median(gray[:, x0 - 70:x0 + 20], axis=1).astype(np.float32)
+        light = cv2.blur(line[:, None], (1, 15)).ravel()
+        before, after = light[row - 13], light[row + 22]
+        return (before - after > 26) & (before > after * 1.36)
+
     def locate(self, frame: np.ndarray, *, at: float | None = None, diagnostics: bool = False) -> dict:
         if not self.camera_aligned(frame):
             return {"found": False, "reason": "camera_alignment"}
         rectified = self.rectify(frame)
-        profile, edge, logo = self._score(rectified)
+        gray = cv2.cvtColor(rectified, cv2.COLOR_BGR2GRAY)
+        gradient = self.features(gray)
         start, end = self.profile["front_search"]
         candidates = np.arange(start, end + 1)
-        background = np.asarray(self.profile.get("background", 0))
-        score = profile + 0.60 * np.maximum(logo, 0) - np.maximum(background - 0.32, 0)
+        background = np.maximum(np.asarray(self.profile.get("background", 0)) - 0.32, 0)
+        inside = self._bright_surface_end(gray, candidates)
+        previous = None
         if at is not None and self.last is not None:
             previous_time, previous_row = self.last
             elapsed = at - previous_time
-            if 0 <= elapsed < 0.65:
-                allowed = np.abs(candidates - previous_row) <= 12 + 180 * elapsed
+            if 0 < elapsed < 0.65:
+                previous = previous_row, elapsed
+
+        def peak(profile, logo, limit):
+            score = profile + 0.60 * np.maximum(logo, 0) - background
+            score = np.where(inside & (logo < 0.30), score - 0.30, score)
+            if previous is not None:
+                prev_row, dt = previous
+                allowed = np.abs(candidates - prev_row) <= 12 + limit * dt
                 score = np.where(allowed, score, -np.inf)
-        index = int(np.argmax(score))
-        far = abs(candidates - candidates[index]) > 12
-        margin = float(score[index] - np.max(score[far]))
+            index = int(np.argmax(score))
+            far = np.abs(candidates - candidates[index]) > 12
+            return score, index, float(score[index] - np.max(score[far]))
+
+        profile, edge, logo = self._score(gray, gradient)
+        score, index, margin = peak(profile, logo, 180)
         found = (edge[index] >= 0.37 or (edge[index] >= 0.20 and logo[index] >= 0.34)) and margin >= 0.05
-        result = {"found": bool(found), "confidence": round(float(score[index]) / 1.6, 3)}
+        strong = found and (edge[index] >= 0.56 or logo[index] >= 0.34)
+        used_blur = False
+        if not strong:
+            broad_profile, broad_edge, broad_logo = self._score(gray, gradient, motion_blur=True)
+            broad_score, broad_index, broad_margin = peak(broad_profile, broad_logo, 400)
+            close = abs(broad_index - index) <= 15
+            landmark = broad_logo[broad_index] >= 0.32
+            two_matches = close and edge[index] >= 0.35 and broad_edge[broad_index] >= 0.46
+            enough_margin = broad_margin >= (0.018 if two_matches else 0.05)
+            if enough_margin and (two_matches or (landmark and broad_edge[broad_index] >= 0.30)):
+                profile, edge, logo = broad_profile, broad_edge, broad_logo
+                score, index, margin = broad_score, broad_index, broad_margin
+                found = used_blur = True
+            elif not close and edge[index] < 0.50 and logo[index] < 0.23 and previous is None:
+                found = False
+        result = {"found": bool(found), "confidence": round(float(np.clip(score[index] / 1.6, 0, 1)), 3)}
         if diagnostics:
-            result.update(best_row=int(candidates[index]), edge=float(edge[index]), logo=float(logo[index]), profile=float(profile[index]), margin=margin if np.isfinite(margin) else 1.6)
+            result.update(
+                best_row=int(candidates[index]), edge=float(edge[index]), logo=float(logo[index]),
+                profile=float(profile[index]), margin=margin if np.isfinite(margin) else 1.6,
+                used_blur=used_blur,
+            )
         if not found:
             return result
         row = float(candidates[index])

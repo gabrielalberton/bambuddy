@@ -9,7 +9,7 @@ export function PlateCamera({ id }: { id: number }) {
     queryKey: ['custom', 'plotter', id, 'plate-camera'],
     queryFn: () => plotter.plateCamera(id),
     enabled: tracking,
-    refetchInterval: query => query.state.status === 'error' ? 2000 : 330,
+    refetchInterval: query => query.state.status === 'error' ? 2000 : 160,
     retry: false,
     staleTime: 0,
     gcTime: 0,
