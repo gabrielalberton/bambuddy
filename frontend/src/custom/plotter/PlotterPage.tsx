@@ -5,6 +5,8 @@ import { ApiError } from '../../api/client';
 import { useAuth } from '../../contexts/AuthContext';
 import { drawableArea, plotter, type Config, type Drawing, type Kind, type Paper, type Pen, type Placement, type Plan, type Rect, type Settings } from './api';
 import { Numeric, PenFields } from './Controls';
+import { MountPicker } from './Mount';
+import { FALLBACK_MOUNTS, MOUNT_ABOUT, mountOf } from './mounts';
 import { Plate, type Edit, type Layer } from './Plate';
 import { PlateCamera } from './PlateCamera';
 import { usePlotterConfig } from './navigation';
@@ -94,6 +96,10 @@ function Workspace({ id, config, initial }: { id: number; config: Config; initia
   const running = useRef(false);
   const positionCustomized = useRef(initial.placement !== null);
   const pen = settings.pens[settings.active_pen];
+  const mounts = config.mounts?.length ? config.mounts : FALLBACK_MOUNTS;
+  const mount = mountOf(pen);
+  const mountInfo = mounts.find(item => item.key === mount);
+  const samePens = Object.entries(settings.pens).filter(([, item]) => mountOf(item) === mount);
   const paper = settings.paper;
   const area = drawableArea(settings.machine, pen, paper);
   const status = statusQuery.error ? undefined : statusQuery.data;
@@ -303,15 +309,17 @@ function Workspace({ id, config, initial }: { id: number; config: Config; initia
           </div>
         </>)}
         {section('Calibração da caneta', <>
-          <p className="plotter-muted">{pen.name} · {pen.z_contact === null ? 'Contato pendente' : `Contato Z ${pen.z_contact} mm`} · {hasPressure ? 'Curva de pressão medida' : 'Curva de pressão pendente'}</p>
+          <MountPicker settings={settings} mounts={mounts} disabled={!!jog || !!busy}
+            onChange={next => { invalidate(); setSettings(next); }} />
+          <p className="plotter-muted">{mountInfo?.name ?? mount} · {pen.name} · {pen.z_contact === null ? 'Contato pendente' : `Contato Z ${pen.z_contact} mm`} · {hasPressure ? 'Curva de pressão medida' : 'Curva de pressão pendente'}</p>
           <details open={jog ? true : undefined}><summary>Editar perfil e ajustar contato</summary>
             <fieldset disabled={!!jog || !canControl}>
-              {Object.keys(settings.pens).length > 1 && <label className="plotter-field"><span>Perfil ativo</span>
+              {samePens.length > 1 && <label className="plotter-field"><span>Perfil ativo</span>
                 <select aria-label="Perfil ativo" value={settings.active_pen} onChange={e => { invalidate(); setSettings({ ...settings, active_pen: e.target.value }); }}>
-                  {Object.entries(settings.pens).map(([key, item]) => <option key={key} value={key}>{item.name}</option>)}
+                  {samePens.map(([key, item]) => <option key={key} value={key}>{item.name}</option>)}
                 </select>
               </label>}
-              <PenFields pen={pen} onChange={changePen} />
+              <PenFields pen={pen} mount={mountInfo} onChange={changePen} />
               <div className="plotter-actions">
                 <button type="button" onClick={() => run('Salvando ajustes…', async () => { await saveSettings(); invalidate(); setMessage('Ajustes salvos.'); })}>Salvar ajustes</button>
                 <button type="button" disabled={!area || !canStart || !ready} onClick={() => run('Iniciando ajuste de altura…', async () => {
@@ -325,8 +333,9 @@ function Workspace({ id, config, initial }: { id: number; config: Config; initia
             </fieldset>
             {jog && <>
               <p role="status">Z atual {jog.z.toFixed(2)} mm {jog.settling > 0 ? '· Aguarde o movimento' : ''}</p>
+              <p className="plotter-muted">{MOUNT_ABOUT[mount].contact}</p>
               <div className="plotter-actions">
-                {[-0.5, -0.1, 0.1, 0.5].filter(step => Math.abs(step) <= config.limits.jog_max_step).map(step =>
+                {(mountInfo?.jog_steps ?? [-0.5, -0.1, 0.1, 0.5]).filter(step => Math.abs(step) <= config.limits.jog_max_step).map(step =>
                   <button key={step} type="button" disabled={!canControl || jog.settling > 0 || jog.z + step < jog.floor - 1e-9 || jog.z + step > jog.max + 1e-9}
                     onClick={() => run('Ajustando altura…', async () => { await plotter.jogMove(id, jog.z + step); await statusQuery.refetch(); })}>
                     {step > 0 ? '+' : ''}{step} mm
@@ -384,7 +393,8 @@ function Workspace({ id, config, initial }: { id: number; config: Config; initia
           </div>}
           {canControl && <label className="plotter-check">
             <input type="checkbox" checked={ready} disabled={!!jog} onChange={e => setReady(e.target.checked)} />
-            Estou junto à A1. O suporte e a caneta estão montados, o papel está fixo na posição indicada e o trajeto está livre.
+            Estou junto à A1. O suporte está montado {mount === 'rigid' ? 'sem mola (caneta travada)' : 'com mola'} e a caneta,
+            no lugar; o papel está fixo na posição indicada e o trajeto está livre.
           </label>}
           <button className="plotter-primary" type="button" disabled={!canControl || !plan?.ok || !ready || !canStart}
             onClick={() => plan && run('Enviando para a A1…', async () => {

@@ -166,3 +166,13 @@
   stroke: #34d399;
   stroke-width: 2px;
 }
+
+.plotter-mount .plotter-segments button { flex: 1 1 0; }
+.plotter-mount > .plotter-muted { margin-block-start: .5rem; }
+.plotter-mount-compare { display: grid; gap: .25rem .9rem; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); }
+.plotter-mount-compare h4 { margin-block-start: .5rem; }
+.plotter-mount-compare ul { margin-block: .2rem; padding: 0; list-style: none; font-size: .85rem; line-height: 1.35; }
+.plotter-mount-compare li { position: relative; padding-inline-start: 1.1rem; margin-block: .2rem; }
+.plotter-mount-compare li::before { position: absolute; inset-inline-start: 0; font-weight: 700; }
+.plotter-mount-compare li.good::before { content: "+"; color: var(--plot-accent); }
+.plotter-mount-compare li.bad::before { content: "−"; color: #c2410c; }

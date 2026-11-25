@@ -4,8 +4,13 @@ export type Paper = { x: number; y: number; w: number; h: number; margin: number
 export type Placement = { cx: number; cy: number; width: number; rotation: number };
 export type Rect = [number, number, number, number];
 export type Machine = { plate_w: number; plate_h: number; nozzle_x: [number, number]; nozzle_y: [number, number] };
+export type MountKey = 'spring' | 'rigid';
+export type MountInfo = {
+  key: MountKey; name: string; depth_limit: number; compression_limit: number;
+  jog_steps: number[]; needs_mesh: boolean; approach_speed: number | null; defaults: Partial<Pen>;
+};
 export type Pen = {
-  name: string; offset_x: number; offset_y: number; z_contact: number | null;
+  name: string; mount: MountKey; offset_x: number; offset_y: number; z_contact: number | null;
   lift: number; depth_min: number; depth_max: number; max_compression: number;
   line_width: number; draw_speed: number; travel_speed: number; z_speed: number;
   dwell_ms: number; use_mesh: boolean; table: [number, number][];
@@ -26,6 +31,7 @@ export type Status = {
 };
 export type Config = {
   paper_presets: { id: string; w: number; h: number }[];
+  mounts?: MountInfo[];
   max_upload_mb: number;
   limits: { jog_max_step: number };
   printers: { id: number; name: string; supported: boolean; plate_vision?: boolean }[];

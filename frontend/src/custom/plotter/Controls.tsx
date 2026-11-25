@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { Pen } from './api';
+import type { MountInfo, Pen } from './api';
 
 type NumberProps = {
   label: string; value: number | null; onChange: (value: number | null) => void;
@@ -24,14 +24,25 @@ export function Numeric({ label, value, onChange, min, max, nullable }: NumberPr
   </label>;
 }
 
-type NumericPenKey = Exclude<keyof Pen, 'name' | 'table' | 'use_mesh' | 'z_contact'>;
-const penFields: [NumericPenKey, string, number, number][] = [
-  ['offset_x', 'Deslocamento X (mm)', -80, 80],
-  ['offset_y', 'Deslocamento Y (mm)', -80, 80],
-  ['lift', 'Elevação entre traços (mm)', 0.5, 20],
-  ['depth_min', 'Compressão mínima (mm)', 0, 6],
-  ['depth_max', 'Compressão máxima (mm)', 0, 6],
-  ['max_compression', 'Limite do suporte (mm)', 0.2, 8],
+type NumericPenKey = Exclude<keyof Pen, 'name' | 'table' | 'use_mesh' | 'z_contact' | 'mount'>;
+
+/** Campos numéricos do perfil; os limites de aperto vêm do modo do suporte (com mola aceita bem mais). */
+function penFields(pen: Pen, mount?: MountInfo): [NumericPenKey, string, number, number][] {
+  const rigid = pen.mount === 'rigid';
+  const depthLimit = mount?.depth_limit ?? (rigid ? 2 : 6);
+  const compressionLimit = mount?.compression_limit ?? (rigid ? 2 : 8);
+  return [
+    ['offset_x', 'Deslocamento X (mm)', -80, 80],
+    ['offset_y', 'Deslocamento Y (mm)', -80, 80],
+    ['lift', 'Elevação entre traços (mm)', 0.5, 20],
+    ['depth_min', rigid ? 'Aperto mínimo da ponta (mm)' : 'Compressão mínima (mm)', 0, depthLimit],
+    ['depth_max', rigid ? 'Aperto máximo do traço (mm)' : 'Compressão máxima (mm)', 0, depthLimit],
+    ['max_compression', rigid ? 'Limite da ponta (mm)' : 'Curso útil da mola (mm)', 0.05, compressionLimit],
+    ...PEN_FIELDS_REST,
+  ];
+}
+
+const PEN_FIELDS_REST: [NumericPenKey, string, number, number][] = [
   ['line_width', 'Largura nominal do traço (mm)', 0.05, 10],
   ['draw_speed', 'Velocidade ao desenhar (mm/s)', 1, 150],
   ['travel_speed', 'Deslocamento no ar (mm/s)', 5, 300],
@@ -39,7 +50,8 @@ const penFields: [NumericPenKey, string, number, number][] = [
   ['dwell_ms', 'Pausa para marcar pontos (ms)', 0, 2000],
 ];
 
-export function PenFields({ pen, onChange }: { pen: Pen; onChange: (value: Pen) => void }) {
+export function PenFields({ pen, mount, onChange }: { pen: Pen; mount?: MountInfo; onChange: (value: Pen) => void }) {
+  const meshRequired = mount?.needs_mesh ?? pen.mount === 'rigid';
   return <>
     <div className="plotter-fields">
       <label className="plotter-field"><span>Nome da caneta</span>
@@ -47,15 +59,17 @@ export function PenFields({ pen, onChange }: { pen: Pen; onChange: (value: Pen) 
       </label>
       <Numeric label="Altura de contato Z (mm)" value={pen.z_contact} min={0.3} max={40} nullable
         onChange={z_contact => onChange({ ...pen, z_contact })} />
-      {penFields.map(([key, label, min, max]) => <Numeric key={key} label={label} value={pen[key]} min={min} max={max}
+      {penFields(pen, mount).map(([key, label, min, max]) => <Numeric key={key} label={label} value={pen[key]} min={min} max={max}
         onChange={value => { if (value !== null) onChange({ ...pen, [key]: value }); }} />)}
     </div>
-    <label className="plotter-check"><input type="checkbox" checked={pen.use_mesh}
-      onChange={e => onChange({ ...pen, use_mesh: e.target.checked })} /> Usar malha de nivelamento salva</label>
+    <label className="plotter-check"><input type="checkbox" checked={pen.use_mesh || meshRequired} disabled={meshRequired}
+      onChange={e => onChange({ ...pen, use_mesh: e.target.checked })} /> Usar malha de nivelamento salva
+      {meshRequired ? ' (obrigatória sem mola)' : ''}</label>
     <h4>Medidas de pressão</h4>
-    <p className="plotter-muted">Meça a largura de cada linha do teste e informe o par compressão e largura em mm.</p>
+    <p className="plotter-muted">Meça a largura de cada linha do teste e informe o par {pen.mount === 'rigid' ? 'aperto' : 'compressão'} e
+      largura em mm.{pen.mount === 'rigid' ? ' Sem mola a escala anda de 0,05 em 0,05 mm.' : ''}</p>
     {pen.table.map(([depth, width], index) => <div className="plotter-measure" key={index}>
-      <Numeric label="Compressão" value={depth} min={0} max={pen.max_compression} onChange={value => {
+      <Numeric label={pen.mount === 'rigid' ? 'Aperto' : 'Compressão'} value={depth} min={0} max={pen.max_compression} onChange={value => {
         if (value !== null) onChange({ ...pen, table: pen.table.map((row, i) => i === index ? [value, width] : row) });
       }} />
       <Numeric label="Largura" value={width} min={0.02} max={20} onChange={value => {
