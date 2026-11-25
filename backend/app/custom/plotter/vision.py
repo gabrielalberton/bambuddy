@@ -9,6 +9,7 @@ from pathlib import Path
 import cv2
 import numpy as np
 
+from .vision_edges import PlateEdges
 from .vision_pose import CameraReference
 
 
@@ -42,6 +43,7 @@ class PlateTracker:
         )
         self.views = [self.from_profile(view) for view in profile.get("views", [])]
         self.active = self
+        self.edges = PlateEdges(profile["edge_references"], self.features) if "edge_references" in profile else None
         self.last: tuple[float, float] | None = None
         self.maps: dict[tuple[int, int], tuple[np.ndarray, np.ndarray]] = {}
         self.anchors = [
@@ -270,6 +272,28 @@ class PlateTracker:
             elif not close and edge[index] < 0.50 and logo[index] < 0.23 and previous is None:
                 found = False
         result = {"found": bool(found), "confidence": round(float(np.clip(score[index] / 1.6, 0, 1)), 3)}
+        evidence = None
+        source = None
+        if self.edges is not None:
+            # During fast moves the front bevel may disappear into the printer base.
+            # The rear edge is visible toward the front of travel and the revealed
+            # stationary base is useful once the plate has receded past it.
+            rear = self.edges.measure_rear(gradient) if not strong else None
+            front = self.edges.measure_front(rectified) if rear is None and not strong else None
+            if rear is not None:
+                evidence, source = rear, "rear_edge"
+            elif front is not None:
+                agrees = abs(front[0] + self.profile["usable_front_offset"] - candidates[index]) < 22
+                if not found or agrees or front[1] > 0.58:
+                    evidence, source = front, "revealed_base"
+        if evidence is not None:
+            front_row, confidence = evidence
+            if at is not None:
+                self.last = at, front_row + self.profile["usable_front_offset"]
+            result.update(found=True, confidence=round(confidence, 3))
+            if diagnostics:
+                result.update(edge_source=source, best_row=round(front_row + self.profile["usable_front_offset"]))
+            return self._project_result(result, front_row)
         if diagnostics:
             result.update(
                 best_row=int(candidates[index]), edge=float(edge[index]), logo=float(logo[index]),
