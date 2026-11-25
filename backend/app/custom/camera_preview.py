@@ -47,9 +47,7 @@ def _http() -> httpx.AsyncClient:
     return _client
 
 
-@router.get("/stream/{printer_id}/preview.jpg")
-async def camera_preview(printer_id: int, _: StreamOpener = RequireCameraStreamTokenIfAuthEnabled):
-    """Última imagem da câmera vinda do Frigate (baixa resolução, instantânea)."""
+async def fetch_preview(printer_id: int) -> bytes:
     url = preview_url(printer_id)
     if url is None:
         raise HTTPException(404, "Camera preview not configured")
@@ -61,7 +59,14 @@ async def camera_preview(printer_id: int, _: StreamOpener = RequireCameraStreamT
     body = resp.content
     if resp.status_code != 200 or not body.startswith(b"\xff\xd8") or len(body) > MAX_BYTES:
         raise HTTPException(502, "Camera preview unavailable")
-    return Response(content=body, media_type="image/jpeg", headers={"Cache-Control": "no-store"})
+    return body
+
+
+@router.get("/stream/{printer_id}/preview.jpg")
+async def camera_preview(printer_id: int, _: StreamOpener = RequireCameraStreamTokenIfAuthEnabled):
+    """Última imagem da câmera vinda do Frigate (baixa resolução, instantânea)."""
+    return Response(content=await fetch_preview(printer_id), media_type="image/jpeg",
+                    headers={"Cache-Control": "no-store"})
 
 
 def add_public_prefix(api_prefix: str) -> None:

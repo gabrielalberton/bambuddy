@@ -3727,6 +3727,9 @@ async def clear_plate(
             f"Printer is not awaiting plate-clear acknowledgment (state={state.state if state else 'unknown'})",
         )
 
+    from backend.app.custom.plate_clear_samples import capture_confirmation
+
+    await capture_confirmation(printer, lambda: getattr(printer_manager.get_status(printer_id), "state", None))
     printer_manager.set_awaiting_plate_clear(printer_id, False)
 
     # #1898: releasing the plate without answering the outcome prompt can

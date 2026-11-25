@@ -75,7 +75,8 @@ def save_native_plate_roi(printer_id: int, roi: dict | None) -> bool:
 
 
 async def capture_native_plate(
-    printer_id: int, ip_address: str, access_code: str, model: str | None, has_external_camera: bool
+    printer_id: int, ip_address: str, access_code: str, model: str | None, has_external_camera: bool,
+    *, light: bool = True,
 ) -> bytes | None:
     from backend.app.api.routes import camera
     from backend.app.services.camera_fanout import get_or_create_broadcaster, iter_subscriber
@@ -120,6 +121,8 @@ async def capture_native_plate(
             # Bring the camera up before acquiring the light. The first
             # valid JPEG is also the baseline for spotting the light change.
             jpeg, luma = baseline
+            if not light:
+                return jpeg
             async with camera_light(SimpleNamespace(id=printer_id), any_mode=True, wait=False, flash=True) as lit_at:
                 already_on = lit_at is None and chamber_light_is_on(printer_id)
                 if lit_at is None:
