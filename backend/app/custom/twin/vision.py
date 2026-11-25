@@ -7,7 +7,9 @@ import math
 import time
 
 BOUNDS = {"x": (-53, 272), "y": (-5, 267), "z": (-5, 261)}
-MAX_AGE = 0.85
+# O serviço de visão entrega a pose com ~0,6–1,6 s de idade (captura + processamento); o Twin
+# compensa a idade (programTime = T − idade·vel), então só recusa o que passa de 2 s.
+MAX_AGE = 2.0
 
 
 def public_pose(raw, now: float) -> dict | None:

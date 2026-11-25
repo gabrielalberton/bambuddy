@@ -1,6 +1,6 @@
 // Observações dos dois detectores da câmera, na hora de captura estimada.
 const AXES = ['x', 'y', 'z'];
-const MAX_AGE = 0.85;
+const MAX_AGE = 2.0;
 
 export function poseTimeShift(program, samples) {
   if (samples.length < 4) return null;
@@ -83,7 +83,7 @@ export class VisionMotion {
 
     const programTime = tracker.T - age * tracker.vel();
     this.samples.push({ at: this.captureAt, pose: this.pose, programTime });
-    this.samples = this.samples.filter((s) => s.at > now - 1.55).slice(-9);
+    this.samples = this.samples.filter((s) => s.at > this.captureAt - 1.55).slice(-9);
     const shift = poseTimeShift(tracker.p, this.samples);
     if (shift === null) return;
     // O estimador existente absorve a correção gradualmente e mantém suas esperas.
