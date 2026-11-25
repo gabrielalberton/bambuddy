@@ -11,7 +11,7 @@ export function useAerialPlate(id: number, enabled: boolean) {
     queryKey: ['custom', 'plotter', id, 'plate-topdown'],
     queryFn: () => plotter.plateCamera(id, true),
     enabled,
-    refetchInterval: current => current.state.status === 'error' ? 2000 : 500,
+    refetchInterval: current => current.state.status === 'error' ? 2000 : 800,
     retry: false,
     staleTime: 0,
     gcTime: 0,

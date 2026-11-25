@@ -191,8 +191,10 @@ class PlateTracker:
         self.maps.clear()
 
     def locate(self, frame: np.ndarray, *, at: float | None = None, diagnostics: bool = False) -> dict:
-        views = (self, *self.views)
-        if self.active is not self:
+        every = (self, *self.views)
+        fitted = [view for view in every if view.profile.get("mode") == "plane_fit"]
+        views = tuple(view for view in every if view not in fitted)
+        if self.active is not self and self.active in views:
             views = (self.active, *(view for view in views if view is not self.active))
         for view in views:
             if view.camera_aligned(frame):
@@ -206,11 +208,83 @@ class PlateTracker:
                     rotation, count = estimated
                     estimates.append((count, view, rotation))
         if not estimates:
+            result = self._locate_plane_fit(fitted, frame)
+            if result is not None:
+                return result
             self.active.last = None
             return {"found": False, "reason": "camera_alignment"}
         _, view, rotation = max(estimates, key=lambda item: item[0])
         view._set_rotation(rotation)
         return self._locate_in_view(view, frame, at=at, diagnostics=diagnostics)
+
+    def _locate_plane_fit(self, views: list[PlateTracker], frame: np.ndarray) -> dict | None:
+        """Mounts with a calibrated camera pose but no appearance templates: find the plate along Y.
+
+        The plate outline is projected through the calibrated pose for every plate position and the
+        position whose edges contrast most (dark plate inside, brighter surroundings outside) wins.
+        """
+        best: tuple[float, float, PlateTracker] | None = None
+        for view in views:
+            found = view._fit_front(frame)
+            if found is not None and (best is None or found[0] > best[0]):
+                best = (found[0], found[1], view)
+        if best is None:
+            return None
+        score, front, view = best
+        if self.active is not view:
+            view.last = None
+            self.active = view
+        view._set_rotation(None)
+        floor = view.profile["fit"]["min_score"]
+        result = {"found": score >= floor, "confidence": round(min(score / 30.0, 1.0), 3), "camera_view": view.profile["view_id"]}
+        if not result["found"]:
+            result["reason"] = "no_match"
+            return result
+        return view._project_result(result, view.y0 - front)
+
+    def _outline(self, front: float, samples: int = 24) -> np.ndarray:
+        size = 256 * self.profile.get("plane_scale", 1.0)
+        left = self.profile["usable_left"]
+        x = np.array([left, left + size, left + size, left])
+        y = np.array([front, front, front + size, front + size])
+        phase = np.arange(samples) / samples
+        ox = (x[:, None] + (np.roll(x, -1) - x)[:, None] * phase).ravel()
+        oy = (y[:, None] + (np.roll(y, -1) - y)[:, None] * phase).ravel()
+        return self.project(ox, oy)
+
+    def _fit_front(self, frame: np.ndarray) -> tuple[float, float] | None:
+        h, w = frame.shape[:2]
+        if abs(w / h - self.size[0] / self.size[1]) > 0.02:
+            return None
+        settings = self.profile["fit"]
+        gray = cv2.GaussianBlur(cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY), (0, 0), 1.5).astype(np.float32)
+        scale = np.array([w / self.size[0], h / self.size[1]])
+
+        def sample(points: np.ndarray) -> np.ndarray:
+            return cv2.remap(
+                gray, points[:, 0].astype(np.float32).reshape(-1, 1), points[:, 1].astype(np.float32).reshape(-1, 1),
+                cv2.INTER_LINEAR,
+            ).ravel()
+
+        def score(front: float) -> float:
+            points = self._outline(front) * scale
+            if not np.isfinite(points).all():
+                return -1e9
+            inside = (points[:, 0] > 6) & (points[:, 0] < w - 7) & (points[:, 1] > 6) & (points[:, 1] < h - 7)
+            if inside.mean() < 0.6:
+                return -1e9
+            direction = points - points.mean(axis=0)
+            direction /= np.maximum(np.linalg.norm(direction, axis=1, keepdims=True), 1e-6)
+            contrast = (sample(points + 4 * direction) - sample(points - 4 * direction))[inside]
+            return float(np.clip(contrast, -10, 30).mean())
+
+        low, high = settings["front_range"]
+        coarse = [(score(f), f) for f in np.arange(low, high + 0.1, 3.0)]
+        top, front = max(coarse)
+        if top < -1e8:
+            return None
+        fine = [(score(f), f) for f in np.arange(front - 3.0, front + 3.01, 0.5)]
+        return max(fine)
 
     def _locate_in_view(self, view, frame, *, at, diagnostics):
         if self.active is not view:
