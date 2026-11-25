@@ -446,13 +446,20 @@ class PlateTracker:
         count = round(span * px_per_mm)
         real = -margin_mm + (np.arange(count) + 0.5) / px_per_mm
         x_real, y_real = np.meshgrid(real, real[::-1])
-        x = view.profile["usable_left"] + x_real * scale
-        y = front_mm + y_real * scale
-        projected = view.project(x, y) * (w / view.size[0], h / view.size[1])
-        out = cv2.remap(
-            frame, projected[:, :, 0].astype("float32"), projected[:, :, 1].astype("float32"),
-            cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT,
-        )
+        # The plate is parked most of the time: reuse the (costly) lens projection per 0.5 mm of Y.
+        key = (id(view), round(front_mm * 2) / 2, margin_mm, px_per_mm, w, h)
+        maps = self.__dict__.setdefault("_top_maps", {})
+        cached = None if view.rotation is not None else maps.get(key)
+        if cached is None:
+            x = view.profile["usable_left"] + x_real * scale
+            y = front_mm + y_real * scale
+            projected = view.project(x, y) * (w / view.size[0], h / view.size[1])
+            cached = (projected[:, :, 0].astype("float32"), projected[:, :, 1].astype("float32"))
+            if view.rotation is None:
+                if len(maps) >= 3:
+                    maps.pop(next(iter(maps)))
+                maps[key] = cached
+        out = cv2.remap(frame, cached[0], cached[1], cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT)
         outside = (x_real < 0) | (x_real > PLATE_MM) | (y_real < 0) | (y_real > PLATE_MM)
         shade = np.where(outside, dim, 1.0).astype("float32")
         shade = cv2.GaussianBlur(shade, (0, 0), px_per_mm * 0.8)

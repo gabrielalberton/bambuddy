@@ -114,3 +114,17 @@ def test_plane_fit_reports_no_match_on_an_empty_scene():
     frame = np.full((SIZE[1], SIZE[0], 3), 120, np.uint8)
     result = tracker.locate(frame)
     assert result["found"] is False
+
+
+def test_top_view_reuses_the_projection_for_a_parked_plate(monkeypatch):
+    tracker = _tracker()
+    frame = _frame(tracker, 100, 120, 50, 70)
+    calls = []
+    original = tracker.project
+    monkeypatch.setattr(tracker, "project", lambda x, y: calls.append(1) or original(x, y))
+
+    first = tracker.top_view(frame, FRONT)
+    second = tracker.top_view(frame, FRONT + 0.2)  # within the same 0.5 mm bucket
+    assert len(calls) == 1 and np.array_equal(first, second)
+    tracker.top_view(frame, FRONT + 20)
+    assert len(calls) == 2

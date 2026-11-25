@@ -25,6 +25,7 @@ _locks = [asyncio.Lock() for _ in range(8)]
 _recent: dict[tuple[int, bool], tuple[float, int, dict]] = {}
 TOP_MARGIN_MM = 30
 SNAPSHOT_ENV = "BAMBUDDY_CUSTOM_PLOTTER_SNAPSHOT_URL"
+SNAPSHOT_TIMEOUT = 10.0  # go2rtc builds a full-resolution JPEG on demand: 2-3 s under load
 TOP_QUALITY = 82
 REUSE_SECONDS = 0.16
 _client: httpx.AsyncClient | None = None
@@ -71,10 +72,11 @@ def _detect(path: Path, revised: int, image: bytes, topdown: bool = False) -> di
     return result
 
 
-async def _fetch(urls: list[str]) -> bytes:
+async def _fetch(urls: list[str], timeout: float | None = None) -> bytes:
     for index, url in enumerate(urls):
         try:
-            async with _http().stream("GET", url) as response:
+            options = {"timeout": timeout} if timeout and index == 0 else {}  # None would mean "no timeout" in httpx
+            async with _http().stream("GET", url, **options) as response:
                 response.raise_for_status()
                 buffer = bytearray()
                 async for chunk in response.aiter_bytes():
@@ -101,7 +103,7 @@ async def match(printer_id: int, topdown: bool = False) -> dict:
             if recent and recent[1] == revised and time.monotonic() - recent[0] < REUSE_SECONDS:
                 return recent[2]
             sharp = snapshot_url(printer_id) if topdown else None
-            image = await _fetch([sharp, url] if sharp else [url])
+            image = await _fetch([sharp, url] if sharp else [url], SNAPSHOT_TIMEOUT if sharp else None)
             source_at = time.time()
             result = await asyncio.to_thread(_detect, path, revised, image, topdown)
         except (ValueError, KeyError, OSError, cv2.error, httpx.HTTPError) as exc:

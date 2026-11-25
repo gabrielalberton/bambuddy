@@ -146,11 +146,12 @@ export function Plate({ machine, paper, area, pen, drawing, placement, imageUrl,
   const w = machine.plate_w;
   const h = machine.plate_h;
   const aerialSrc = aerial?.src;
-  const margin = live && aerial ? aerial.margin : 0;
+  // The framing never depends on the photo's dimmed margin, so the plate keeps the same size and
+  // position when switching between the reference drawing and the live aerial view.
   const view = drag.current?.view ?? [
-    Math.min(-margin, paper.x), Math.max(h + margin, paper.y + paper.h),
-    Math.max(w + margin, paper.x + paper.w) - Math.min(-margin, paper.x),
-    Math.max(h + margin, paper.y + paper.h) - Math.min(-margin, paper.y),
+    Math.min(0, paper.x), Math.max(h, paper.y + paper.h),
+    Math.max(w, paper.x + paper.w) - Math.min(0, paper.x),
+    Math.max(h, paper.y + paper.h) - Math.min(0, paper.y),
   ];
   const [left, top, spanX, spanY] = view;
   const scale = (SIZE - 2 * PADDING) / Math.max(spanX, spanY);
