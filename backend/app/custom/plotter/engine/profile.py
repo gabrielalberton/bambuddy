@@ -6,6 +6,15 @@ frente-esquerda da placa):
 - ``posição da ponta da caneta = posição do bico + (offset_x, offset_y)``;
 - ``z_contact`` é o Z do BICO no instante em que a ponta encosta no papel;
 - "aperto" (``depth``) é quanto o bico desce abaixo de ``z_contact``: mais aperto, traço mais largo.
+
+O suporte tem dois modos (``PenProfile.mount``), cada um com limites próprios (ver ``MOUNTS``):
+
+- ``spring`` (com mola): a caneta desliza no tubo contra a mola. O aperto comprime a mola, a força cresce
+  devagar com o Z e a mola absorve ondulação do papel e da mesa. Custa folga lateral, atrito/histerese
+  e uma força mínima (pré-carga) que limita o traço mais leve;
+- ``rigid`` (sem mola, caneta travada): o aperto é a deformação da própria ponta. Resposta imediata e XY
+  preciso, ideal para ponta de pincel; mas a largura muda muito com décimos de mm, então a folha tem que
+  estar plana e presa, a malha de nivelamento é obrigatória e o aperto máximo é bem menor.
 """
 
 from __future__ import annotations
@@ -15,6 +24,81 @@ from dataclasses import asdict, dataclass, field
 
 class ProfileError(ValueError):
     """Dado físico inválido ou perigoso."""
+
+
+@dataclass(frozen=True)
+class Mount:
+    """Como a caneta está presa no módulo e o que isso muda no plano."""
+
+    key: str
+    name: str
+    depth_limit: float  # maior aperto aceito no perfil (mm abaixo do contato)
+    compression_limit: float  # teto do "limite do suporte" (max_compression)
+    max_slope: float  # variação máxima de aperto por mm de traço (o planejador suaviza acima disto)
+    approach_speed: float | None  # mm/s nos últimos APPROACH_GAP mm antes do papel (None = descida direta)
+    ladder: tuple[float, ...]  # apertos candidatos da folha de teste
+    ladder_top: float  # a folha de teste vai pelo menos até aqui (se o limite do suporte deixar)
+    jog_steps: tuple[float, ...]  # passos oferecidos no ajuste de altura
+    needs_mesh: bool  # exige a malha de nivelamento salva
+    defaults: dict  # valores iniciais de um perfil novo neste modo
+
+
+APPROACH_GAP = 0.3  # mm acima do contato em que a descida passa para a velocidade de aproximação
+
+MOUNTS: dict[str, Mount] = {
+    "spring": Mount(
+        key="spring",
+        name="Com mola",
+        depth_limit=6.0,
+        compression_limit=8.0,
+        max_slope=0.6,
+        approach_speed=None,
+        ladder=(0.0, 0.1, 0.2, 0.35, 0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 2.5, 3.0),
+        ladder_top=1.5,
+        jog_steps=(-1.0, -0.5, -0.1, 0.1, 0.5, 1.0),
+        needs_mesh=False,
+        defaults={
+            "name": "Caneta com mola",
+            "depth_min": 0.2,
+            "depth_max": 1.2,
+            "max_compression": 3.0,
+            "z_speed": 10.0,
+        },
+    ),
+    "rigid": Mount(
+        key="rigid",
+        name="Sem mola",
+        depth_limit=2.0,
+        compression_limit=2.0,
+        max_slope=0.25,
+        approach_speed=2.0,
+        ladder=(0.0, 0.05, 0.1, 0.15, 0.2, 0.3, 0.4, 0.5, 0.6, 0.8, 1.0, 1.5, 2.0),
+        ladder_top=0.4,
+        jog_steps=(-1.0, -0.1, -0.02, 0.02, 0.1, 1.0),
+        needs_mesh=True,
+        defaults={
+            "name": "Caneta sem mola",
+            "depth_min": 0.05,
+            "depth_max": 0.4,
+            "max_compression": 0.6,
+            "z_speed": 5.0,
+        },
+    ),
+}
+
+
+def mount_info(mount: Mount) -> dict:
+    """O que a tela precisa saber de cada modo."""
+    return {
+        "key": mount.key,
+        "name": mount.name,
+        "depth_limit": mount.depth_limit,
+        "compression_limit": mount.compression_limit,
+        "jog_steps": list(mount.jog_steps),
+        "needs_mesh": mount.needs_mesh,
+        "approach_speed": mount.approach_speed,
+        "defaults": dict(mount.defaults),
+    }
 
 
 @dataclass(frozen=True)
@@ -65,13 +149,14 @@ def _num(value, name: str, lo: float, hi: float) -> float:
 @dataclass
 class PenProfile:
     name: str = "Caneta"
+    mount: str = "spring"  # "spring" (com mola) ou "rigid" (sem mola, caneta travada): ver MOUNTS
     offset_x: float = 0.0
     offset_y: float = -32.0
     z_contact: float | None = None  # None = altura de contato ainda não calibrada: não plota
     lift: float = 3.0  # quanto sobe acima do contato para deslocar sem riscar
     depth_min: float = 0.2  # aperto do traço mais fino (garante que a ponta encosta)
     depth_max: float = 1.2  # aperto do traço mais grosso
-    max_compression: float = 3.0  # limite duro do suporte com mola
+    max_compression: float = 3.0  # limite duro: curso útil da mola, ou o quanto a ponta aguenta sem mola
     line_width: float = 0.5  # largura nominal da ponta (pressão constante e pré-visualização)
     table: list[list[float]] = field(default_factory=list)  # [[aperto, largura], ...] medidos na folha de teste
     draw_speed: float = 25.0  # mm/s
@@ -83,28 +168,44 @@ class PenProfile:
     @classmethod
     def from_dict(cls, data: dict | None) -> PenProfile:
         data = data or {}
-        p = cls()
+        mount = data.get("mount") or "spring"
+        if mount not in MOUNTS:
+            raise ProfileError("mount: use 'spring' (com mola) ou 'rigid' (sem mola)")
+        p = cls.for_mount(mount)
+        spec = MOUNTS[mount]
         p.name = str(data.get("name") or p.name)[:60]
         p.offset_x = _num(data.get("offset_x", p.offset_x), "offset_x", -80, 80)
         p.offset_y = _num(data.get("offset_y", p.offset_y), "offset_y", -80, 80)
         zc = data.get("z_contact", p.z_contact)
         p.z_contact = None if zc is None or zc == "" else _num(zc, "z_contact", 0.3, 40)
         p.lift = _num(data.get("lift", p.lift), "lift", 0.5, 20)
-        p.depth_min = _num(data.get("depth_min", p.depth_min), "depth_min", 0.0, 6)
-        p.depth_max = _num(data.get("depth_max", p.depth_max), "depth_max", 0.0, 6)
-        p.max_compression = _num(data.get("max_compression", p.max_compression), "max_compression", 0.2, 8)
+        p.depth_min = _num(data.get("depth_min", p.depth_min), "depth_min", 0.0, spec.depth_limit)
+        p.depth_max = _num(data.get("depth_max", p.depth_max), "depth_max", 0.0, spec.depth_limit)
+        p.max_compression = _num(
+            data.get("max_compression", p.max_compression), "max_compression", 0.05, spec.compression_limit
+        )
         p.line_width = _num(data.get("line_width", p.line_width), "line_width", 0.05, 10)
         p.draw_speed = _num(data.get("draw_speed", p.draw_speed), "draw_speed", 1, 150)
         p.travel_speed = _num(data.get("travel_speed", p.travel_speed), "travel_speed", 5, 300)
         p.z_speed = _num(data.get("z_speed", p.z_speed), "z_speed", 1, 25)
         p.dwell_ms = int(_num(data.get("dwell_ms", p.dwell_ms), "dwell_ms", 0, 2000))
-        p.use_mesh = bool(data.get("use_mesh", p.use_mesh))
+        # sem mola, 0,1 mm de desnível da mesa já é boa parte da faixa de aperto: a malha não é opcional
+        p.use_mesh = True if spec.needs_mesh else bool(data.get("use_mesh", p.use_mesh))
         if p.depth_max < p.depth_min:
             raise ProfileError("depth_max menor que depth_min")
         if p.depth_max > p.max_compression:
             raise ProfileError("depth_max maior que o aperto máximo do suporte (max_compression)")
         p.table = _clean_table(data.get("table") or [], p.max_compression)
         return p
+
+    @classmethod
+    def for_mount(cls, mount: str) -> PenProfile:
+        """Perfil novo com os valores iniciais do modo."""
+        return cls(mount=mount, **MOUNTS[mount].defaults)
+
+    @property
+    def mount_spec(self) -> Mount:
+        return MOUNTS[self.mount]
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -209,6 +310,15 @@ class Paper:
         p.thickness = _num(data.get("thickness", p.thickness), "papel espessura", 0, 2)
         return p
 
+    @classmethod
+    def for_mount(cls, mount: str) -> PenProfile:
+        """Perfil novo com os valores iniciais do modo."""
+        return cls(mount=mount, **MOUNTS[mount].defaults)
+
+    @property
+    def mount_spec(self) -> Mount:
+        return MOUNTS[self.mount]
+
     def to_dict(self) -> dict:
         return asdict(self)
 
@@ -234,6 +344,15 @@ class Placement:
         p.width = _num(data.get("width", p.width), "desenho largura", 1, 1000)
         p.rotation = _num(data.get("rotation", p.rotation), "desenho rotação", -3600, 3600) % 360.0
         return p
+
+    @classmethod
+    def for_mount(cls, mount: str) -> PenProfile:
+        """Perfil novo com os valores iniciais do modo."""
+        return cls(mount=mount, **MOUNTS[mount].defaults)
+
+    @property
+    def mount_spec(self) -> Mount:
+        return MOUNTS[self.mount]
 
     def to_dict(self) -> dict:
         return asdict(self)

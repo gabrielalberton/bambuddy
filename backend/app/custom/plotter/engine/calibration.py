@@ -22,13 +22,23 @@ LADDER_WEDGE = 60.0
 
 
 def default_ladder_depths(pen: PenProfile, steps: int = 8) -> list[float]:
-    top = min(pen.max_compression, max(pen.depth_max, 1.5))
-    base = [0.0, 0.1, 0.2, 0.35, 0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 2.5, 3.0]
-    out = [d for d in base if d <= top + 1e-9]
+    """Apertos da folha de teste: do zero até o aperto máximo do perfil (ou o mínimo útil do modo).
+
+    Com mola os passos são de décimos a meio mm; sem mola, de 0,05 mm, porque a ponta travada passa de
+    "não marca" a "esmaga" em poucos décimos.
+    """
+    spec = pen.mount_spec
+    top = min(pen.max_compression, max(pen.depth_max * 1.25, spec.ladder_top))
+    out = [d for d in spec.ladder if d <= top + 1e-9]
     if len(out) > steps:
         idx = np.round(np.linspace(0, len(out) - 1, steps)).astype(int)
         out = [out[i] for i in sorted(set(idx.tolist()))]
     return out
+
+
+def _light(pen: PenProfile) -> float:
+    """Aperto leve e seguro para cruz e contorno: um pouco acima do mínimo, proporcional à faixa do modo."""
+    return min(pen.depth_max, pen.depth_min + min(0.15, 0.3 * (pen.depth_max - pen.depth_min)))
 
 
 def _line(x0: float, y0: float, x1: float, y1: float, d0: float, d1: float | None = None) -> PenPath:
@@ -73,7 +83,7 @@ def offset_cross(area: Area, pen: PenProfile, target: tuple[float, float] | None
     half = size / 2.0
     if cx - half < x0 or cx + half > x1 or cy - half < y0 or cy + half > y1:
         raise PlanError("a cruz de teste não cabe na área útil nesse ponto")
-    depth = min(pen.depth_max, pen.depth_min + 0.15)
+    depth = _light(pen)
     box = 3.0
     square = np.array(
         [
@@ -92,7 +102,7 @@ def offset_cross(area: Area, pen: PenProfile, target: tuple[float, float] | None
 def frame(area: Area, pen: PenProfile) -> tuple[list[PenPath], dict]:
     """Contorno da área útil (onde a caneta de fato desenha)."""
     x0, y0, x1, y1 = area
-    depth = min(pen.depth_max, pen.depth_min + 0.1)
+    depth = _light(pen)
     loop = np.array(
         [[x0, y0, depth], [x1, y0, depth], [x1, y1, depth], [x0, y1, depth], [x0, y0, depth]], dtype=np.float64
     )

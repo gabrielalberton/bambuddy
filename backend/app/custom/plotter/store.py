@@ -16,7 +16,7 @@ import secrets
 import shutil
 import time
 
-from .engine import Paper, PenProfile, Placement, ProfileError
+from .engine import MOUNTS, Paper, PenProfile, Placement, ProfileError
 
 KEEP_DRAWINGS = 12
 KEEP_PLANS = 12
@@ -50,10 +50,15 @@ def _read_json(path: pathlib.Path):
 
 
 # ---------------------------------------------------------------- ajustes por impressora
+# um perfil inicial por modo do suporte; cada um guarda a própria calibração (o contato e a curva de pressão
+# com mola não valem sem mola: a caneta muda de altura ao ser travada e a ponta passa a ser a única "mola")
+DEFAULT_PEN_IDS = {"spring": "padrao", "rigid": "sem-mola"}
+
+
 def default_settings() -> dict:
     return {
-        "pens": {"padrao": PenProfile(name="Caneta padrão").to_dict()},
-        "active_pen": "padrao",
+        "pens": {pen_id: PenProfile.for_mount(mount).to_dict() for mount, pen_id in DEFAULT_PEN_IDS.items()},
+        "active_pen": DEFAULT_PEN_IDS["spring"],
         "paper": Paper().to_dict(),
         "placement": None,
     }
@@ -72,6 +77,10 @@ def normalize_settings(doc: dict | None) -> dict:
         if not isinstance(pen_id, str) or not _PEN_ID.match(pen_id):
             raise ProfileError("identificador de caneta inválido")
         pens[pen_id] = PenProfile.from_dict(raw if isinstance(raw, dict) else {}).to_dict()
+    for mount, pen_id in DEFAULT_PEN_IDS.items():  # garante um perfil de cada modo (ajustes antigos só tinham um)
+        if mount in MOUNTS and not any(p["mount"] == mount for p in pens.values()) and pen_id not in pens:
+            if len(pens) < MAX_PENS:
+                pens[pen_id] = PenProfile.for_mount(mount).to_dict()
     active = doc.get("active_pen")
     if active not in pens:
         active = next(iter(pens))

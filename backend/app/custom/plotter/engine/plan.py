@@ -241,6 +241,14 @@ def build_paths(
     if not drawing.strokes:
         raise PlanError("o desenho não tem traços")
     variable = opts.pressure == "variable"
+    if pen.mount == "rigid":
+        issues.append(
+            Issue(
+                "warning",
+                "rigid_flatness",
+                "Sem mola: a folha tem que estar plana e bem presa; 0,1 mm de ondulação já muda o traço.",
+            )
+        )
     if variable and not pen.pressure_calibrated:
         variable = False
         issues.append(
@@ -289,6 +297,9 @@ def build_paths(
         depth = np.interp(np.clip(target, pen_lo, pen_hi), table_w, table_d)
         return np.clip(depth, pen.depth_min, pen.depth_max), flag
 
+    spec = pen.mount_spec
+    # sem mola a faixa de aperto é de décimos de mm: a tolerância da simplificação acompanha a faixa
+    eps_depth = min(GCODE_EPS_DEPTH, max(0.003, 0.03 * (pen.depth_max - pen.depth_min)))
     paths: list[PenPath] = []
     total_len = kept_len = thin_len = thick_len = 0.0
     dots_total = dots_kept = 0
@@ -312,11 +323,11 @@ def build_paths(
             thin_len += float(seg[seg_flag < 0].sum())
             thick_len += float(seg[seg_flag > 0].sum())
         for piece in clip_polyline(pts, area):
-            piece = simplify.simplify_xyv(piece, GCODE_EPS_XY, GCODE_EPS_DEPTH)
+            piece = simplify.simplify_xyv(piece, GCODE_EPS_XY, eps_depth)
             piece = _drop_tiny(piece)
             if len(piece) < 2:
                 continue
-            piece = limit_slope(piece)
+            piece = limit_slope(piece, spec.max_slope)
             kept_len += float(np.hypot(np.diff(piece[:, 0]), np.diff(piece[:, 1])).sum())
             paths.append(PenPath(piece))
 

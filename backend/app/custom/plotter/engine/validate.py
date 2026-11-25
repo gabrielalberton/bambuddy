@@ -95,6 +95,7 @@ def validate(text: str, machine: Machine, pen: PenProfile, paper: Paper, keep_si
         return rep
     touch, floor = z["touch"], z["floor"]
     z_clear = touch + min(1.0, pen.lift * 0.5)  # abaixo disto a caneta está "baixa"
+    approach = pen.mount_spec.approach_speed if (pen.mount_spec.approach_speed or 0) < pen.z_speed else None
     ox, oy = pen.offset_x, pen.offset_y
     sheet = intersect(paper.rect(), (0.0, 0.0, machine.plate_w, machine.plate_h))
     if sheet is None:
@@ -139,6 +140,8 @@ def validate(text: str, machine: Machine, pen: PenProfile, paper: Paper, keep_si
         if line in _FIXED:
             if line in seen_off:
                 seen_off[line] = True
+            if line == "G29.2 S0" and pen.mount_spec.needs_mesh:
+                rep.error("mesh_required", "sem mola, a malha de nivelamento é obrigatória", n)
             continue
         cmd, _, body = line.partition(" ")
         cmd = cmd.upper()
@@ -220,6 +223,16 @@ def validate(text: str, machine: Machine, pen: PenProfile, paper: Paper, keep_si
                 rep.error("z_ceiling", f"bico alto demais: Z{nz:g}", n)
             if has_z and not has_xy and feed > MAX_Z_FEED + EPS:
                 rep.error("z_feed", f"Z rápido demais: F{feed:g}", n)
+            if (
+                approach is not None
+                and has_z
+                and zpos is not None
+                and nz < touch - EPS
+                and zpos > touch + EPS
+                and feed > approach * 60.0 + EPS
+            ):
+                # sem mola a ponta chega no papel na velocidade de aproximação, não na de Z
+                rep.error("fast_contact", f"caneta sem mola encostando rápido demais: F{feed:g}", n)
             if nx is None or ny is None:
                 rep.error("xy_unknown", "movimento sem posição X/Y conhecida", n)
                 continue

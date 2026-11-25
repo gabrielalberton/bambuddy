@@ -466,3 +466,48 @@ def test_so_ficam_os_desenhos_mais_recentes():
         store.save_drawing(f"{i:012x}", {"width": 1, "height": 1, "strokes": [], "meta": {}})
     kept = [d.name for d in (store.base_dir() / "drawings").iterdir()]
     assert len(kept) == store.KEEP_DRAWINGS
+
+
+# ---------------------------------------------------------------- modos do suporte
+async def test_ha_um_perfil_com_mola_e_um_sem_mola_cada_um_com_sua_calibracao(async_client, printer_factory, manager):
+    printer = await printer_factory(model="A1")
+    cfg = (await async_client.get(f"{API}/config")).json()
+    mounts = {m["key"]: m for m in cfg["mounts"]}
+    assert set(mounts) == {"spring", "rigid"} and mounts["rigid"]["needs_mesh"]
+    assert 0.02 in mounts["rigid"]["jog_steps"] and mounts["rigid"]["defaults"]["max_compression"] == 0.6
+    doc = (await async_client.get(f"{API}/printers/{printer.id}/settings")).json()
+    assert {p["mount"] for p in doc["pens"].values()} == {"spring", "rigid"}
+    assert doc["active_pen"] == "padrao" and doc["pens"]["sem-mola"]["use_mesh"] is True
+    assert doc["derived"]["sem-mola"]["mount"] == "rigid" and -0.02 in doc["derived"]["sem-mola"]["jog_steps"]
+    # calibrar o sem mola não mexe no com mola
+    doc["pens"]["sem-mola"].update({"z_contact": 5.5, "table": [[0.05, 0.5], [0.4, 1.5]]})
+    body = {k: doc[k] for k in ("pens", "active_pen", "paper", "placement")}
+    body["active_pen"] = "sem-mola"
+    saved = (await async_client.put(f"{API}/printers/{printer.id}/settings", json=body)).json()
+    assert saved["pens"]["sem-mola"]["z_contact"] == 5.5 and saved["pens"]["padrao"]["z_contact"] is None
+    assert saved["active_pen"] == "sem-mola" and saved["derived"]["sem-mola"]["pressure_calibrated"]
+
+
+async def test_ajustes_antigos_com_uma_caneta_ganham_o_perfil_sem_mola(async_client, printer_factory, manager):
+    printer = await printer_factory(model="A1")
+    old = {"pens": {"padrao": {"name": "Minha caneta", "z_contact": 4.2}}, "active_pen": "padrao"}
+    saved = (await async_client.put(f"{API}/printers/{printer.id}/settings", json=old)).json()
+    assert saved["pens"]["padrao"]["mount"] == "spring" and saved["pens"]["padrao"]["z_contact"] == 4.2
+    assert saved["pens"]["sem-mola"]["mount"] == "rigid"
+
+
+async def test_plano_sem_mola_sai_com_malha_e_aproximacao_lenta(async_client, printer_factory, manager):
+    printer = await printer_factory(model="A1")
+    doc = (await async_client.get(f"{API}/printers/{printer.id}/settings")).json()
+    doc["pens"]["sem-mola"].update({"z_contact": 4.0, "table": [[0.05, 0.5], [0.4, 1.5]]})
+    body = {k: doc[k] for k in ("pens", "active_pen", "paper", "placement")}
+    assert (await async_client.put(f"{API}/printers/{printer.id}/settings", json=body)).status_code == 200
+    drawing = await _drawing(async_client)
+    r = await _plan(async_client, printer.id, drawing["id"], pen_id="sem-mola")
+    assert r.status_code == 200, r.text
+    plan = r.json()
+    assert plan["ok"] and plan["pen_id"] == "sem-mola" and plan["pen"]["mount"] == "rigid"
+    assert "rigid_flatness" in {w["code"] for w in plan["warnings"]}
+    pkg = (await async_client.get(f"{API}/printers/{printer.id}/plans/{plan['id']}/download")).content
+    gcode = E.package.read_gcode(pkg)
+    assert "G29.2 S1" in gcode and "; pen_mount = rigid" in gcode and " F120" in gcode

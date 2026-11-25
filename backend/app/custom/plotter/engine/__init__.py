@@ -19,8 +19,10 @@ from .plan import Issue, PenPath, PlanError, PlanOptions, PlanPaths, build_paths
 from .profile import (
     A1,
     MACHINES,
+    MOUNTS,
     PAPER_PRESETS,
     Machine,
+    Mount,
     Paper,
     PenProfile,
     Placement,
@@ -28,6 +30,7 @@ from .profile import (
     drawable_area,
     home_point,
     machine_for_model,
+    mount_info,
     pen_reach,
 )
 from .raster import ImageError
@@ -38,12 +41,14 @@ from .vectorize import VectorizeOptions, render_preview, vectorize, vectorize_im
 __all__ = [
     "A1",
     "MACHINES",
+    "MOUNTS",
     "PAPER_PRESETS",
     "Drawing",
     "GcodeResult",
     "ImageError",
     "Issue",
     "Machine",
+    "Mount",
     "Paper",
     "PenPath",
     "PenProfile",
@@ -63,6 +68,7 @@ __all__ = [
     "home_point",
     "machine_for_model",
     "make_plot",
+    "mount_info",
     "package",
     "pen_reach",
     "placement_corners",

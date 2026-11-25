@@ -90,6 +90,7 @@ async def get_config(
     return {
         "enabled": True,
         "paper_presets": [{"id": k, "w": v[0], "h": v[1]} for k, v in E.PAPER_PRESETS.items()],
+        "mounts": [E.mount_info(m) for m in E.MOUNTS.values()],
         "max_upload_mb": MAX_UPLOAD_BYTES // (1024 * 1024),
         "limits": {
             "nozzle_max_temp": P.MAX_NOZZLE_TEMP,
@@ -143,6 +144,8 @@ def _settings_view(printer_id: int, doc: dict) -> dict:
             "reach": [round(v, 2) for v in E.pen_reach(machine, pen)],
             "area": [round(v, 2) for v in area] if area else None,
             "width_range": [round(v, 3) for v in pen.width_range()],
+            "mount": pen.mount,
+            "jog_steps": list(pen.mount_spec.jog_steps),
             "contact_calibrated": pen.contact_calibrated,
             "pressure_calibrated": pen.pressure_calibrated,
             "ladder_depths": E.calibration.default_ladder_depths(pen),

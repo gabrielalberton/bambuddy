@@ -19,7 +19,7 @@ import re
 from dataclasses import dataclass
 
 from .plan import PenPath, PlanError
-from .profile import Machine, Paper, PenProfile, home_point
+from .profile import APPROACH_GAP, Machine, Paper, PenProfile, home_point
 
 ACCEL_XY = 3000.0  # mm/s²: abaixo do padrão da A1 (6000) para a caneta não balançar no suporte
 ACCEL_Z = 500.0
@@ -130,6 +130,20 @@ def end_lines(machine: Machine, pen: PenProfile, z_end: float) -> list[str]:
     ]
 
 
+def _pen_down(pen: PenProfile, touch: float, z_from: float, z_to: float) -> list[tuple[str, float]]:
+    """Desce a caneta. Sem mola, os últimos APPROACH_GAP mm vão devagar: a ponta travada não tem
+    amortecimento e a batida a 5 mm/s deixa borrão no começo do traço e cansa a ponta."""
+    f_z = pen.z_speed * 60.0
+    approach = pen.mount_spec.approach_speed
+    gap = touch + APPROACH_GAP
+    if approach is None or approach >= pen.z_speed or z_from <= gap or z_to >= gap:
+        return [(f"G1 Z{fmt(z_to)} F{fmt(f_z, 0)}", _move_time(z_from - z_to, pen.z_speed, ACCEL_Z))]
+    return [
+        (f"G1 Z{fmt(gap)} F{fmt(f_z, 0)}", _move_time(z_from - gap, pen.z_speed, ACCEL_Z)),
+        (f"G1 Z{fmt(z_to)} F{fmt(approach * 60.0, 0)}", _move_time(gap - z_to, approach, ACCEL_Z)),
+    ]
+
+
 def build_gcode(
     paths: list[PenPath], pen: PenProfile, paper: Paper, machine: Machine, title: str = "plot"
 ) -> GcodeResult:
@@ -180,9 +194,7 @@ def build_gcode(
             dist = math.hypot(nx - nozzle[0], ny - nozzle[1])
             ops.append((f"G0 X{fmt(nx)} Y{fmt(ny)} F{fmt(f_travel, 0)}", _move_time(dist, pen.travel_speed, ACCEL_XY)))
             travel_mm += dist
-            ops.append(
-                (f"G1 Z{fmt(touch - d0)} F{fmt(f_z, 0)}", _move_time(z_travel - (touch - d0), pen.z_speed, ACCEL_Z))
-            )
+            ops += _pen_down(pen, touch, z_travel, touch - d0)
             pen_downs += 1
             dwell = max(pen.dwell_ms, DOT_DWELL_MS) if path.is_dot else pen.dwell_ms
             if dwell > 0:
@@ -233,6 +245,7 @@ def build_gcode(
         "; pen_plotter = 1",
         f"; plot_title = {clean_title(title)}",
         "; printer_model = Bambu Lab A1",
+        f"; pen_mount = {pen.mount}",
         f"; pen_offset = {fmt(ox)},{fmt(oy)}",
         f"; pen_z_contact = {fmt(pen.z_contact or 0)}",
         f"; pen_z_touch = {fmt(touch)}",
