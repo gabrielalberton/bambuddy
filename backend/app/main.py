@@ -5094,7 +5094,9 @@ async def on_print_start(printer_id: int, data: dict):
         logger.info(
             f"[PLATE CHECK] printer_id={printer_id}, plate_detection_enabled={printer.plate_detection_enabled if printer else 'NO PRINTER'}"
         )
-        if printer and printer.plate_detection_enabled:
+        from backend.app.custom.plotter.hooks import is_plotter_job  # custom(plotter): o papel não é "objeto"
+
+        if printer and printer.plate_detection_enabled and not is_plotter_job(data):
             logger.info("[PLATE CHECK] ENTERING plate detection code for printer %s", printer_id)
             # Release the pooled DB connection before the plate-detection camera
             # work (a 2.5s light-settle sleep + FTP/camera capture). Only the

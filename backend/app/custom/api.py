@@ -59,6 +59,13 @@ def install(app: FastAPI) -> list[str]:
     from .print_history import router as print_history_router
 
     app.include_router(print_history_router, prefix=app_settings.api_prefix)
+    # Plotter de caneta na A1 (custom/docs/plotter.md)
+    from .plotter.router import plotter_enabled, router as plotter_router
+
+    if plotter_enabled():
+        app.include_router(plotter_router, prefix=app_settings.api_prefix)
+    else:
+        logger.info("Plotter de caneta do fork desligado (BAMBUDDY_CUSTOM_PLOTTER)")
     from .asset_404 import Asset404NoStoreMiddleware
 
     if not any(m.cls is Asset404NoStoreMiddleware for m in app.user_middleware):
