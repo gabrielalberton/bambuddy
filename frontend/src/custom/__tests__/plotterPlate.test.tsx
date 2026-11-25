@@ -10,7 +10,7 @@ it('paints the calibrated plate, A4 paper and reachable area on mount', () => {
     setLineDash: vi.fn(), arc: vi.fn(), fill: vi.fn(), fillText: vi.fn(),
   };
   const getContext = vi.spyOn(HTMLCanvasElement.prototype, 'getContext')
-    .mockReturnValue(context as unknown as CanvasRenderingContext2D);
+    .mockReturnValue(context as unknown as ReturnType<HTMLCanvasElement['getContext']>);
   try {
     render(<Plate
       machine={{ plate_w: 256, plate_h: 256, nozzle_x: [0, 256], nozzle_y: [0, 254] }}
