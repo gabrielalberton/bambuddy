@@ -492,16 +492,21 @@ Ver [prévia e perfil leve](docs/camera-previa.md).
 
 ## Vídeo ao vivo em H.264 (`custom(camera)`, 2026-11-24)
 
-Resolução cheia a 10 fps com ~1,5 Mbps: o H.264 do go2rtc toca num `<video>` no lugar do MJPEG do upstream (que só
-abre nos primeiros segundos e fica de reserva). Detalhes e medições: [camera-h264](docs/camera-h264.md).
+Resolução cheia a 10 fps com ~1,5 Mbps: o H.264 do go2rtc toca num `<video>` no lugar do MJPEG do upstream. Desde
+2026-11-25 o MJPEG nem abre (abertura direta, com a prévia do Frigate até o 1º quadro) e fica só de reserva.
+Detalhes e medições: [camera-h264](docs/camera-h264.md).
 
-- Interruptores: `BAMBUDDY_CUSTOM_H264_WS_URL` (sem ela, 4404 e tudo fica no MJPEG); `localStorage['custom.h264']`.
+- Interruptores: `BAMBUDDY_CUSTOM_H264_WS_URL` (sem ela, 4404 e tudo fica no MJPEG); `localStorage['custom.h264']`;
+  `localStorage['custom.h264Direct'] = 'off'` (volta a abrir o MJPEG junto).
 - Código nosso: `backend/app/custom/camera_h264.py` (WebSocket), `backend/app/custom/api.py` (+4),
   `frontend/src/custom/camera/H264Live.tsx` e `h264.ts`, `CameraOrTwin.tsx` (monta o player), `useTwinView.ts`
   (`useTwinActive` = `useH264Active`), seletor compartilhado em `CameraPreview.tsx` e `useCameraImageFit.ts`; testes
   `backend/tests/custom/test_camera_h264.py` e `frontend/src/custom/__tests__/cameraH264.test.tsx`.
-- Upstream: **nenhuma linha nova** (ganchos do twin em `CameraPage.tsx`/`EmbeddedCameraViewer.tsx`). Depende do `src`
-  com `/camera/stream`, do `useStreamImgRef` e da checagem de travamento condicionada a `twinActive`.
+- Upstream: gancho de 2 linhas em `frontend/src/hooks/useStreamImgRef.ts` (`claimStreamImg`, só age num `<img>` dentro
+  do `CameraOrTwin`), além dos ganchos do twin em `CameraPage.tsx`/`EmbeddedCameraViewer.tsx`. Depende do `src` com
+  `/camera/stream`, de o stream só abrir pelo `useStreamImgRef` e da checagem de travamento condicionada a `twinActive`.
+- Produção: a URL RTSP da impressora é `rtsp://frigate-standalone:8554/thingino_135?video` (sem `?video`, o ffmpeg do
+  MJPEG fazia o go2rtc abrir a fonte de áudio e quebrava o 1º quadro do H.264).
 
 ## Prévia colorida de 3MF sem fatiamento
 

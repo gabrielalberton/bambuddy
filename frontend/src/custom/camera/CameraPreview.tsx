@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { withStreamToken } from '../../api/client';
 import { cameraPreviewEnabled } from './previewFlags';
-import { STREAM_IMG_SELECTOR } from './h264';
+import { STREAM_IMG_SELECTOR, isWaitingForH264 } from './h264';
 import { displayedAspect, fitRect, rememberCameraAspect, rotationFromTransform } from './cameraAspect';
 
 /** Intervalo entre imagens da prévia (o Frigate atualiza a ~3 fps). */
@@ -90,7 +90,8 @@ export function CameraPreview({ printerId }: { printerId: number }) {
       setHost(img?.parentElement ?? null);
       const nextBox = img ? frameBox(img) : null;
       setBox((prev) => (sameBox(prev, nextBox) ? prev : nextBox));
-      const hasFrame = !!img && img.naturalWidth > 0;
+      // reservado para o H.264 sem quadro ainda: a imagem transparente não conta, a prévia fica até o vídeo chegar
+      const hasFrame = !!img && img.naturalWidth > 0 && !isWaitingForH264(img);
       const rot = rotationFromTransform(img?.style.transform);
       setRotation(rot);
       if (img && hasFrame) rememberCameraAspect(printerId, displayedAspect(img.naturalWidth, img.naturalHeight, rot));

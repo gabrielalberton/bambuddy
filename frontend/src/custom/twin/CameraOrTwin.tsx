@@ -2,6 +2,7 @@ import { lazy, Suspense, useRef, useState, type ReactNode } from 'react';
 import { ArrowLeft } from 'lucide-react';
 import { CameraPreview } from '../camera/CameraPreview';
 import { H264Live } from '../camera/H264Live';
+import { SCOPE_ATTR } from '../camera/h264';
 import { FillParentHeight } from '../camera/FillParentHeight';
 import { useCameraImageFit } from '../camera/useCameraImageFit';
 import { useTwinAvailable } from './useTwinView';
@@ -43,5 +44,6 @@ export function CameraOrTwin({ printerId, className = 'relative w-full h-full', 
       {main && <button type="button" className="custom-pair-back" aria-label="Voltar às duas visualizações" onClick={(e) => { e.stopPropagation(); setMain(null); }}><ArrowLeft className="h-5 w-5" /></button>}
     </div>
   ) : <>{children}<CameraPreview printerId={printerId} /><H264Live printerId={printerId} /></>;
-  return <div ref={root} className="contents">{switchPlacement === 'viewport' ? <FillParentHeight>{content}</FillParentHeight> : content}</div>;
+  // SCOPE_ATTR: o gancho do useStreamImgRef só reserva para o H.264 um <img> dentro deste contêiner (há um H264Live aqui)
+  return <div ref={root} className="contents" {...{ [SCOPE_ATTR]: printerId }}>{switchPlacement === 'viewport' ? <FillParentHeight>{content}</FillParentHeight> : content}</div>;
 }

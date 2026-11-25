@@ -1,17 +1,26 @@
 import { act, render, renderHook, screen, waitFor } from '@testing-library/react';
+import { useRef } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { useStreamImgRef } from '../../hooks/useStreamImgRef';
 import { H264Live } from '../camera/H264Live';
 import {
+  SCOPE_ATTR,
+  claimStreamImg,
   forgetIfReplaced,
   h264SocketUrl,
   h264Unavailable,
   isH264Active,
   isTakenOver,
+  isWaitingForH264,
   liveAdjust,
+  markAdopted,
   release,
+  rememberedVideoSize,
   resetH264StateForTests,
   retryDelayMs,
   setH264Active,
+  setH264DirectOverride,
+  setH264Failing,
   setH264Override,
   supportedCodecs,
   takeOver,
@@ -19,6 +28,20 @@ import {
 } from '../camera/h264';
 
 const MJPEG = '/api/v1/printers/1/camera/stream?fps=15&t=1&viewer=a';
+
+/** O setup dos testes troca o localStorage por vi.fn() vazios: aqui ele guarda de verdade (tamanho do vídeo). */
+function memoryStorage() {
+  const data = new Map<string, string>();
+  vi.mocked(localStorage.getItem).mockImplementation((key: string) => data.get(key) ?? null);
+  vi.mocked(localStorage.setItem).mockImplementation((key: string, value: string) => void data.set(key, String(value)));
+  vi.mocked(localStorage.removeItem).mockImplementation((key: string) => void data.delete(key));
+}
+
+function resetStorage() {
+  vi.mocked(localStorage.getItem).mockReset();
+  vi.mocked(localStorage.setItem).mockReset();
+  vi.mocked(localStorage.removeItem).mockReset();
+}
 
 describe('h264: partes puras', () => {
   afterEach(() => resetH264StateForTests());
@@ -90,6 +113,92 @@ describe('h264: partes puras', () => {
     expect(result.current).toBe(true);
     act(() => setH264Active(1, false));
     expect(result.current).toBe(false);
+  });
+});
+
+describe('h264: abertura direta (o MJPEG nem abre)', () => {
+  const fakeMse = class {
+    static isTypeSupported = () => true;
+  };
+  let scope: HTMLDivElement;
+  beforeEach(() => {
+    setH264Override(true);
+    vi.stubGlobal('MediaSource', fakeMse);
+    memoryStorage();
+    scope = document.createElement('div');
+    scope.setAttribute(SCOPE_ATTR, '1');
+    document.body.appendChild(scope);
+  });
+  afterEach(() => {
+    scope.remove();
+    resetH264StateForTests();
+    resetStorage();
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
+  });
+
+  const streamImg = () => {
+    const img = document.createElement('img');
+    scope.appendChild(img);
+    return img;
+  };
+
+  it('reserva o <img> do stream dentro do quadro com a imagem transparente do último vídeo', () => {
+    localStorage.setItem('custom.h264Size', JSON.stringify({ 1: [2304, 1296] }));
+    const img = streamImg();
+    expect(claimStreamImg(img, MJPEG)).toBe(true);
+    expect(img.getAttribute('src')).toMatch(/^data:image\/svg\+xml,/);
+    expect(decodeURIComponent(img.getAttribute('src')!)).toContain('width="2304" height="1296"');
+    expect(isWaitingForH264(img)).toBe(true);
+    // falhou: volta ao MJPEG com a URL guardada
+    release(img);
+    expect(img.getAttribute('src')).toBe(MJPEG);
+    expect(isWaitingForH264(img)).toBe(false);
+  });
+
+  it('segue o upstream fora do quadro, em snapshot, na câmera nativa, desligado ou com o H.264 em falha', () => {
+    const outside = document.createElement('img');
+    document.body.appendChild(outside);
+    expect(claimStreamImg(outside, MJPEG)).toBe(false);
+    outside.remove();
+    expect(claimStreamImg(streamImg(), '/api/v1/printers/1/camera/snapshot?t=1')).toBe(false);
+    expect(claimStreamImg(streamImg(), '/api/v1/printers/1/camera/stream?native=true&fps=5')).toBe(false);
+    setH264DirectOverride(false);
+    expect(claimStreamImg(streamImg(), MJPEG)).toBe(false);
+    setH264DirectOverride(null);
+    setH264Failing(1, true);
+    expect(claimStreamImg(streamImg(), MJPEG)).toBe(false);
+    setH264Failing(1, false);
+    vi.stubGlobal('MediaSource', undefined);
+    expect(claimStreamImg(streamImg(), MJPEG)).toBe(false);
+  });
+
+  it('URL nova num <img> já sem MJPEG: só guarda para a volta', () => {
+    const img = streamImg();
+    claimStreamImg(img, MJPEG);
+    const placeholder = img.getAttribute('src');
+    const next = MJPEG.replace('t=1', 't=2');
+    expect(claimStreamImg(img, next)).toBe(true);
+    expect(img.getAttribute('src')).toBe(placeholder);
+    release(img);
+    expect(img.getAttribute('src')).toBe(next);
+  });
+
+  it('sem H264Live para assumir em 3 s, devolve o MJPEG', () => {
+    vi.useFakeTimers();
+    const lost = streamImg();
+    const kept = streamImg();
+    claimStreamImg(lost, MJPEG);
+    claimStreamImg(kept, MJPEG);
+    markAdopted(kept);
+    vi.advanceTimersByTime(3100);
+    expect(lost.getAttribute('src')).toBe(MJPEG);
+    expect(isTakenOver(kept)).toBe(true);
+  });
+
+  it('lembra só tamanhos válidos', () => {
+    localStorage.setItem('custom.h264Size', JSON.stringify({ 1: [0, 'x'] }));
+    expect(rememberedVideoSize(1)).toEqual([1920, 1080]);
   });
 });
 
@@ -244,6 +353,53 @@ describe('H264Live (vídeo H.264 no lugar do MJPEG)', () => {
     await new Promise((r) => setTimeout(r, 300));
     expect(FakeWebSocket.instances.length).toBe(0);
     expect(screen.getByTestId('stream').getAttribute('src')).toBe(MJPEG);
+  });
+
+  it('abre direto pelo gancho do upstream: o MJPEG nunca recebe src e volta como reserva se o H.264 cair', async () => {
+    memoryStorage();
+    const seen: string[] = [];
+    const srcSetter = vi.spyOn(HTMLImageElement.prototype, 'src', 'set');
+    srcSetter.mockImplementation(function (this: HTMLImageElement, value: string) {
+      seen.push(value);
+      this.setAttribute('src', value);
+    });
+    function Upstream({ url }: { url: string }) {
+      const imgRef = useRef<HTMLImageElement | null>(null);
+      const attach = useStreamImgRef(imgRef, url);
+      return (
+        <div data-testid="video-area" className="relative">
+          <img data-testid="stream" ref={attach} alt="Camera stream" />
+        </div>
+      );
+    }
+    const Page = ({ url }: { url: string }) => (
+      <div {...{ [SCOPE_ATTR]: 1 }}>
+        <Upstream url={url} />
+        <H264Live printerId={1} />
+      </div>
+    );
+    const { rerender } = render(<Page url={MJPEG} />);
+    const img = screen.getByTestId('stream');
+    expect(isWaitingForH264(img as HTMLImageElement)).toBe(true);
+    await waitFor(() => expect(isH264Active(1)).toBe(true)); // checagem de travamento do upstream pausada
+    const ws = await openSession();
+    act(() => {
+      ws.onmessage?.({ data: '{"type":"mse","value":"video/mp4; codecs=\\"avc1.4D0029\\""}' });
+    });
+    setVideoReady(screen.getByTestId('custom-h264-video'));
+    await waitFor(() => expect(isWaitingForH264(img as HTMLImageElement)).toBe(false));
+    expect(decodeURIComponent(img.getAttribute('src')!)).toContain('width="2304" height="1296"');
+    expect(rememberedVideoSize(1)).toEqual([2304, 1296]);
+    expect(seen.some((v) => v.includes('/camera/stream'))).toBe(false);
+
+    // caiu depois de tocar: MJPEG de reserva e, até o H.264 voltar, URL nova do upstream abre o MJPEG
+    act(() => ws.onclose?.({ code: 4502 }));
+    expect(img.getAttribute('src')).toBe(MJPEG);
+    const next = MJPEG.replace('t=1', 't=2');
+    rerender(<Page url={next} />);
+    expect(img.getAttribute('src')).toBe(next);
+    srcSetter.mockRestore();
+    resetStorage();
   });
 
   it('devolve o MJPEG ao desmontar', async () => {

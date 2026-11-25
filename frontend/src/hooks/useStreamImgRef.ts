@@ -1,4 +1,5 @@
 import { useCallback, type MutableRefObject } from 'react';
+import { claimStreamImg } from '../custom/camera/h264';
 
 /**
  * A ref for a camera stream <img> that gives it its src only once React has
@@ -41,7 +42,8 @@ export function useStreamImgRef(imgRef: MutableRefObject<HTMLImageElement | null
       if (!src) {
         if (img.hasAttribute('src')) img.removeAttribute('src');
       } else if (img.getAttribute('src') !== src) {
-        img.src = src;
+        // custom(camera): com o H.264 do go2rtc o MJPEG não abre (custom/docs/camera-h264.md)
+        if (!claimStreamImg(img, src)) img.src = src;
       }
       return () => {
         if (imgRef.current === img) imgRef.current = null;

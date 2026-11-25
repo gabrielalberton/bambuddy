@@ -28,21 +28,29 @@ O go2rtc do Frigate já entrega o mesmo H.264 em MP4 fragmentado para Media Sour
   upstream, então não precisa de prefixo público.
 - **Frontend** `frontend/src/custom/camera/H264Live.tsx` + `h264.ts`, montado pelo `CameraOrTwin` junto da prévia
   (página da câmera, janela flutuante e câmera embutida no card):
-  1. o `<img>` MJPEG do upstream abre como sempre, com a prévia do Frigate por cima;
-  2. o vídeo H.264 toca escondido atrás dele (`z-index: -1`, o quadro ganha `isolation: isolate`);
-  3. com o primeiro quadro, o `src` do `<img>` vira um SVG transparente do tamanho do vídeo: o MJPEG para (o navegador
-     fecha a conexão e o backend encerra o ffmpeg), a prévia some e o vídeo aparece no mesmo retângulo e com o mesmo
-     `transform` do `<img>` (zoom, arrasto e rotação do upstream continuam funcionando sobre o `<img>` transparente);
-  4. `useTwinActive` (gancho que o upstream já chama) devolve `useH264Active`: pausa a checagem de travamento, senão o
-     `/camera/status` sem MJPEG faria o upstream reconectar;
-  5. se o H.264 cair ou travar (8 s sem dados), o `<img>` volta ao MJPEG e o player tenta de novo em 2/5/15/30 s;
-     4404 desiste até recarregar a página;
+  1. **abertura direta** (desde 2026-11-25): o `CameraOrTwin` marca seu contêiner com `data-custom-h264-scope`. O gancho
+     `claimStreamImg` no `useStreamImgRef` do upstream não põe a URL do MJPEG num `<img>` de stream ali dentro: põe um
+     SVG transparente com o tamanho do último vídeo (`localStorage['custom.h264Size']`, padrão 1920x1080) e guarda a
+     URL para a volta. O MJPEG nem abre (nenhum ffmpeg no servidor). A prévia do Frigate fica por cima enquanto o
+     `<img>` tem `data-custom-h264-wait`;
+  2. o vídeo H.264 toca atrás do `<img>` (`z-index: -1`, o quadro ganha `isolation: isolate`), no mesmo retângulo e
+     com o mesmo `transform` (zoom, arrasto e rotação do upstream continuam funcionando sobre o `<img>` transparente);
+  3. com o primeiro quadro, sai o `data-custom-h264-wait` (a prévia some com fade) e o SVG fica com o tamanho real do
+     vídeo. Sem abertura direta (interruptor desligado ou H.264 em falha), o `<img>` abre o MJPEG e a troca pelo SVG
+     acontece só aqui;
+  4. `useTwinActive` (gancho que o upstream já chama) devolve `useH264Active`: pausa a checagem de travamento enquanto o
+     `<img>` está sem MJPEG, senão o `/camera/status` faria o upstream reconectar;
+  5. se o H.264 cair, travar (8 s sem dados) ou não ter quadro (8 s na abertura direta, 15 s com MJPEG na tela), o
+     `<img>` volta ao MJPEG. O player tenta de novo em 2/5/15/30 s e, até ter quadro de novo, o gancho deixa o MJPEG
+     abrir. 4404, navegador sem os codecs ou sem MediaSource: desiste até recarregar a página. Reserva que nenhum
+     `H264Live` assume em 3 s também volta ao MJPEG;
   6. em segundo plano (PWA minimizado) a conexão fecha e nada trafega; ao voltar reabre, com o último quadro como
      pôster.
   Latência: janela de 5 s no buffer e velocidade ajustada pelo atraso (~1 s), como o player do go2rtc.
-- **Upstream**: nenhuma linha nova. Depende de o `<img>` do stream ter `/camera/stream` no `src`, de o
-  `useStreamImgRef` só repor o `src` quando a URL muda, da checagem de travamento respeitar `twinActive` e do CSP do SPA
-  permitir `media-src blob:` e `connect-src ws: wss:`. Conferir ao atualizar.
+- **Upstream**: um gancho de 2 linhas em `frontend/src/hooks/useStreamImgRef.ts` (`claimStreamImg`). Depende também de
+  o `<img>` do stream ter `/camera/stream` no `src`, de os visualizadores só zerarem o `src` direto (`src = ''`) e
+  abrirem o stream pelo `useStreamImgRef`, da checagem de travamento respeitar `twinActive` e do CSP do SPA permitir
+  `media-src blob:` e `connect-src ws: wss:`. Conferir ao atualizar.
 
 Produção: `BAMBUDDY_CUSTOM_H264_WS_URL=ws://frigate-standalone:1984/api/ws?src=thingino_135` no `23-bambuddy.yml`.
 O MJPEG (perfil leve) continua como reserva e nos primeiros segundos.
@@ -63,10 +71,11 @@ Medido no Chrome headless, com o 3D desligado (ms desde a navegação):
 | Só MJPEG, para comparar | — | 1º quadro em 6,0–6,6 s |
 
 Com `?video`, abrir o MJPEG junto não atrasa o H.264, inclusive no celular. Lá a demora é a página: a câmera surge em
-~3–4,5 s e o H.264 entra 0,6–0,8 s depois. Por isso não vale um gancho no `useStreamImgRef` para nem abrir o MJPEG. O
-custo do MJPEG é um ffmpeg por ~6 s no servidor, que encerra sozinho, sem quadro enviado. Em troca, ele cobre um H.264
-lento ou indisponível.
+~3–4,5 s e o H.264 entra 0,6–0,8 s depois. O MJPEG aberto junto só gastava: um ffmpeg por ~6 s no servidor, sem
+nenhum quadro enviado. Por isso, desde 2026-11-25, a abertura é direta e o MJPEG ficou só como reserva.
 
 Desligar: tirar a variável (backend; tudo volta ao MJPEG) ou `localStorage['custom.h264'] = 'off'` (aparelho).
+Só a abertura direta: `localStorage['custom.h264Direct'] = 'off'` (o MJPEG volta a abrir junto e o H.264 assume no 1º
+quadro).
 
 Capturas, verificação da mesa, prévia e gravações não mudam: seguem seus próprios caminhos.

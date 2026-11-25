@@ -9,12 +9,16 @@ import {
   h264SocketUrl,
   h264Unavailable,
   isTakenOver,
+  isWaitingForH264,
   liveAdjust,
+  markAdopted,
   markH264Unavailable,
   mediaSourceCtor,
   release,
   retryDelayMs,
   setH264Active,
+  setH264Failing,
+  showH264,
   supportedCodecs,
   takeOver,
 } from './h264';
@@ -24,6 +28,8 @@ const WATCH_MS = 150;
 const STALL_MS = 8000;
 /** Sem primeiro quadro (o quadro-chave da Thingino vem a cada 2 s): desiste desta tentativa. */
 const START_TIMEOUT_MS = 15000;
+/** Idem com o MJPEG nem aberto (só a prévia do Frigate na tela): volta ao MJPEG mais cedo. */
+const DIRECT_START_TIMEOUT_MS = 8000;
 const MAX_PENDING_BYTES = 4 * 1024 * 1024;
 
 type Layout = { box: { left: number; top: number; width: number; height: number } | null; transform: string };
@@ -65,14 +71,16 @@ function rememberFrame(video: HTMLVideoElement) {
 
 /**
  * Vídeo ao vivo em H.264 (go2rtc via backend, ~1,5 Mbps em resolução cheia) no lugar do MJPEG do upstream
- * (custom/docs/camera-h264.md). Toca escondido atrás do `<img>` do upstream; quando tem quadro, troca o `src` do
- * `<img>` por uma imagem transparente do mesmo tamanho (o MJPEG para) e o vídeo aparece no mesmo lugar, com o mesmo
- * zoom/rotação. Se o H.264 cair, devolve o MJPEG e tenta de novo depois. Não mexe no componente do upstream.
+ * (custom/docs/camera-h264.md). Toca atrás do `<img>` do upstream, que fica com uma imagem transparente do mesmo
+ * tamanho: o vídeo aparece no mesmo lugar, com o mesmo zoom/rotação. Normalmente o `<img>` já nasce assim (gancho no
+ * `useStreamImgRef`, o MJPEG nem abre); senão a troca acontece no 1º quadro. Se o H.264 cair, devolve o MJPEG e tenta
+ * de novo depois.
  */
 export function H264Live({ printerId }: { printerId: number }) {
   const anchorRef = useRef<HTMLSpanElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const owned = useRef(new Set<HTMLImageElement>());
+  const shown = useRef(new WeakSet<HTMLImageElement>());
   const activeRef = useRef(false);
   const failures = useRef(0);
   const [host, setHost] = useState<HTMLElement | null>(null);
@@ -92,6 +100,20 @@ export function H264Live({ printerId }: { printerId: number }) {
   };
   const releaseRef = useRef(releaseAll);
   releaseRef.current = releaseAll;
+
+  /** `<img>` já sem MJPEG (reservado na abertura ou trocado depois do 1º quadro): pausa a checagem do upstream. */
+  const own = (img: HTMLImageElement) => {
+    if (!owned.current.has(img)) {
+      owned.current.add(img);
+      markAdopted(img);
+    }
+    if (!activeRef.current) {
+      activeRef.current = true;
+      setH264Active(printerId, true);
+    }
+  };
+  const ownRef = useRef(own);
+  ownRef.current = own;
 
   // Devolve o MJPEG ao desmontar ou desligar.
   useEffect(() => {
@@ -122,6 +144,7 @@ export function H264Live({ printerId }: { printerId: number }) {
         return;
       }
       forgetIfReplaced(img);
+      if (isTakenOver(img)) ownRef.current(img);
       const next = layoutOf(img, nextHost);
       setLayout((prev) => (sameLayout(prev, next) ? prev : next));
     };
@@ -160,6 +183,8 @@ export function H264Live({ printerId }: { printerId: number }) {
       ms = new media.ctor();
       ws = new WebSocket(h264SocketUrl(printerId, withStreamToken));
     } catch {
+      markH264Unavailable();
+      releaseRef.current();
       setStopped(true);
       return;
     }
@@ -182,6 +207,9 @@ export function H264Live({ printerId }: { printerId: number }) {
     const fail = (retry: boolean) => {
       if (disposed) return;
       dispose();
+      // antes de devolver o MJPEG: o gancho do upstream não reserva de novo enquanto o H.264 não voltar
+      if (retry) setH264Failing(printerId, true);
+      else markH264Unavailable();
       releaseRef.current();
       if (!retry) {
         setStopped(true);
@@ -302,20 +330,21 @@ export function H264Live({ printerId }: { printerId: number }) {
       if (!ready && video.readyState >= 2 && video.videoWidth > 0) {
         ready = true;
         failures.current = 0;
+        setH264Failing(printerId, false);
       }
+      const root = anchorRef.current?.parentElement;
+      const img = root?.querySelector<HTMLImageElement>(STREAM_IMG_SELECTOR) ?? null;
       if (ready) {
-        const root = anchorRef.current?.parentElement;
-        const img = root?.querySelector<HTMLImageElement>(STREAM_IMG_SELECTOR) ?? null;
-        if (img && !isTakenOver(img) && takeOver(img, video.videoWidth, video.videoHeight)) {
-          owned.current.add(img);
-          if (!activeRef.current) {
-            activeRef.current = true;
-            setH264Active(printerId, true);
+        if (img && (isTakenOver(img) || takeOver(img, video.videoWidth, video.videoHeight))) {
+          ownRef.current(img);
+          if (!shown.current.has(img) || isWaitingForH264(img)) {
+            shown.current.add(img);
+            showH264(img, printerId, video.videoWidth, video.videoHeight);
           }
         }
         if (video.paused) video.play().catch(() => undefined);
         if (now - lastData > STALL_MS) fail(true);
-      } else if (now - started > START_TIMEOUT_MS) {
+      } else if (now - started > (img && isWaitingForH264(img) ? DIRECT_START_TIMEOUT_MS : START_TIMEOUT_MS)) {
         fail(true);
       }
     }, WATCH_MS);
