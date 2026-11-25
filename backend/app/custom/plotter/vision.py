@@ -106,10 +106,35 @@ class PlateTracker:
         profile, _, _ = self._score(self.rectify(frame))
         return profile
 
+    def _front_row(self, rectified: np.ndarray, prior: float) -> float:
+        """Refine the front of the square body against the thin, dark PEI rim."""
+        stripe = self.profile.get("front_edge_stripe")
+        if stripe is None:
+            return prior
+        x0, x1 = stripe
+        lo = max(2, int(prior) - 15)
+        hi = min(rectified.shape[0] - 4, int(prior) + 7)
+        ys = np.arange(lo, hi + 1)
+        if not ys.size:
+            return prior
+        patch = cv2.cvtColor(rectified[lo - 2:hi + 4, x0:x1], cv2.COLOR_BGR2GRAY)
+        gradient = np.median(self.features(patch), axis=1)
+        i = ys - lo + 2
+        fall = np.maximum(-gradient[i - 1], -gradient[i])
+        rise = np.maximum(gradient[i + 1], gradient[i + 2])
+        contrast = np.minimum(fall, rise)
+        score = contrast - 1.4 * np.abs(ys - prior)
+        peak = int(np.argmax(score))
+        # Dim or occluded rims keep the estimate from the template search.
+        if contrast[peak] < 19 or score[peak] < 11:
+            return prior
+        return float(ys[peak])
+
     def locate(self, frame: np.ndarray, *, at: float | None = None, diagnostics: bool = False) -> dict:
         if not self.camera_aligned(frame):
             return {"found": False, "reason": "camera_alignment"}
-        profile, edge, logo = self._score(self.rectify(frame))
+        rectified = self.rectify(frame)
+        profile, edge, logo = self._score(rectified)
         start, end = self.profile["front_search"]
         candidates = np.arange(start, end + 1)
         background = np.asarray(self.profile.get("background", 0))
@@ -136,10 +161,12 @@ class PlateTracker:
                 row += 0.5 * (left - right) / (left + right - 2 * mid)
         if at is not None:
             self.last = at, row
-        front = self.y0 - row + self.profile["usable_front_offset"]
+        front_row = self._front_row(rectified, row - self.profile["usable_front_offset"])
+        front = self.y0 - front_row
         x_left = self.profile["usable_left"]
-        x = np.array([x_left, x_left + 256, x_left + 256, x_left])
-        y = np.array([front, front, front + 256, front + 256])
+        size = 256 * self.profile.get("plane_scale", 1.0)
+        x = np.array([x_left, x_left + size, x_left + size, x_left])
+        y = np.array([front, front, front + size, front + size])
         corners = self.project(x, y) / self.size
         phase = np.arange(8) / 8
         outline_x = (x[:, None] + (np.roll(x, -1) - x)[:, None] * phase).ravel()
