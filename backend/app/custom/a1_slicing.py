@@ -8,6 +8,7 @@ import re
 import zipfile
 from dataclasses import dataclass
 from io import BytesIO
+from typing import TYPE_CHECKING
 
 from fastapi import HTTPException
 
@@ -16,10 +17,18 @@ from backend.app.schemas.slicer import PresetRef, SliceRequest
 from backend.app.utils.printer_models import normalize_printer_model, normalize_printer_model_id
 from backend.app.utils.slicer_strings import first_slicer_string
 
+if TYPE_CHECKING:
+    from backend.app.schemas.slicer_presets import UnifiedPreset
+
 _PROJECT_SETTINGS = "Metadata/project_settings.config"
 _PLATE_GCODE = re.compile(r"Metadata/plate_\d+\.gcode", re.IGNORECASE)
 _GCODE_SETTING = re.compile(rb"^;[ \t]*(printer_model|nozzle_diameter)[ \t]*=[ \t]*([^\r\n]+)", re.MULTILINE)
 _GCODE_SCAN_BYTES = 128 * 1024
+# Bambu names every system preset for the machine it was made for: "... @BBL A1" is the
+# 0.4 nozzle, "... @BBL A1 0.2 nozzle" the 0.2 one. Measured 2026-11-25 against the
+# sidecar's 233 process / 1928 filament presets: the name and `compatible_printers`
+# agree on every A1 0.2 / 0.4 preset.
+_A1_PRESET_NAME = re.compile(r"@BBL A1(?: (?P<nozzle>\d\.\d) nozzle)?$")
 
 
 def enabled() -> bool:
@@ -78,7 +87,23 @@ class A1SliceTarget:
         except (zipfile.BadZipFile, KeyError, OSError, ValueError):
             return False
 
+    def check_presets(self, request: SliceRequest) -> None:
+        """Refuse a bundled process / filament preset made for another printer or nozzle."""
+        refs = [request.process_preset, *request.filament_presets]
+        wrong = [
+            ref.id
+            for ref in refs
+            if ref is not None and ref.source == "standard" and not _named_for_a1(ref.id, (self.diameter,))
+        ]
+        if wrong:
+            raise HTTPException(
+                422,
+                f"Perfil que não é da Bambu Lab A1 com bico de {self.diameter} mm: {', '.join(wrong)}. "
+                "Escolha um perfil da A1.",
+            )
+
     def apply(self, request: SliceRequest, can_use_embedded: bool) -> SliceRequest:
+        self.check_presets(request)
         return request.model_copy(
             update={
                 "printer_preset": self.preset,
@@ -119,6 +144,36 @@ class A1SliceTarget:
         return ("printer_model" not in fields or is_a1(fields["printer_model"])) and (
             "nozzle_diameter" not in fields or _nozzle_diameter(fields["nozzle_diameter"]) == self.diameter
         )
+
+
+def a1_printer_names(diameters: tuple[str, ...] = NOZZLE_OPTIONS) -> set[str]:
+    return {f"Bambu Lab A1 {diameter} nozzle" for diameter in diameters}
+
+
+def _named_for_a1(name: str | None, diameters: tuple[str, ...]) -> bool:
+    match = _A1_PRESET_NAME.search((name or "").strip())
+    return match is not None and (match.group("nozzle") or "0.4") in diameters
+
+
+def preset_fits_a1(preset: UnifiedPreset, slot: str, diameters: tuple[str, ...] = NOZZLE_OPTIONS) -> bool:
+    """Whether a preset is the A1's own, for one of its nozzles (0.2 / 0.4 by default)."""
+    printers = a1_printer_names(diameters)
+    if slot == "printer":
+        return preset.name in printers or (preset.inherits or "") in printers
+    if preset.compatible_printers:
+        return any(name in printers for name in preset.compatible_printers)
+    return _named_for_a1(preset.name, diameters) or _named_for_a1(preset.inherits, diameters)
+
+
+def only_a1_presets(tier: dict[str, list[UnifiedPreset]]) -> dict[str, list[UnifiedPreset]]:
+    """Drop every preset made for another printer (or for an A1 nozzle not owned here).
+
+    The A1 is the only printer in this installation. Listing other machines' presets
+    (1928 filaments, 233 processes, 70 printers) only offered wrong choices.
+    """
+    if not enabled():
+        return tier
+    return {slot: [preset for preset in presets if preset_fits_a1(preset, slot)] for slot, presets in tier.items()}
 
 
 def fixed_a1_presets() -> dict[str, PresetRef] | None:

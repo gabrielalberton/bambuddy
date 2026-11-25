@@ -7,8 +7,9 @@ import pytest
 from fastapi import HTTPException
 
 from backend.app.api.routes.library import _run_slicer_with_fallback
-from backend.app.custom.a1_slicing import fixed_a1_presets, fixed_a1_target
+from backend.app.custom.a1_slicing import fixed_a1_presets, fixed_a1_target, only_a1_presets
 from backend.app.schemas.slicer import PresetRef, SliceRequest
+from backend.app.schemas.slicer_presets import UnifiedPreset
 from backend.app.services.slice_preview import get_preview_filaments
 from backend.app.services.slicer_api import SlicerApiServerError, SlicerApiService, SliceResult
 
@@ -50,6 +51,13 @@ def slice_request() -> SliceRequest:
         a1_nozzle_diameter="0.4",
         use_embedded_settings=True,
     )
+
+
+def _for_nozzle(request: SliceRequest, diameter: str) -> None:
+    suffix = "" if diameter == "0.4" else f" {diameter} nozzle"
+    request.a1_nozzle_diameter = diameter
+    request.process_preset = PresetRef(source="standard", id=f"0.20mm Standard @BBL A1{suffix}")
+    request.filament_presets = [PresetRef(source="standard", id=f"Generic PLA @BBL A1{suffix}")]
 
 
 def test_target_uses_the_two_official_a1_profiles():
@@ -101,7 +109,7 @@ async def test_requires_explicit_nozzle_even_with_an_a1_printer_preset(
 async def test_slice_uses_a1_even_when_client_requests_x1c(
     db_session, monkeypatch, slice_request, model, nozzle, chosen, embedded
 ):
-    slice_request.a1_nozzle_diameter = chosen
+    _for_nozzle(slice_request, chosen)
     output = _project("Bambu Lab A1", chosen, gcode_models=("Bambu Lab A1",))
     with_profiles = AsyncMock(return_value=SliceResult(output, 10, 1, 2))
     from_project = AsyncMock(return_value=SliceResult(output, 10, 1, 2))
@@ -176,14 +184,92 @@ async def test_non_a1_filament_inspection_does_not_slice_with_the_source_profile
 
 
 async def test_a1_result_with_the_wrong_nozzle_is_rejected(db_session, monkeypatch, slice_request):
-    slice_request.a1_nozzle_diameter = "0.2"
+    _for_nozzle(slice_request, "0.2")
     output = _project("Bambu Lab A1", "0.4", gcode_models=("Bambu Lab A1",))
     monkeypatch.setattr(SlicerApiService, "slice_with_profiles", AsyncMock(return_value=SliceResult(output, 10, 1, 2)))
 
-    with pytest.raises(HTTPException, match="bico de 0.2 mm"):
+    with pytest.raises(HTTPException, match="não confirmou a Bambu Lab A1 com bico de 0.2 mm"):
         await _run_slicer_with_fallback(
             db_session, model_bytes=_project("Bambu Lab A1"), model_filename="part.3mf", request=slice_request
         )
+
+
+def _preset(name: str, source: str = "standard", compatible: list[str] | None = None, inherits: str | None = None):
+    return UnifiedPreset(id=name, name=name, source=source, compatible_printers=compatible, inherits=inherits)
+
+
+def test_only_a1_presets_keeps_the_a1_0_2_and_0_4_and_drops_every_other_printer():
+    tier = {
+        "printer": [
+            _preset("Bambu Lab A1 0.4 nozzle"),
+            _preset("Bambu Lab A1 0.2 nozzle"),
+            _preset("Bambu Lab A1 0.6 nozzle"),
+            _preset("Bambu Lab A1"),
+            _preset("Bambu Lab A1 mini 0.4 nozzle"),
+            _preset("Bambu Lab X1 Carbon 0.4 nozzle"),
+            _preset("Minha A1", source="cloud", inherits="Bambu Lab A1 0.4 nozzle"),
+            _preset("Minha P1S", source="cloud", inherits="Bambu Lab P1S 0.4 nozzle"),
+        ],
+        "process": [
+            _preset("0.20mm Standard @BBL A1"),
+            _preset("0.10mm Standard @BBL A1 0.2 nozzle"),
+            _preset("0.30mm Standard @BBL A1 0.6 nozzle"),
+            _preset("0.20mm Standard @BBL A1M"),
+            _preset("0.20mm Standard @BBL X1C"),
+            _preset("Endurance", source="cloud", inherits="0.12mm High Quality @BBL A1"),
+            _preset("Importado", source="local", compatible=["Bambu Lab P1S 0.4 nozzle"]),
+        ],
+        "filament": [
+            _preset("Generic PETG @BBL A1", compatible=["Bambu Lab A1 0.4 nozzle", "Bambu Lab A1 0.8 nozzle"]),
+            _preset("Generic PETG @BBL A1 0.2 nozzle"),
+            _preset("Generic PETG @BBL A1M"),
+            _preset("Generic PETG @BBL H2D"),
+            _preset("Generic PETG"),
+            _preset("PETG local", source="local", compatible=["Bambu Lab A1 0.2 nozzle"]),
+        ],
+    }
+
+    kept = {slot: [p.name for p in presets] for slot, presets in only_a1_presets(tier).items()}
+
+    assert kept == {
+        "printer": ["Bambu Lab A1 0.4 nozzle", "Bambu Lab A1 0.2 nozzle", "Minha A1"],
+        "process": ["0.20mm Standard @BBL A1", "0.10mm Standard @BBL A1 0.2 nozzle", "Endurance"],
+        "filament": ["Generic PETG @BBL A1", "Generic PETG @BBL A1 0.2 nozzle", "PETG local"],
+    }
+
+
+def test_only_a1_presets_lists_everything_when_the_lock_is_off(monkeypatch):
+    monkeypatch.delenv("BAMBUDDY_CUSTOM_A1_SLICING")
+    tier = {"process": [_preset("0.20mm Standard @BBL X1C")]}
+    assert only_a1_presets(tier) == tier
+
+
+@pytest.mark.parametrize(
+    ("diameter", "process", "filament"),
+    [
+        ("0.4", "0.20mm Standard @BBL X1C", "Generic PLA @BBL A1"),
+        ("0.4", "0.20mm Standard @BBL A1", "Generic PLA @BBL A1M"),
+        ("0.2", "0.20mm Standard @BBL A1", "Generic PLA @BBL A1 0.2 nozzle"),
+        ("0.4", "0.10mm Standard @BBL A1 0.2 nozzle", "Generic PLA @BBL A1"),
+    ],
+)
+async def test_slice_refuses_a_preset_for_another_printer_or_nozzle(
+    db_session, monkeypatch, slice_request, diameter, process, filament
+):
+    slice_request.a1_nozzle_diameter = diameter
+    slice_request.process_preset = PresetRef(source="standard", id=process)
+    slice_request.filament_presets = [PresetRef(source="standard", id=filament)]
+    sidecar = AsyncMock()
+    monkeypatch.setattr(SlicerApiService, "slice_with_profiles", sidecar)
+    monkeypatch.setattr(SlicerApiService, "slice_without_profiles", sidecar)
+
+    with pytest.raises(HTTPException, match="não é da Bambu Lab A1") as refused:
+        await _run_slicer_with_fallback(
+            db_session, model_bytes=_project("Bambu Lab A1", diameter), model_filename="part.3mf", request=slice_request
+        )
+
+    assert refused.value.status_code == 422
+    sidecar.assert_not_awaited()
 
 
 async def test_old_clients_cannot_enqueue_slices_or_pipeline_runs(

@@ -548,12 +548,17 @@ Detalhes e medições: [camera-h264](docs/camera-h264.md).
 
 - `BAMBUDDY_CUSTOM_A1_SLICING=1` fixa o modelo na Bambu Lab A1 e exige escolher 0,2 ou 0,4 mm toda vez que se fatia. O diâmetro da operação seleciona o perfil oficial e a compatibilidade de processo, filamento e pipelines.
 - O servidor exige `a1_nozzle_diameter` antes de criar o trabalho e monta o perfil de máquina. Valida o resultado antes de gravá-lo e usa as configurações embutidas ou de recuperação somente quando o 3MF já identifica o mesmo modelo e bico. A escolha vale para o próximo fatiamento, inclusive na execução e nas novas tentativas de pipelines.
+- Só a A1 aparece (2026-11-25): `/slicer/presets` devolve apenas perfis da A1 com bico 0,2 ou 0,4 em todos os níveis
+  (padrão, nuvem, Orca e local). Antes eram 70 impressoras, 233 processos e 1.928 filamentos. Agora são 2, 18 e 133.
+  Isso vale para o fatiamento, os pipelines, o modal de slot da AMS e o MCP. O fatiamento também recusa (422) um
+  processo ou filamento padrão de outra impressora ou de outro bico: `@BBL A1` é o 0,4 e `@BBL A1 0.2 nozzle` é o 0,2.
+  Perfis de nuvem ou locais valem quando a lista de compatibilidade ou o `inherits` aponta para a A1.
 - A análise preliminar dos filamentos de projetos para outras impressoras lê os slots do projeto. O fatiamento efetivo aplica o perfil da A1. A opção é configurada no servidor para valer também para clientes com a interface antiga em cache.
 
 | Arquivo | Âncora | Efeito |
 |---|---|---|
 | `backend/app/api/routes/library.py` e `archives.py` | rotas de fatiamento e `_run_slicer_with_fallback` | Exige o diâmetro nos endpoints e valida o alvo em `backend/app/custom/a1_slicing.py`. Impressos registra o bico encontrado no 3MF novo. |
-| `backend/app/api/routes/slicer_presets.py`, `slicer_pipelines.py` e schemas correspondentes | listagens | Expõem os perfis de máquina permitidos por diâmetro. |
+| `backend/app/api/routes/slicer_presets.py`, `slicer_pipelines.py` e schemas correspondentes | listagens | Expõem os perfis de máquina permitidos por diâmetro. `list_unified_presets` passa cada nível por `only_a1_presets` (1 linha). |
 | `backend/app/api/routes/pipeline_runs.py` e `backend/app/schemas/{pipeline_run,slicer}.py` | criação, nova tentativa e requisição de fatiamento | Validam o valor explícito antes de enfileirar e repassam a escolha ao trabalho. |
 | `backend/app/services/slice_preview.py` | entrada de `get_preview_filaments` | Usa os metadados de projetos para outras impressoras. |
 | `frontend/src/components/SliceModal.tsx`, `RunWithPipelineModal.tsx`, `pages/PipelineRunsPage.tsx` e `api/client.ts` | estado do preset, envio e nova tentativa | Montam o seletor de bico em `custom/slicing/` e usam a escolha para habilitar a ação e selecionar os perfis compatíveis. `SliceModal` toca mais de dez linhas porque o perfil alimenta os efeitos de seleção, o corpo da requisição e o filtro de pipelines. |

@@ -38,7 +38,7 @@ from backend.app.core.config import settings as app_settings
 from backend.app.core.database import get_db
 from backend.app.core.permissions import Permission
 from backend.app.core.printer_scope import PrinterScope
-from backend.app.custom.a1_slicing import fixed_a1_presets
+from backend.app.custom.a1_slicing import fixed_a1_presets, only_a1_presets
 from backend.app.models.local_preset import LocalPreset
 from backend.app.models.printer import Printer
 from backend.app.models.slot_preset import SlotPresetMapping
@@ -755,6 +755,8 @@ async def list_unified_presets(
     standard = await _fetch_bundled_presets(db, refresh=refresh)
 
     orca_cloud, cloud, local, standard = _enrich_cloud_metadata(orca_cloud, cloud, local, standard)
+    # custom(a1-only): só perfis da Bambu Lab A1 (bicos 0,2 e 0,4) chegam às telas e às ferramentas.
+    orca_cloud, cloud, local, standard = (only_a1_presets(tier) for tier in (orca_cloud, cloud, local, standard))
     stock_aliases = _stock_aliases(cloud, standard)
     standard = _drop_aliased(standard, stock_aliases)
 
