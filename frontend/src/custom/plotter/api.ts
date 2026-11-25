@@ -28,7 +28,11 @@ export type Config = {
   paper_presets: { id: string; w: number; h: number }[];
   max_upload_mb: number;
   limits: { jog_max_step: number };
-  printers: { id: number; name: string; supported: boolean }[];
+  printers: { id: number; name: string; supported: boolean; plate_vision?: boolean }[];
+};
+export type PlateMatch = {
+  found: boolean; reason?: 'camera_alignment'; image: string; received_at: number;
+  corners?: [number, number][]; front_plane_mm?: number; y_mm?: number;
 };
 export type Kind = 'drawing' | 'ladder' | 'cross' | 'frame';
 export type SimPoint = [x: number, y: number, depth: number, time: number];
@@ -64,6 +68,7 @@ export const plotter = {
   config: () => json<Config>('/config'),
   settings: (id: number) => json<Settings>(`${printer(id)}/settings`),
   save: (id: number, settings: Settings) => json<Settings>(`${printer(id)}/settings`, 'PUT', settings),
+  plateCamera: (id: number) => json<PlateMatch>(`${printer(id)}/plate-camera`),
   status: (id: number) => json<Status>(`${printer(id)}/status`),
   drawing: (file: File, options: object) => {
     const body = new FormData();

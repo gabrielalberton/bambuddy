@@ -51,3 +51,9 @@ O contorno e as três aberturas visíveis na foto delimitam a mesma chapa no edi
 A peça quadrada de 258 × 258 mm fica centrada na área de trabalho de 256 × 256 mm.
 As duas abas avançam além da área de trabalho. A chapa usa a espessura de 0,8 mm do CAD do Twin,
 com contorno, aberturas e marcações posicionados pela foto em vista superior.
+
+## Câmera do prato
+
+Em **Mesa da A1 → Rastrear prato pela câmera**, o Bambuddy sobrepõe a área útil estimada ao quadro da câmera externa. O perfil usa a calibração fisheye existente da Thingino, uma estimativa do plano da chapa e referências do seu contorno e da marca central. Na vista retificada, a busca varia somente a posição da chapa no eixo Y. A câmera, o ângulo e o enquadramento precisam ser os mesmos usados na geração do perfil.
+
+A rota de leitura usa a mesma URL interna da prévia da câmera e exige `printers:read` no escopo da impressora. O processamento acontece enquanto a prévia do prato está aberta. O perfil local fica em `<dados>/custom/plotter/vision/<printer_id>.json`; tirar esse arquivo desativa a função para essa impressora. O perfil contém pequenos recortes da câmera e fica fora do Git. A sobreposição é uma estimativa visual. A origem do Y da máquina e a precisão em milímetros dependem de uma varredura com posições conhecidas. A prévia não altera as coordenadas do papel nem o G-code.

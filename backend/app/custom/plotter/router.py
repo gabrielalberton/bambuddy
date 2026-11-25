@@ -23,7 +23,7 @@ from backend.app.core.auth import (
 from backend.app.core.permissions import Permission
 from backend.app.core.printer_scope import PrinterScope
 
-from . import engine as E, printer as P, store, worker
+from . import engine as E, printer as P, store, vision_api, worker
 
 log = logging.getLogger("custom.plotter")
 
@@ -97,7 +97,10 @@ async def get_config(
             "jog_max_step": P.JOG_MAX_STEP,
             "jog_max_z": P.JOG_MAX_Z,
         },
-        "printers": await P.list_printers(printer_scope),
+        "printers": [
+            {**printer, "plate_vision": vision_api.profile_path(printer["id"]).is_file()}
+            for printer in await P.list_printers(printer_scope)
+        ],
     }
 
 
@@ -105,6 +108,11 @@ async def get_config(
 async def get_status(printer_id: int, _=RequirePrinterPermissionIfAuthEnabled(Permission.PRINTERS_READ)):
     snap = P.snapshot(printer_id)
     return {**snap, "blockers": P.blockers(snap)}
+
+
+@router.get("/printers/{printer_id}/plate-camera")
+async def get_plate_camera(printer_id: int, _=RequirePrinterPermissionIfAuthEnabled(Permission.PRINTERS_READ)):
+    return await vision_api.match(printer_id)
 
 
 @router.get("/printers/{printer_id}/settings")

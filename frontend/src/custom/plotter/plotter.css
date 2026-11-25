@@ -138,3 +138,31 @@
   .plotter-workspace { grid-template-columns: minmax(0, 1.45fr) minmax(330px, 1fr); }
   .plotter-board { position: sticky; top: .75rem; }
 }
+
+.plotter-camera {
+  margin-top: 0.75rem;
+}
+
+.plotter-camera-frame {
+  position: relative;
+  margin-top: 0.625rem;
+  overflow: hidden;
+  border-radius: 0.5rem;
+}
+
+.plotter-camera-frame img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+}
+
+.plotter-camera-frame svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  fill: #10b98125;
+  stroke: #34d399;
+  stroke-width: 2px;
+}

@@ -6,6 +6,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { drawableArea, plotter, type Config, type Drawing, type Kind, type Paper, type Pen, type Placement, type Plan, type Rect, type Settings } from './api';
 import { Numeric, PenFields } from './Controls';
 import { Plate, type Edit, type Layer } from './Plate';
+import { PlateCamera } from './PlateCamera';
 import { usePlotterConfig } from './navigation';
 import './plotter.css';
 
@@ -236,6 +237,7 @@ function Workspace({ id, config, initial }: { id: number; config: Config; initia
         <div className="plotter-key"><span><i className="plotter-swatch paper" /> Papel</span><span><i className="plotter-swatch bed" /> Mesa</span>
           {area ? <span><i className="plotter-swatch area" /> Área útil</span> : <span className="plotter-error">Papel fora do alcance</span>}
         </div>
+        {config.printers.some(printer => printer.id === id && printer.plate_vision) && <PlateCamera id={id} />}
         <div className="plotter-segments" aria-label="Camada da prévia">
           {([['vector', 'Vetor'], ['original', 'Original'], ['overlay', 'Sobreposição'], ['simulation', 'Simulação']] as const).map(([value, label]) =>
             <button key={value} type="button" aria-pressed={layer === value} disabled={value === 'simulation' ? !plan : !drawing}
