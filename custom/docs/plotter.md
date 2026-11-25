@@ -44,3 +44,10 @@ ao longo do traço. A curva é uma calibração indireta de pressão, em milíme
 - Requer A1 com controle LAN disponível para enviar ou ajustar Z. A geração e a prévia funcionam com a A1 cadastrada e offline.
 - A superfície física, o comportamento da mola, o fluxo da tinta e a sequência de firmware precisam ser
   aferidos na A1 antes de reaproveitar uma curva de pressão. Os valores de exemplo servem para simulação.
+
+## Chapa PEI compartilhada com o Twin
+
+O contorno e as três aberturas visíveis na foto delimitam a mesma chapa no editor 2D e no Twin 3D.
+A peça quadrada de 258 × 258 mm fica centrada na área de trabalho de 256 × 256 mm.
+As duas abas avançam além da área de trabalho. A chapa usa a espessura de 0,8 mm do CAD do Twin,
+com contorno, aberturas e marcações posicionados pela foto em vista superior.

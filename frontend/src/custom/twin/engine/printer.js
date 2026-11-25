@@ -4,6 +4,7 @@
 // no centro da placa: um ponto (bx,by) da mesa está em (bx-128, 0, 128-by) no referencial local da mesa; a mesa anda em z
 // (bed.position.z = Ycmd-128). A ponta do bico fica fixa em z=0: (X-128, Z, 0). Em X=128, Y=128 o bico está sobre o centro da placa.
 import * as THREE from 'three';
+import { createPeiPlate } from './peiPlate.js';
 
 const M = (o) => new THREE.MeshStandardMaterial(o);
 
@@ -28,25 +29,6 @@ function mesh(g, m, parent, x = 0, y = 0, z = 0, cast = true) {
   o.castShadow = cast; o.receiveShadow = true;
   parent.add(o);
   return o;
-}
-
-function pei() {
-  if (typeof document === 'undefined') return null;   // testes em Node (sem GPU/DOM)
-  const c = document.createElement('canvas');
-  c.width = c.height = 512;
-  const g = c.getContext('2d');
-  g.fillStyle = '#808080'; g.fillRect(0, 0, 512, 512);
-  const im = g.getImageData(0, 0, 512, 512);
-  for (let i = 0; i < im.data.length; i += 4) {
-    const v = 128 + (Math.random() - 0.5) * 70;
-    im.data[i] = im.data[i + 1] = im.data[i + 2] = v;
-  }
-  g.putImageData(im, 0, 0);
-  const t = new THREE.CanvasTexture(c);
-  t.wrapS = t.wrapT = THREE.RepeatWrapping;
-  t.repeat.set(10, 10);
-  t.anisotropy = 4;
-  return t;
 }
 
 const ROD_STEP = 37.4;   // mm: altura da face inferior da barra X acima da ponta, no STEP
@@ -91,14 +73,10 @@ export class A1Model {
 
     // ---- mesa (Y) ----
     this.bed = new THREE.Group(); this.root.add(this.bed);
-    const bw = 256;
     mesh(rbox(278, 14, 278, 7), graphite, this.bed, 0, -13, 0);
     mesh(rbox(268, 4, 268, 5), dark, this.bed, 0, -4.6, 0);
-    const tex = pei();
-    const peiMat = M({ color: 0x6f5a34, roughness: 0.7, metalness: 0.3, roughnessMap: tex, bumpMap: tex, bumpScale: 0.6 });
-    const sheet = mesh(new THREE.BoxGeometry(bw, 1.6, bw), peiMat, this.bed, 0, -0.8, 0);
-    this.pei = sheet;
-    sheet.castShadow = false;
+    this.pei = createPeiPlate();
+    this.bed.add(this.pei);
     // moldura frontal clara
     mesh(rbox(120, 6, 8, 2), light, this.bed, 0, -9, 131);
     this.bedGroupOffsetZ = 0;
@@ -159,13 +137,13 @@ export class A1Model {
   }
 
   // Modelo real (GLB do STEP "Bambulab A1 printer - Default", feito por `cad step export`; ver docs/tools/digital-twin.md).
-  // Nós do assembly: NAUO1 base, NAUO2 trilho, NAUO3 tela, NAUO6 pórtico/pilares (fixos); NAUO4 mesa aquecida + NAUO5 PEI (Y);
+  // Nós do assembly: NAUO1 base, NAUO2 trilho, NAUO3 tela, NAUO6 pórtico/pilares (fixos); NAUO4 mesa aquecida (Y). A PEI vem da mesma referência do Plotter.
   // NAUO7 eixo X + carros de Z (Z); NAUO8 cabeçote (X). Coordenadas medidas no STEP (mm, referencial do GLB): a ponta do bico na pose
   // "Default" está em (x=-2,23; y=8,20; z=-157,73) com "cima" = -z, frente = +y, direita = +x; topo da PEI em z=-83,80; a área de
   // impressão (256x256) é centrada na chapa quadrada (258x258) em x=0, y=0 (borda frontal em y=+128). Pose Default = X 125,77, Y 119,8, Z 73,93.
   // Mapa CAD -> mundo: (x, y, z) -> (x, -z, y) (rotação própria), com a origem de cada grupo como no procedural.
   attachCAD(scene) {
-    const names = { fixed: ['NAUO1', 'NAUO2', 'NAUO3', 'NAUO6'], bed: ['NAUO4', 'NAUO5'], gantry: ['NAUO7'], head: ['NAUO8'] };
+    const names = { fixed: ['NAUO1', 'NAUO2', 'NAUO3', 'NAUO6'], bed: ['NAUO4'], gantry: ['NAUO7'], head: ['NAUO8'] };
     const find = (n) => { let r = null; scene.traverse((o) => { if (!r && o.name === n) r = o; }); return r; };
     scene.updateMatrixWorld(true);
     const rot = new THREE.Matrix4().set(1, 0, 0, 0, 0, 0, -1, 0, 0, 1, 0, 0, 0, 0, 0, 1);   // (x,y,z) -> (x,-z,y)
@@ -185,14 +163,13 @@ export class A1Model {
         const src = find(n); if (!src) throw new Error('STEP sem o nó ' + n);
         const c = src.clone(true); c.matrixAutoUpdate = false; c.matrix.copy(src.matrixWorld);
         c.traverse((o) => { if (o.isMesh) { o.castShadow = g !== 'bed'; o.receiveShadow = true; o.material = o.material.clone(); o.material.side = THREE.FrontSide; const c0 = o.material.color; if (Math.max(c0.r, c0.g, c0.b) > 0.6) c0.multiplyScalar(0.38); o.material.roughness = 0.55; } });
-        if (n === 'NAUO5') { this.pei = c; }
         if (n === 'NAUO7') { this.rodLow = c; }
         grp.add(c);
       }
       made[g] = grp;
     }
-    // esconde o procedural e monta o modelo real
-    for (const grp of [this.root.children[0], ...this.bed.children.filter((c) => c !== this.area), ...this.gantry.children.filter((c) => c !== this.head)]) grp.visible = false;
+    // Monta o CAD da impressora e preserva a chapa comum ao Plotter.
+    for (const grp of [this.root.children[0], ...this.bed.children.filter((c) => c !== this.area && c !== this.pei), ...this.gantry.children.filter((c) => c !== this.head)]) grp.visible = false;
     for (const c of this.head.children) if (!c.isLight) c.visible = false;
     for (const g of Object.keys(made)) parents[g].add(made[g]);
     this.headMats = [];

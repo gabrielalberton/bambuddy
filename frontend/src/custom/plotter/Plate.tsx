@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type PointerEvent } from 'react';
-import platePhotoUrl from './textured-pei-a1.jpg';
+import { platePhoto as referencePhoto } from '../plate/reference';
 import { renderPlatePhoto } from './platePhoto';
 import type { Drawing, Machine, Paper, Pen, Placement, Rect, SimPoint } from './api';
 
@@ -155,7 +155,7 @@ export function Plate({ machine, paper, area, pen, drawing, placement, imageUrl,
   useEffect(() => {
     const photo = new Image();
     photo.onload = () => setPlatePhoto(photo);
-    photo.src = platePhotoUrl;
+    photo.src = referencePhoto.url;
     return () => { photo.onload = null; };
   }, []);
 
@@ -173,11 +173,7 @@ export function Plate({ machine, paper, area, pen, drawing, placement, imageUrl,
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, SIZE, SIZE);
     ctx.setTransform(scale, 0, 0, scale, ox, oy);
-    if (platePhoto) renderPlatePhoto(ctx, platePhoto, w, h);
-    else {
-      ctx.fillStyle = '#c7a36a';
-      ctx.fillRect(0, -h, w, h);
-    }
+    renderPlatePhoto(ctx, platePhoto, w, h);
     ctx.lineWidth = 0.55;
     ctx.fillStyle = '#f5f1e7';
     ctx.fillRect(paper.x, -paper.y - paper.h, paper.w, paper.h);

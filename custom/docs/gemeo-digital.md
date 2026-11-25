@@ -126,6 +126,9 @@ docker cp ~/projects/3d-printing/twin/web/assets/a1.glb bambuddy:/app/data/custo
 # (ou copiar para <volume de dados>/custom/twin/a1.glb no host). Não precisa reiniciar.
 ```
 
+A chapa PEI no Bambuddy é compartilhada com o [Plotter](plotter.md), inclusive quando o GLB está ativo.
+O Twin extruda o contorno e as aberturas da mesma referência utilizada em 2D e aplica a foto sobre a superfície.
+
 ## O que mudou em relação ao twin avulso
 
 - Sem segunda conexão MQTT e sem `pushall`; sem chave de API nem `printer.env`; sem HTTP próprio (porta 4860).

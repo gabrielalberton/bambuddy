@@ -8,9 +8,16 @@ it('paints the calibrated plate, A4 paper and reachable area on mount', () => {
     setTransform: vi.fn(), clearRect: vi.fn(), fillRect: vi.fn(), strokeRect: vi.fn(),
     beginPath: vi.fn(), moveTo: vi.fn(), lineTo: vi.fn(), stroke: vi.fn(),
     setLineDash: vi.fn(), arc: vi.fn(), fill: vi.fn(), fillText: vi.fn(),
+    save: vi.fn(), restore: vi.fn(), translate: vi.fn(), scale: vi.fn(), clip: vi.fn(),
   };
   const getContext = vi.spyOn(HTMLCanvasElement.prototype, 'getContext')
     .mockReturnValue(context as unknown as ReturnType<HTMLCanvasElement['getContext']>);
+  vi.stubGlobal('Path2D', class {
+    moveTo = vi.fn();
+    lineTo = vi.fn();
+    quadraticCurveTo = vi.fn();
+    closePath = vi.fn();
+  });
   try {
     render(<Plate
       machine={{ plate_w: 256, plate_h: 256, nozzle_x: [0, 256], nozzle_y: [0, 254] }}
@@ -21,10 +28,13 @@ it('paints the calibrated plate, A4 paper and reachable area on mount', () => {
       onPaper={vi.fn()} onPlacement={vi.fn()} onToggleStroke={vi.fn()}
     />);
     expect(getContext.mock.contexts).toContain(screen.getByLabelText(/Vista superior da mesa/));
-    expect(context.fillRect).toHaveBeenCalledWith(0, -256, 256, 256);
+    expect(context.translate).toHaveBeenCalledWith(128, -128);
+    expect(context.clip).toHaveBeenCalledWith(expect.any(Path2D), 'evenodd');
+    expect(context.fillRect).toHaveBeenCalledWith(0, 0, 2000, 2000);
     expect(context.fillRect).toHaveBeenCalledWith(23, -297, 210, 297);
     expect(context.strokeRect).toHaveBeenCalledWith(28, -222, 200, 217);
   } finally {
     getContext.mockRestore();
+    vi.unstubAllGlobals();
   }
 });
