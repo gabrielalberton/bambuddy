@@ -19,6 +19,7 @@ import { ChunkErrorFallback, hardReload, isChunkLoadError } from './custom/app/c
 import { QueueHistoryRedirect } from './custom/printHistory/views';
 
 // Every page loads as its own file when first opened (#3175).
+const PlotterPage = lazyPage(() => import('./custom/plotter/PlotterPage'), 'PlotterPage');
 const PrintersPage = lazyPage(() => import('./pages/PrintersPage'), 'PrintersPage');
 const ArchivesPage = lazyPage(() => import('./pages/ArchivesPage'), 'ArchivesPage');
 const QueuePage = lazyPage(() => import('./pages/QueuePage'), 'QueuePage');
@@ -235,6 +236,7 @@ function App() {
                 {/* Main app with WebSocket for real-time updates */}
                 <Route element={<ProtectedRoute><WebSocketProvider><EmbeddedCameraProvider><Layout /></EmbeddedCameraProvider></WebSocketProvider></ProtectedRoute>}>
                   <Route index element={<PrintersPage />} />
+                  <Route path="plotter" element={<PermissionRoute permission="printers:read"><PlotterPage /></PermissionRoute>} />
                   <Route path="archives" element={<ArchivesPage />} />
                   {/* An archive opens over the list (archive redesign P4). */}
                   <Route path="archives/:id" element={<ArchivesPage />} />

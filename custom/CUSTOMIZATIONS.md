@@ -603,3 +603,16 @@ Interruptores: `localStorage['custom.nativeCamera'] = 'off'` oculta o item.
 | `backend/app/api/routes/printers.py` | gancho já existente `save_native_plate_roi` | Agora também grava os cantos da câmera externa e corrige x/y/w/h para o envolvente. |
 | `frontend/src/pages/PrintersPage.tsx` | estado `editingRoi`/`plateCheckResult.roi` (tipo), `{editingRoi ? (` do editor de ROI (+3 imports) | Troca os sliders por `PlateRoiEditor` quando o interruptor está ligado. |
 | `frontend/src/api/client.ts` | `PlateDetectionROI` | `points?` opcional. |
+
+## Plotter de caneta da A1 (`custom(plotter)`)
+
+Aba `/plotter` para vetorizar imagens, posicionar papel e desenho, calibrar a caneta,
+simular e despachar G-code validado. A API usa o login e as permissões de impressora do Bambuddy.
+`BAMBUDDY_CUSTOM_PLOTTER=0` desliga a API e retira o item do menu. A aba aparece quando há uma A1
+no escopo de acesso do usuário. Operação e manutenção em [docs/plotter.md](docs/plotter.md).
+
+| Arquivo do upstream | Âncora | Gancho |
+|---|---|---|
+| `frontend/src/App.tsx` | Lazy pages e rota index | Carrega o editor sob demanda atrás de `printers:read`. |
+| `frontend/src/components/Layout.tsx` | `defaultNavItems` / `isHidden` | Inclui o item do menu conforme a disponibilidade informada pela API. |
+| `backend/app/main.py` | `on_print_start` / `plate_detection_enabled` | Dispensa a detecção de objeto somente quando o início corresponde ao plot recém-despachado pelo Bambuddy para aquela A1. |

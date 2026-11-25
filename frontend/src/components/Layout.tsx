@@ -37,6 +37,7 @@ import {
   saveSidebarOrder,
   SIDEBAR_LAYOUT_CHANGED_EVENT,
 } from '../utils/sidebarLayout';
+import { plotterNavItem, usePlotterConfig } from '../custom/plotter/navigation';
 import { HeaderSlot } from '../custom/layout/HeaderSlot';
 import { compactBugReportHidden } from '../custom/layout/headerFlags';
 import { useHideHeaderCamera } from '../custom/layout/useHideHeaderCamera';
@@ -54,6 +55,7 @@ export const defaultNavItems: NavItem[] = [
   { id: 'archives', to: '/archives', icon: Archive, labelKey: 'nav.archives' },
   { id: 'queue', to: '/queue', icon: ListOrdered, labelKey: 'nav.queue' },
   { id: 'projects', to: '/projects', icon: FolderKanban, labelKey: 'nav.projects' },
+  plotterNavItem,
   { id: 'files', to: '/files', icon: FolderOpen, labelKey: 'nav.files' },
   // Id kept from when the page was MakerWorld-only, so saved sidebar orders and hidden items still apply.
   { id: 'makerworld', to: '/model-sources', icon: Globe, labelKey: 'nav.modelSources' },
@@ -116,6 +118,7 @@ export function Layout() {
   // render — refresh with the real catalog names. See #857.
   useColorCatalogVersion();
   const { user, authEnabled, logout, hasPermission, hasAnyPermission, loading: authLoading } = useAuth();
+  const plotterConfig = usePlotterConfig(!authLoading && (!authEnabled || hasPermission('printers:read')));
   const hideHeaderCamera = useHideHeaderCamera();
   const { showToast } = useToast();
   const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
@@ -379,6 +382,7 @@ export function Layout() {
     const isHidden = (id: string) => {
       // User-toggled hide (#1673) wins first — cheapest check, explicit intent.
       if (hiddenSystemItemIds.includes(id)) return true;
+      if (id === plotterNavItem.id && (!plotterConfig.data?.printers.some(p => p.supported) || (authEnabled && !hasPermission('printers:read')))) return true;
       // Permission gate accepts Permission | Permission[] so resources with
       // granular `*:read_own` / `*:read_all` tiers (default Operators group)
       // don't get hidden from users who only hold the granular variant (#1755).

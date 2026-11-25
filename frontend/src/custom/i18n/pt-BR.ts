@@ -17,7 +17,7 @@ const ptBR = {
     loadFailed: 'Não foi possível carregar o histórico de impressão.',
     removeQueueConfirm: 'Remover este trabalho do histórico da fila?',
   },
-  nav: { archives: 'Impressos' },
+  nav: { penPlotter: 'Plotter', archives: 'Impressos' },
   archives: { page: { title: 'Impressos', allArchives: 'Todos os impressos' } },
   notifications: {
     providerTypes: { webpush: 'Web Push (PWA)' },

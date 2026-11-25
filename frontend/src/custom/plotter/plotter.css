@@ -1,0 +1,139 @@
+.plotter {
+  --plot-accent: #087d70;
+  --plot-line: var(--color-bambu-dark-tertiary, #52616b);
+  max-width: 1180px;
+  margin-inline: auto;
+  padding-block-end: 2rem;
+}
+
+.plotter-header,
+.plotter-board-heading,
+.plotter-actions,
+.plotter-key,
+.plotter-check,
+.plotter-segments {
+  display: flex;
+  align-items: center;
+  gap: .65rem;
+}
+
+.plotter-header, .plotter-board-heading {
+  justify-content: space-between;
+  margin-block-end: .75rem;
+}
+
+.plotter-header h1 {
+  display: flex;
+  gap: .65rem;
+  align-items: center;
+  font-size: 1.8rem;
+  font-weight: 700;
+}
+
+.plotter-header p, .plotter-muted, .plotter-board-heading span, .plotter-key {
+  font-size: .875rem;
+  opacity: .85;
+}
+
+.plotter-workspace {
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
+  align-items: start;
+}
+
+.plotter-sidebar {
+  display: grid;
+  min-width: 0;
+  gap: .75rem;
+}
+
+.plotter-card {
+  border: 1px solid var(--plot-line);
+  border-radius: .85rem;
+  min-width: 0;
+  padding: .85rem;
+  background: var(--color-bambu-dark-secondary, transparent);
+}
+
+.plotter-card h2 { font-size: 1.12rem; font-weight: 650; }
+.plotter-sidebar h2, .plotter-card p { margin-block-end: .55rem; }
+.plotter-card h4 { font-weight: 600; margin-block-start: .85rem; }
+
+.plotter-plate {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  margin-block: .6rem;
+  background: #192328;
+  border: 1px solid #354750;
+  border-radius: .6rem;
+}
+
+.plotter-segments, .plotter-actions, .plotter-key { flex-wrap: wrap; }
+.plotter-key { margin-block: .65rem; }
+.plotter-key span { display: flex; align-items: center; gap: .3rem; }
+.plotter-swatch { width: .72rem; height: .72rem; background: #f5f1e7; border: 1px solid #a39378; border-radius: 2px; }
+.plotter-swatch.bed { background: #26333b; border-color: #657988; }
+.plotter-swatch.area { background: none; border: 2px dashed #158986; }
+
+.plotter button, .plotter input:not([type=checkbox], [type=range], [type=file]), .plotter select {
+  min-height: 42px;
+  border: 1px solid var(--plot-line);
+  border-radius: .45rem;
+  padding: .4rem .65rem;
+  color: inherit;
+  background: var(--color-bambu-dark, transparent);
+}
+
+.plotter button { display: inline-flex; align-items: center; justify-content: center; gap: .4rem; font-size: .875rem; }
+.plotter button:enabled { cursor: pointer; }
+.plotter button:disabled { opacity: .5; }
+.plotter button:enabled:hover { border-color: #389f91; }
+.plotter button[aria-pressed=true], .plotter button.plotter-primary {
+  background: var(--plot-accent);
+  color: #fff;
+  border-color: var(--plot-accent);
+}
+.plotter-primary { width: 100%; margin-block-start: .5rem; }
+.plotter-field { min-width: 0; display: grid; gap: .25rem; font-size: .83rem; line-height: 1.3; }
+.plotter-field input, .plotter-field select, .plotter-simulation input[type=range] { width: 100%; }
+.plotter-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .65rem; margin-block: .6rem; }
+.plotter-swap { align-self: end; }
+.plotter-check { align-items: flex-start; font-size: .875rem; margin-block: .65rem; line-height: 1.4; }
+.plotter-check input { margin-block-start: .15rem; width: 1rem; height: 1rem; flex: none; accent-color: var(--plot-accent); }
+.plotter button:focus-visible, .plotter input:focus-visible, .plotter select:focus-visible, .plotter summary:focus-visible, .plotter-upload:focus-within {
+  outline: 2px solid #2eb0a0;
+  outline-offset: 2px;
+}
+.plotter-upload {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  border: 1px dashed #54887f;
+  border-radius: .6rem;
+  padding: .65rem .75rem;
+  cursor: pointer;
+}
+
+.plotter-upload span { min-width: 0; overflow-wrap: anywhere; }
+.plotter-upload strong, .plotter-upload small { display: block; }
+.plotter-upload small { opacity: .8; }
+.plotter-upload input { cursor: pointer; opacity: 0; position: absolute; inset: 0; width: 100%; }
+.plotter details { margin-block: .7rem .15rem; }
+.plotter summary { cursor: pointer; font-size: .9rem; padding-block: .25rem; }
+.plotter-result, .plotter-simulation { margin-block: .65rem; padding: .6rem; border: 1px solid var(--plot-line); border-radius: .45rem; font-size: .85rem; }
+.plotter-result { overflow-wrap: anywhere; }
+.plotter-gradient { display: inline-block; width: 3.2rem; height: .5rem; border-radius: .25rem; background: linear-gradient(90deg, #1e928e, #876022); }
+.plotter-measure { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; gap: .5rem; align-items: end; margin-block: .55rem; }
+.plotter-messages { position: sticky; top: 0; z-index: 2; }
+.plotter-messages p { padding: .55rem .7rem; margin-block: .3rem; border-radius: .4rem; background: #163e36; color: #fff; }
+.plotter-messages .plotter-error { background: #7a3131; }
+.plotter-error { font-weight: 600; }
+.plotter-retry { margin-inline-start: .5rem; }
+
+@media (min-width: 850px) {
+  .plotter-workspace { grid-template-columns: minmax(0, 1.45fr) minmax(330px, 1fr); }
+  .plotter-board { position: sticky; top: .75rem; }
+}
