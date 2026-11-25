@@ -22,6 +22,7 @@ from typing import Any
 from .jobs import JobManager, norm_name
 from .recorder import Recorder
 from .state import PUBLIC_KEYS, PrinterState, record_view
+from .vision import public_pose, read_pose
 
 log = logging.getLogger("custom.twin")
 
@@ -109,6 +110,8 @@ class TwinHub:
         self.sim = False
         self._record = (os.environ.get("BAMBUDDY_CUSTOM_TWIN_RECORD", "0") == "1") if record is None else record
         self.rec: Recorder | None = None
+        self._vision_socket = os.environ.get("BAMBUDDY_CUSTOM_TWIN_VISION_SOCKET") if printer_id == 1 else None
+        self._vision_pose: dict | None = None
 
     # ----- ciclo de vida (preguiçoso: começa no primeiro cliente/saúde) -----
     def start(self) -> None:
@@ -127,6 +130,8 @@ class TwinHub:
             self._tasks.append(self.loop.create_task(make_sim_runner(sim, speed, start)(self)))
         else:
             self._attach()
+            if self._vision_socket:
+                self._tasks.append(self.loop.create_task(self._vision_ticker(self._vision_socket)))
 
     async def stop(self) -> None:
         for t in self._tasks:
@@ -277,6 +282,7 @@ class TwinHub:
             "job": self.jobs.public(),
             "since_pr": round(now - self.state.pr_at, 3) if self.state.pr_at else None,
             "plate_wait": self.plate_wait(),
+            "vision": public_pose(self._vision_pose, now),
         }
 
     def plate_wait(self) -> bool | None:
@@ -320,6 +326,22 @@ class TwinHub:
             if self._dirty:
                 self._dirty.set()
 
+    async def _vision_ticker(self, socket: str) -> None:
+        while True:
+            active = self.state.raw.get("gcode_state") in ("PREPARE", "RUNNING", "PAUSE")
+            if self.clients or (self.rec is not None and active):
+                pose = await read_pose(socket)
+                if pose != self._vision_pose:
+                    self._vision_pose = pose
+                    if self.rec is not None and pose is not None:
+                        self.rec.write("vision", pose, pose["at"])
+                    if self._dirty is not None:
+                        self._dirty.set()
+                await asyncio.sleep(0.12)
+            else:
+                self._vision_pose = None
+                await asyncio.sleep(0.4)
+
     def health(self) -> dict:
         j = self.jobs.current
         return {
@@ -334,6 +356,7 @@ class TwinHub:
             "job_error": (j.error if j else ""),
             "state": self.state.raw.get("gcode_state"),
             "recorder_refused": self.rec.refused if self.rec else None,
+            "vision": public_pose(self._vision_pose, time.time()) is not None,
         }
 
 

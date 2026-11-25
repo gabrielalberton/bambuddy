@@ -8,7 +8,7 @@ export interface TwinTuning {
   autoFocus?: boolean;
 }
 
-export type MotionStatus = 'unknown' | 'estimated' | 'print';
+export type MotionStatus = 'unknown' | 'estimated' | 'print' | 'camera';
 
 export interface TwinOptions {
   printerId?: number;

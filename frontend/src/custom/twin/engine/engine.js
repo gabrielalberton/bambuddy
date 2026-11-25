@@ -9,6 +9,7 @@ import { A1Model } from './printer.js';
 import { PrintedObject } from './object.js';
 import { decodeJob } from './program.js';
 import { Tracker } from './sync.js';
+import { VisionMotion } from './vision.js';
 import { createManualMotion, listenToTwinMotion, twinMotionStatus } from '../manualMotion';
 
 const REST = { x: 40, y: 170, z: 90 };
@@ -220,6 +221,7 @@ export function createTwin(container, opts) {
     pose: { ...REST }, trays: [], lastMsgPerf: -1e9, bbox: null, zmax: 0, geom: null, buildT0: 0,
   };
   const manual = createManualMotion();
+  const vision = new VisionMotion();
   let motionMessage = null;
   let displayedMotion = 'unknown';
   function showMotion(status) {
@@ -305,6 +307,7 @@ export function createTwin(container, opts) {
     if (S.job.status === 'ready' && S.job.id && S.job.id !== S.jobId) loadJob(S.job.id);
     if (S.job.status === 'none' && S.prog) { S.prog = null; S.tracker = null; S.jobId = ''; }
     if (S.tracker) S.tracker.feed(S.s, nowPerf, age, { sincePR: msg.since_pr });
+    vision.observe(msg, nowPerf, S.tracker);
     if (S.prog) applyPalette();
   }
 
@@ -321,6 +324,7 @@ export function createTwin(container, opts) {
     src.onerror = () => {
       if (es !== src) return;
       motionMessage = null;
+      vision.reset();
       resetManual();
       // erro transitório: o EventSource reconecta sozinho. Fechado (ex.: 401 com token vencido): reabre com URL nova.
       if (src.readyState === EventSource.CLOSED) {
@@ -332,6 +336,7 @@ export function createTwin(container, opts) {
   }
   function disconnect() {
     motionMessage = null;
+    vision.reset();
     resetManual();
     clearTimeout(retryTimer);
     if (es) { es.close(); es = null; }
@@ -365,12 +370,16 @@ export function createTwin(container, opts) {
     // placa liberada no Bambuddy depois do fim (plate_wait false fora de RUNNING/PREPARE/PAUSE): a peça saiu da mesa
     if (showObj && S.msg && S.msg.plate_wait === false && !['RUNNING', 'PREPARE', 'PAUSE'].includes(S.s.gcode_state)) showObj = false;
     if (manual.target) target = constrainPose(manual.target);
+    const seen = vision.current(nowS);
+    const cameraPose = seen && (!trackingPrint || !tr?.locked || tr.waiting || !vision.locked(nowS));
+    if (cameraPose) target = constrainPose({ ...target, ...seen });
     // suavização curtíssima da pose (esconde correções do estimador)
-    const k = 1 - Math.exp(-dt / (manual.target || tr?.locked ? 0.035 : 0.6));
+    const k = 1 - Math.exp(-dt / (cameraPose || manual.target || tr?.locked ? 0.035 : 0.6));
     S.pose.x += (target.x - S.pose.x) * k; S.pose.y += (target.y - S.pose.y) * k; S.pose.z += (target.z - S.pose.z) * k;
     model.setPose(S.pose.x, S.pose.y, S.pose.z);
-    const poseKnown = manual.referenced || (trackingPrint && homed && tr?.locked && !stale);
-    showMotion(manual.referenced ? 'estimated' : poseKnown ? 'print' : 'unknown');
+    const cameraKnown = seen && ['x', 'y', 'z'].every((axis) => Number.isFinite(seen[axis]));
+    const poseKnown = cameraKnown || manual.referenced || (trackingPrint && homed && tr?.locked && !stale);
+    showMotion(cameraKnown ? 'camera' : manual.referenced ? 'estimated' : poseKnown ? 'print' : 'unknown');
     model.setLook({ nozzleTemp: S.s.nozzle_temper ?? 25, fan: (S.s.cooling_fan_speed ?? 0) / 15 + (kind === 1 ? 0.25 : 0), printing,
       unreliable: !poseKnown }, dt);
     object.update(T, dt, showObj && S.prog != null, printing ? 1 : 0);

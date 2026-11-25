@@ -159,3 +159,30 @@ sincronia (resíduo grande na âncora M73) — útil como sinal de pausa/falha n
   existir), somente leitura, lista branca, rotas/autorização, cache, parser fora do processo.
 - `frontend/src/custom/__tests__/twin.test.tsx`: chave, troca do quadro nas duas telas, stream fechado, persistência,
   teclado, nenhuma checagem de travamento com o 3D ativo.
+
+## Posição pela Thingino
+
+Com `BAMBUDDY_CUSTOM_TWIN_VISION_SOCKET` apontando para o socket privado do serviço
+`a1-vision`, o SSE entrega as coordenadas em mm observadas no mesmo quadro. X/Z vêm
+da bolinha do cabeçote e Y do `PlateTracker` do Plotter. As âncoras de câmera do
+prato verificam o enquadramento para os dois eixos do cabeçote. Somente a montagem
+referenciada na A1 fornece coordenadas absolutas. Os perfis históricos de câmera
+do Plotter continuam disponíveis para sobreposição da chapa.
+
+O Twin usa observações recentes para mostrar a pose antes e depois da impressão
+e em movimentos manuais. Durante uma impressão, procura uma sequência compatível
+no G-code em torno do tempo estimado. Quando a sequência identifica um único
+deslocamento temporal, o planejador interpola os movimentos entre quadros. Sem
+um ajuste inequívoco do tempo, os eixos visíveis podem acompanhar a câmera
+enquanto o programa continua determinando o avanço do objeto impresso.
+
+Cada observação expira pelo timestamp da captura. Campos ausentes continuam com
+a fonte que o Twin já usava. O socket envia apenas os eixos e o timestamp aos
+clientes autorizados pelo SSE. O processo de visão abre o RTSP sob demanda e
+fecha sem consultas. Com `BAMBUDDY_CUSTOM_TWIN_RECORD=1`, o recorder existente
+guarda também as observações estruturadas durante a sessão (atalho para replays
+futuros com o G-code arquivado). O histórico gravado antes de ativar o recorder
+depende dos arquivos que já estiverem disponíveis.
+
+A coleta e a calibração ficam em `3d-printing/twin/vision`. O resultado do ajuste
+depende do stream, da montagem da câmera e da visibilidade dos alvos.
