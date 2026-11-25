@@ -24,7 +24,6 @@ log = logging.getLogger(__name__)
 _locks = [asyncio.Lock() for _ in range(8)]
 _recent: dict[tuple[int, bool], tuple[float, int, dict]] = {}
 TOP_MARGIN_MM = 30
-DETECT_SIZE = (640, 360)
 SNAPSHOT_ENV = "BAMBUDDY_CUSTOM_PLOTTER_SNAPSHOT_URL"
 TOP_QUALITY = 82
 REUSE_SECONDS = 0.16
@@ -59,9 +58,8 @@ def _detect(path: Path, revised: int, image: bytes, topdown: bool = False) -> di
     if frame is None:
         raise ValueError("A câmera não retornou uma imagem válida.")
     tracker = _tracker(path, revised)
-    # Locate on a small copy (fast), flatten from the full-resolution frame (sharp).
-    small = cv2.resize(frame, DETECT_SIZE, interpolation=cv2.INTER_AREA) if frame.shape[1] > 1.5 * DETECT_SIZE[0] else frame
-    result = tracker.locate(small, at=time.monotonic())
+    # Locate on the same frame we flatten: 640x360 substream frames make the edge match jitter (~7 mm).
+    result = tracker.locate(frame, at=time.monotonic())
     if not topdown:
         return {**result, "image": base64.b64encode(image).decode("ascii")}
     if result.get("found"):
