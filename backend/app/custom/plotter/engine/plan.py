@@ -241,14 +241,6 @@ def build_paths(
     if not drawing.strokes:
         raise PlanError("o desenho não tem traços")
     variable = opts.pressure == "variable"
-    if pen.mount == "rigid":
-        issues.append(
-            Issue(
-                "warning",
-                "rigid_flatness",
-                "Sem mola: a folha tem que estar plana e bem presa; 0,1 mm de ondulação já muda o traço.",
-            )
-        )
     if variable and not pen.pressure_calibrated:
         variable = False
         issues.append(

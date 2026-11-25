@@ -380,7 +380,7 @@ function Workspace({ id, config, initial }: { id: number; config: Config; initia
           <button type="button" disabled={!canFiles || !area || penChanged || (kind === 'drawing' && (!drawing || excluded.size === drawing.strokes.length)) || !!jog} onClick={preview}>Gerar e validar plano</button>
           {plan && <div className="plotter-result" aria-live="polite">
             <strong>{plan.ok ? 'G-code validado' : 'Plano recusado'}{plan.stats.time_s !== undefined ? ` · ${showTime(plan.stats.time_s)} estimados` : ''}</strong>
-            {!!plan.calibration.rows?.length && <p>Compressões, de cima para baixo: {plan.calibration.rows.map(row => row.depth).join(' · ')} mm</p>}
+            {!!plan.calibration.rows?.length && <p>{mount === 'rigid' ? 'Apertos' : 'Compressões'}, de cima para baixo: {plan.calibration.rows.map(row => row.depth).join(' · ')} mm</p>}
             {[...plan.errors, ...plan.warnings].map((notice, index) => <p key={index}>{notice.text}</p>)}
             {plan.ok && <button type="button" onClick={() => run('Baixando G-code…', async () => {
               const url = URL.createObjectURL(await plotter.download(id, plan));

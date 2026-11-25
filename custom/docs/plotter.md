@@ -13,8 +13,8 @@ ao longo do traço. A curva é uma calibração indireta de pressão, em milíme
 2. Prenda a folha. Selecione A4 (210 × 297 mm) ou ajuste largura, altura, margem e espessura. Mova a folha sobre
    a vista da mesa ou informe X e Y do canto inferior esquerdo. A4 pode ultrapassar a borda da mesa de 256 mm.
    O tracejado delimita a interseção entre a folha, a margem, a mesa e o alcance da ponta.
-3. Em **Calibração da caneta**, informe o deslocamento da ponta em relação ao bico e o limite físico medido
-   do suporte. Confirme as condições em **Operação** antes de iniciar o ajuste de altura. Acompanhe o home
+3. Em **Calibração da caneta**, escolha **Com mola** ou **Sem mola** (seção abaixo), informe o deslocamento da
+   ponta em relação ao bico e o limite físico medido do suporte. Confirme as condições em **Operação** antes de iniciar o ajuste de altura. Acompanhe o home
    na máquina. Com a caneta sobre o papel, desça aos poucos até o primeiro contato e salve. A espessura da
    folha entra na compensação se o bico fez o home sobre ela.
 4. Use **Cruz de alinhamento** para conferir a posição de XY. A correção do offset é o offset atual mais
@@ -22,6 +22,28 @@ ao longo do traço. A curva é uma calibração indireta de pressão, em milíme
 5. Gere **Escala de pressão** e confira os valores antes do envio. As linhas vão da menor à maior compressão
    de cima para baixo, seguidas por uma cunha de compressão crescente. Meça as larguras e salve os pares
    compressão/largura no perfil. Repita após trocar de caneta, suporte ou papel com espessura diferente.
+
+## Suporte com mola ou sem mola
+
+Em **Calibração da caneta**, escolha o modo do suporte. Cada modo tem perfil próprio, com altura de contato e
+curva de pressão separadas: travar a caneta muda a altura da ponta e a mola deixa de participar.
+
+| | Com mola | Sem mola (caneta travada) |
+|---|---|---|
+| O que cede | A mola; a força cresce aos poucos com o Z | Só a ponta da caneta |
+| Melhor para | Esferográfica, gel, fineliner, marcador | Caneta pincel e feltro macio |
+| Ondulação da folha/mesa | Absorvida | Muda o traço; folha plana e presa |
+| Precisão XY | Folga do tubo pode tremer o traço | Sem folga |
+| Histerese | Atrito: descendo e subindo dão pressões diferentes | Só a da ponta |
+| Aperto padrão | 0,2 a 1,2 mm, curso da mola 3 mm (até 8) | 0,05 a 0,4 mm, limite 0,6 mm (até 2) |
+| Escala de pressão | Passos de 0,1 a 0,5 mm | Passos de 0,05 mm |
+| Malha de nivelamento | Opcional | Obrigatória (o validador recusa sem ela) |
+| Descida | Direta na velocidade de Z | Rápida até 0,3 mm do papel e 2 mm/s até o aperto |
+| Variação de aperto no traço | Até 0,6 mm por mm | Até 0,25 mm por mm |
+| Ajuste de altura | Passos de 1, 0,5 e 0,1 mm | Passos de 1, 0,1 e 0,02 mm |
+
+No modo sem mola, aperto demais quebra ponta dura e marca a chapa: comece pelo padrão e só aumente o limite
+para ponta de pincel. A pesquisa que embasou os limites está em `3d-printing/pen plotter/references/mola-vs-sem-mola.md`.
 
 ## Da imagem ao papel
 

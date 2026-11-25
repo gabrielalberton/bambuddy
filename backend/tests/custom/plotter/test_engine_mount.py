@@ -117,3 +117,10 @@ def test_plano_sem_mola_avisa_da_folha_plana():
     assert plot.ok and "rigid_flatness" in {i.code for i in plot.issues}
     plot = E.make_plot(wavy_drawing(), E.Placement(cx=128, cy=110, width=100), E.Paper(), spring())
     assert "rigid_flatness" not in {i.code for i in plot.issues}
+
+
+def test_escala_de_pressao_sem_mola_tambem_avisa_da_folha_plana():
+    pen = rigid()
+    paths, _ = E.calibration.pressure_ladder(E.drawable_area(E.A1, pen, E.Paper()), pen)
+    plot = E.plot_paths(paths, pen, E.Paper())
+    assert plot.ok and [i.code for i in plot.issues] == ["rigid_flatness"]

@@ -114,10 +114,16 @@ def plot_paths(
     stats: dict | None = None,
 ) -> Plot:
     """Caminhos prontos -> G-code -> validação. Erro do validador deixa ``ok`` falso (e não empacota)."""
+    issues = list(issues or [])
+    if pen.mount == "rigid":  # vale para desenho e para os padrões de calibração
+        issues.insert(0, Issue("warning", "rigid_flatness", RIGID_FLATNESS))
     result = build_gcode(paths, pen, paper, machine, title)
     report = validate(result.text, machine, pen, paper)
     thumb = package.render_thumbnail(paths, pen, paper, machine)
-    return Plot(title, result.text, report, paths, issues or [], {**(stats or {}), "gcode": result.stats}, thumb)
+    return Plot(title, result.text, report, paths, issues, {**(stats or {}), "gcode": result.stats}, thumb)
+
+
+RIGID_FLATNESS = "Sem mola: a folha tem que estar plana e bem presa; 0,1 mm de ondulação já muda o traço."
 
 
 def make_plot(
