@@ -75,9 +75,11 @@ def _isolated(tmp_path, monkeypatch):
     monkeypatch.setattr(worker, "IN_PROCESS", True)
     P._jog.clear()
     P._start_locks.clear()
+    hooks._pending.clear()
     yield
     P._jog.clear()
     P._start_locks.clear()
+    hooks._pending.clear()
 
 
 @pytest.fixture
@@ -288,7 +290,7 @@ async def test_iniciar_envia_o_arquivo_e_manda_imprimir_sem_calibracoes(async_cl
         "nozzle_offset_cali": "off",
     }
     assert not ftp.deleted
-    assert hooks.is_plotter_job({"subtask_name": name.removesuffix(".3mf")})
+    assert hooks.is_plotter_job(printer.id, {"subtask_name": name.removesuffix(".3mf")})
 
 
 @pytest.mark.parametrize(
@@ -419,21 +421,27 @@ async def test_ajuste_de_altura_nao_cria_sessao_se_a_impressora_recusa(async_cli
     assert (await async_client.post(f"{API}/printers/{printer.id}/jog/start", json={})).status_code == 409
 
 
-async def test_iniciar_plot_encerra_a_sessao_de_ajuste(async_client, printer_factory, manager, ftp):
+async def test_iniciar_plot_recusa_sessao_de_ajuste(async_client, printer_factory, manager, ftp):
     printer = await printer_factory(model="A1")
     plan = await _ready_plan(async_client, printer)
     await async_client.post(f"{API}/printers/{printer.id}/jog/start", json={})
     assert P.jog_public(printer.id)
-    assert (await async_client.post(f"{API}/printers/{printer.id}/plans/{plan['id']}/start")).status_code == 200
-    assert P.jog_public(printer.id) is None
+    response = await async_client.post(f"{API}/printers/{printer.id}/plans/{plan['id']}/start")
+    assert response.status_code == 409 and response.json()["detail"]["reasons"][0]["code"] == "jog_open"
+    assert not ftp.uploaded
+    assert P.jog_public(printer.id)
 
 
 # ---------------------------------------------------------------- ganchos e interruptor
 def test_gancho_reconhece_so_os_arquivos_do_plotter():
-    assert hooks.is_plotter_job({"subtask_name": "penplot_0123456789ab"})
-    assert hooks.is_plotter_job({"gcode_file": "/sdcard/penplot_0123456789ab.3mf"})
-    assert not hooks.is_plotter_job({"subtask_name": "benchy", "filename": "/benchy.3mf"})
-    assert not hooks.is_plotter_job({"subtask_name": None}) and not hooks.is_plotter_job(None)
+    job = {"gcode_file": "/sdcard/penplot_0123456789ab.3mf"}
+    assert not hooks.is_plotter_job(1, job)
+    hooks.register_plot(1, "penplot_0123456789ab.3mf")
+    assert not hooks.is_plotter_job(2, job)
+    assert not hooks.is_plotter_job(1, {"subtask_name": "benchy", "filename": "/benchy.3mf"})
+    assert not hooks.is_plotter_job(1, {"subtask_name": None}) and not hooks.is_plotter_job(1, None)
+    assert hooks.is_plotter_job(1, job)
+    assert not hooks.is_plotter_job(1, job)
 
 
 def test_gancho_esta_no_ponto_da_verificacao_de_mesa_vazia():
@@ -442,7 +450,7 @@ def test_gancho_esta_no_ponto_da_verificacao_de_mesa_vazia():
     from backend.app import main
 
     src = inspect.getsource(main.on_print_start)
-    assert "printer.plate_detection_enabled and not is_plotter_job(data)" in src
+    assert "printer.plate_detection_enabled and not is_plotter_job(printer_id, data)" in src
 
 
 def test_interruptor_por_variavel_de_ambiente(monkeypatch):

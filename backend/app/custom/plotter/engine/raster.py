@@ -16,6 +16,8 @@ import numpy as np
 MAX_PIXELS_DEFAULT = 4_000_000
 # Teto absoluto do que aceitamos decodificar (bomba de descompressão).
 DECODE_PIXEL_LIMIT = 120_000_000
+# PNG e outros formatos precisam passar pela resolução original antes do resize.
+FULL_DECODE_PIXEL_LIMIT = 24_000_000
 
 
 class ImageError(ValueError):
@@ -56,11 +58,13 @@ def decode_image(data: bytes, max_pixels: int = MAX_PIXELS_DEFAULT) -> np.ndarra
     Image.MAX_IMAGE_PIXELS = DECODE_PIXEL_LIMIT
     try:
         im = Image.open(io.BytesIO(data))
-        if im.width * im.height > DECODE_PIXEL_LIMIT:
-            raise ImageError("imagem grande demais")
+        pixels = im.width * im.height
+        limit = DECODE_PIXEL_LIMIT if im.format == "JPEG" else FULL_DECODE_PIXEL_LIMIT
+        if pixels > limit:
+            raise ImageError(f"imagem grande demais: reduza para até {limit // 1_000_000} megapixels")
         # JPEG: decodifica já reduzido (economiza muita RAM em foto de celular)
-        if im.format == "JPEG" and im.width * im.height > max_pixels * 2:
-            scale = (im.width * im.height / max_pixels) ** 0.5
+        if im.format == "JPEG" and pixels > max_pixels * 2:
+            scale = (pixels / max_pixels) ** 0.5
             im.draft("RGB", (max(1, int(im.width / scale)), max(1, int(im.height / scale))))
         im = ImageOps.exif_transpose(im)
         if im.mode in ("RGBA", "LA") or (im.mode == "P" and "transparency" in im.info):

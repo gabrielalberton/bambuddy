@@ -15,8 +15,13 @@ from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
-from backend.app.core.auth import RequirePermissionIfAuthEnabled, RequirePrinterPermissionIfAuthEnabled
+from backend.app.core.auth import (
+    RequestPrinterScope,
+    RequirePermissionIfAuthEnabled,
+    RequirePrinterPermissionIfAuthEnabled,
+)
 from backend.app.core.permissions import Permission
+from backend.app.core.printer_scope import PrinterScope
 
 from . import engine as E, printer as P, store, worker
 
@@ -78,7 +83,10 @@ class JogFinishBody(BaseModel):
 
 # ---------------------------------------------------------------- leitura
 @router.get("/config")
-async def get_config(_=RequirePermissionIfAuthEnabled(Permission.PRINTERS_READ)):
+async def get_config(
+    _=RequirePermissionIfAuthEnabled(Permission.PRINTERS_READ),
+    printer_scope: PrinterScope = RequestPrinterScope,
+):
     return {
         "enabled": True,
         "paper_presets": [{"id": k, "w": v[0], "h": v[1]} for k, v in E.PAPER_PRESETS.items()],
@@ -89,7 +97,7 @@ async def get_config(_=RequirePermissionIfAuthEnabled(Permission.PRINTERS_READ))
             "jog_max_step": P.JOG_MAX_STEP,
             "jog_max_z": P.JOG_MAX_Z,
         },
-        "printers": await P.list_printers(),
+        "printers": await P.list_printers(printer_scope),
     }
 
 
@@ -274,7 +282,8 @@ async def jog_start(
     printer_id: int, body: JogStartBody, _=RequirePrinterPermissionIfAuthEnabled(Permission.PRINTERS_CONTROL)
 ):
     try:
-        return await P.jog_start(printer_id, body.pen_id, tuple(body.target) if body.target else None)
+        async with P.motion_lock(printer_id):
+            return await P.jog_start(printer_id, body.pen_id, tuple(body.target) if body.target else None)
     except (P.Blocked, E.ProfileError) as exc:
         raise _fail(exc) from exc
 
@@ -284,7 +293,8 @@ async def jog_move(
     printer_id: int, body: JogMoveBody, _=RequirePrinterPermissionIfAuthEnabled(Permission.PRINTERS_CONTROL)
 ):
     try:
-        return await P.jog_move(printer_id, body.z)
+        async with P.motion_lock(printer_id):
+            return await P.jog_move(printer_id, body.z)
     except P.Blocked as exc:
         raise _fail(exc) from exc
 
@@ -294,6 +304,7 @@ async def jog_finish(
     printer_id: int, body: JogFinishBody, _=RequirePrinterPermissionIfAuthEnabled(Permission.PRINTERS_CONTROL)
 ):
     try:
-        return await P.jog_finish(printer_id, body.save)
+        async with P.motion_lock(printer_id):
+            return await P.jog_finish(printer_id, body.save)
     except (P.Blocked, E.ProfileError) as exc:
         raise _fail(exc) from exc

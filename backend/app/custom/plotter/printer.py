@@ -10,11 +10,14 @@ import asyncio
 import json
 import logging
 import time
+from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from . import engine as E, store
-from .hooks import FILE_PREFIX, is_plotter_job  # noqa: F401 - reexportado
+from backend.app.core.printer_scope import PrinterScope
+
+from . import engine as E, hooks, store
+from .hooks import FILE_PREFIX
 
 log = logging.getLogger("custom.plotter")
 
@@ -55,14 +58,17 @@ async def printer_row(printer_id: int):
         return (await db.execute(select(Printer).where(Printer.id == printer_id))).scalar_one_or_none()
 
 
-async def list_printers() -> list[dict]:
+async def list_printers(printer_scope: PrinterScope) -> list[dict]:
     from sqlalchemy import select
 
     from backend.app.core.database import async_session
     from backend.app.models.printer import Printer
 
     async with async_session() as db:
-        rows = (await db.execute(select(Printer).order_by(Printer.id))).scalars().all()
+        query = select(Printer).order_by(Printer.id)
+        if (clause := printer_scope.where_strict(Printer.id)) is not None:
+            query = query.where(clause)
+        rows = (await db.execute(query)).scalars().all()
     out = []
     for row in rows:
         machine = E.machine_for_model(row.model)
@@ -140,6 +146,8 @@ def blockers(snap: dict, for_plot: bool = True) -> list[dict]:
         )
     if (snap["bed_target"] or 0) > 0 or (snap["bed"] or 0) > MAX_BED_TEMP:
         out.append({"code": "bed_hot", "text": f"Mesa quente ou aquecendo ({snap['bed']} °C)."})
+    if for_plot and snap["jog"]:
+        out.append({"code": "jog_open", "text": "Encerre o ajuste de altura antes de iniciar a plotagem."})
     if for_plot and snap["awaiting_plate_clear"]:
         out.append(
             {
@@ -159,12 +167,18 @@ def _check(printer_id: int, for_plot: bool = True) -> dict:
 
 
 # ---------------------------------------------------------------- envio do plot
-async def start_plan(printer_id: int, plan_id: str) -> dict:
-    """Confere tudo de novo, envia o ``.gcode.3mf`` por FTPS e manda imprimir, sem nenhuma calibração."""
+@asynccontextmanager
+async def motion_lock(printer_id: int):
     lock = _start_locks.setdefault(printer_id, asyncio.Lock())
     if lock.locked():
-        raise Blocked([{"code": "starting", "text": "Já existe um envio em andamento."}])
+        raise Blocked([{"code": "starting", "text": "Já existe um comando do plotter em andamento."}])
     async with lock:
+        yield
+
+
+async def start_plan(printer_id: int, plan_id: str) -> dict:
+    """Confere tudo de novo, envia o ``.gcode.3mf`` por FTPS e manda imprimir, sem nenhuma calibração."""
+    async with motion_lock(printer_id):
         summary = store.load_plan(plan_id)
         package_path = store.plan_package(plan_id)
         if not summary or package_path is None or not summary.get("ok"):
@@ -186,7 +200,6 @@ async def start_plan(printer_id: int, plan_id: str) -> dict:
         if not report.ok:
             raise Blocked([{"code": "invalid", "text": "O G-code não passou na validação: gere de novo."}])
         _check(printer_id)
-        jog_drop(printer_id)
 
         from backend.app.services.bambu_ftp import (
             FtpFailureReport,
@@ -233,6 +246,7 @@ async def start_plan(printer_id: int, plan_id: str) -> dict:
         started = False
         try:
             _check(printer_id)
+            hooks.register_plot(printer_id, remote_name)
             started = bool(
                 _manager().start_print(
                     printer_id,
@@ -250,6 +264,7 @@ async def start_plan(printer_id: int, plan_id: str) -> dict:
             )
         finally:
             if not started:
+                hooks.forget_plot(printer_id)
                 # arquivo que ficou na raiz do SD sem ser impresso vira impressão fantasma ao religar a A1
                 try:
                     await delete_file_async(row.ip_address, row.access_code, remote_path, printer_model=row.model)
@@ -363,6 +378,8 @@ def _command_lines(lines: list[str]) -> list[str]:
 async def jog_start(printer_id: int, pen_id: str | None = None, target: tuple[float, float] | None = None) -> dict:
     """Faz o home (com a caneta fora da mesa) e leva a caneta para cima do papel, alta."""
     _check(printer_id, for_plot=False)
+    if jog_public(printer_id) is not None:
+        raise Blocked([{"code": "jog_open", "text": "Encerre o ajuste de altura atual primeiro."}])
     row = await printer_row(printer_id)
     machine = E.machine_for_model(getattr(row, "model", None))
     if machine is None:
@@ -415,13 +432,12 @@ async def jog_finish(printer_id: int, save: bool) -> dict:
     if s is None or jog_public(printer_id) is None:
         raise Blocked([{"code": "no_session", "text": "Sessão de ajuste expirada: refaça o home."}])
     _check(printer_id, for_plot=False)
-    saved = None
-    if save:
-        saved = round(s.z + (s.paper_thickness if s.home_on_paper else 0.0), 2)
-        store.update_pen(printer_id, s.pen_id, {"z_contact": saved})
+    saved = round(s.z + (s.paper_thickness if s.home_on_paper else 0.0), 2) if save else None
     up = min(JOG_MAX_Z, s.z + 20.0)
     try:
         await _send(printer_id, ["G90", f"G1 Z{E.gcode.fmt(up)} F600", "G0 X128 Y254 F6000", "M400"])
     finally:
         jog_drop(printer_id)
+    if saved is not None:
+        store.update_pen(printer_id, s.pen_id, {"z_contact": saved})
     return {"saved_z_contact": saved, "pen_id": s.pen_id}

@@ -1,21 +1,34 @@
-"""Ganchos chamados de dentro do upstream. Sem dependências (nem numpy): não podem falhar nem pesar."""
+"""Identifica o próximo plot despachado para cada impressora no callback de início."""
 
 from __future__ import annotations
 
-# Prefixo do arquivo que o plotter manda para a impressora; o nome do job (subtask) herda o prefixo.
+import time
+
 FILE_PREFIX = "penplot_"
+_PENDING_SECONDS = 300
+_pending: dict[int, tuple[str, float]] = {}
 
 
-def is_plotter_job(data: dict | None) -> bool:
-    """True quando o job que está começando é um plot nosso (gancho em ``main.on_print_start``).
+def register_plot(printer_id: int, filename: str) -> None:
+    _pending[printer_id] = (filename, time.monotonic())
 
-    O papel preso na mesa faria a verificação de "mesa vazia" pausar o plot; num plot o papel é o
-    próprio trabalho, então a verificação é pulada só para estes arquivos.
-    """
-    if not isinstance(data, dict):
+
+def forget_plot(printer_id: int) -> None:
+    _pending.pop(printer_id, None)
+
+
+def is_plotter_job(printer_id: int, data: dict | None) -> bool:
+    """Pula a detecção de objeto só quando o início coincide com um plot recém-despachado."""
+    pending = _pending.get(printer_id)
+    if pending is None or not isinstance(data, dict):
+        return False
+    filename, sent_at = pending
+    if time.monotonic() - sent_at > _PENDING_SECONDS:
+        forget_plot(printer_id)
         return False
     for key in ("subtask_name", "filename", "gcode_file"):
         value = data.get(key)
-        if isinstance(value, str) and value.rsplit("/", 1)[-1].startswith(FILE_PREFIX):
+        if isinstance(value, str) and value.rsplit("/", 1)[-1] in (filename, filename.removesuffix(".3mf")):
+            forget_plot(printer_id)
             return True
     return False
