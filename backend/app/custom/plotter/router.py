@@ -6,6 +6,7 @@ impressora e iniciar o plot pedem ``printers:control`` da impressora em questão
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import os
@@ -57,13 +58,15 @@ class VectorizeBody(BaseModel):
 
 
 class PlanBody(BaseModel):
-    kind: Literal["drawing", "ladder", "cross", "frame"] = "drawing"
+    kind: Literal["drawing", "ladder", "comb", "wedge", "wave", "cross", "frame"] = "drawing"
     drawing_id: str | None = None
     placement: dict | None = None
     paper: dict | None = None
     pen_id: str | None = None
     options: dict = Field(default_factory=dict)
     depths: list[float] | None = Field(default=None, max_length=24)
+    spacings: list[float] | None = Field(default=None, max_length=12)
+    top_depth: float | None = None
     target: list[float] | None = Field(default=None, min_length=2, max_length=2)
     title: str | None = Field(default=None, max_length=80)
 
@@ -91,6 +94,8 @@ async def get_config(
         "enabled": True,
         "paper_presets": [{"id": k, "w": v[0], "h": v[1]} for k, v in E.PAPER_PRESETS.items()],
         "mounts": [E.mount_info(m) for m in E.MOUNTS.values()],
+        "pen_types": [E.pen_type_info(t) for t in E.PEN_TYPES.values()],
+        "default_pen_type": E.DEFAULT_PEN_TYPE,
         "max_upload_mb": MAX_UPLOAD_BYTES // (1024 * 1024),
         "limits": {
             "nozzle_max_temp": P.MAX_NOZZLE_TEMP,
@@ -152,6 +157,7 @@ def _settings_view(printer_id: int, doc: dict) -> dict:
             "contact_calibrated": pen.contact_calibrated,
             "pressure_calibrated": pen.pressure_calibrated,
             "ladder_depths": E.calibration.default_ladder_depths(pen),
+            "tests": E.calibration.thickness_layouts(pen, area),
         }
     hx, hy, on_paper = E.home_point(machine, paper)
     return {**doc, "derived": derived, "home": [hx, hy, on_paper], "machine": P.machine_info(machine)}
@@ -166,7 +172,9 @@ async def _vectorize(item_id: str, data: bytes, options: dict, name: str | None,
     drawing = result["drawing"]
     if name:
         drawing["meta"]["name"] = name
-    store.save_drawing(item_id, drawing, data if keep_source else None, result["preview"] or None)
+    store.save_drawing(
+        item_id, drawing, data if keep_source else None, result["preview"] or None, result.get("thumb") or None, options
+    )
     return {"id": item_id, **drawing}
 
 
@@ -201,6 +209,19 @@ async def revectorize(
         raise HTTPException(404, detail={"message": "Desenho não encontrado: envie a imagem de novo.", "reasons": []})
     name = (old.get("meta") or {}).get("name")
     return await _vectorize(drawing_id, source.read_bytes(), body.options, name, keep_source=False)
+
+
+@router.get("/drawings")
+async def list_drawings(_=RequirePermissionIfAuthEnabled(Permission.PRINTERS_READ)):
+    """Histórico de imagens enviadas (as mais recentes primeiro), com miniatura embutida."""
+    return {"items": await asyncio.to_thread(store.list_drawings), "keep": store.KEEP_DRAWINGS}
+
+
+@router.delete("/drawings/{drawing_id}")
+async def delete_drawing(drawing_id: str, _=RequirePermissionIfAuthEnabled(Permission.PRINTERS_FILES)):
+    if not await asyncio.to_thread(store.delete_drawing, drawing_id):
+        raise HTTPException(404, detail={"message": "Desenho não encontrado.", "reasons": []})
+    return {"deleted": drawing_id}
 
 
 @router.get("/drawings/{drawing_id}")
@@ -242,11 +263,13 @@ async def create_plan(
     if body.kind == "drawing":
         drawing = store.load_drawing(body.drawing_id or "")
         if drawing is None:
-            raise HTTPException(404, detail={"message": "Desenho não encontrado: envie a imagem de novo.", "reasons": []})
+            raise HTTPException(
+                404, detail={"message": "Desenho não encontrado: envie a imagem de novo.", "reasons": []}
+            )
         request.update(drawing=drawing, placement=body.placement, options=body.options)
         request["title"] = body.title or (drawing.get("meta") or {}).get("name") or "desenho"
     else:
-        request.update(depths=body.depths, target=body.target)
+        request.update(depths=body.depths, spacings=body.spacings, top_depth=body.top_depth, target=body.target)
     try:
         result = await worker.run("plan", request, timeout=worker.PLAN_TIMEOUT)
     except (ValueError, worker.JobError) as exc:

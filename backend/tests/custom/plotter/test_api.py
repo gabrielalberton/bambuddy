@@ -254,6 +254,10 @@ async def test_padroes_de_calibracao_viram_planos(async_client, printer_factory,
     )
     assert ladder.status_code == 200, ladder.text
     assert ladder.json()["ok"] and [r["depth"] for r in ladder.json()["calibration"]["rows"]] == [0.0, 0.4, 0.8, 1.2]
+    comb = (await async_client.post(f"{API}/printers/{printer.id}/plans", json={"kind": "comb"})).json()
+    assert comb["ok"] and comb["calibration"]["test"] == "comb" and len(comb["calibration"]["spacings"]) == 8
+    wedge = await async_client.post(f"{API}/printers/{printer.id}/plans", json={"kind": "wedge", "top_depth": 1.0})
+    assert wedge.json()["ok"] and wedge.json()["calibration"]["to"] == 1.0, wedge.text
     cross = await async_client.post(f"{API}/printers/{printer.id}/plans", json={"kind": "cross", "target": [100, 100]})
     assert cross.json()["ok"] and cross.json()["calibration"]["target"] == [100.0, 100.0]
     assert (await async_client.post(f"{API}/printers/{printer.id}/plans", json={"kind": "frame"})).json()["ok"]
@@ -468,6 +472,70 @@ def test_so_ficam_os_desenhos_mais_recentes():
     assert len(kept) == store.KEEP_DRAWINGS
 
 
+def test_historico_respeita_o_teto_de_disco_das_imagens(monkeypatch):
+    monkeypatch.setattr(store, "KEEP_DRAWINGS_BYTES", 2500)
+    for i in range(4):
+        store.save_drawing(f"{i:012x}", {"width": 1, "height": 1, "strokes": [], "meta": {}}, source=b"x" * 1000)
+    kept = sorted(d.name for d in (store.base_dir() / "drawings").iterdir())
+    assert kept == [f"{2:012x}", f"{3:012x}"]  # os dois mais novos; o mais novo fica mesmo sozinho acima do teto
+
+
+# ---------------------------------------------------------------- histórico de envios
+async def test_historico_lista_envios_com_miniatura_e_opcoes(async_client):
+    first = await _drawing(async_client)
+    files = {"file": ("logo.png", shapes.png_bytes(shapes.wedge()), "image/png")}
+    second = (await async_client.post(f"{API}/drawings", files=files, data={"options": '{"threshold": 0.4}'})).json()
+    r = await async_client.get(f"{API}/drawings")
+    assert r.status_code == 200
+    items = r.json()["items"]
+    assert [i["id"] for i in items] == [second["id"], first["id"]]  # mais recente primeiro
+    top = items[0]
+    assert top["name"] == "logo" and top["strokes"] == len(second["strokes"]) and top["options"] == {"threshold": 0.4}
+    assert top["thumb"].startswith("data:image/jpeg;base64,") and top["can_revectorize"]
+    assert (top["width"], top["height"]) == (900, 500) and top["created_at"] <= top["updated_at"]
+    # revetorizar guarda as novas opções e mantém a data de envio
+    await async_client.post(f"{API}/drawings/{first['id']}/vectorize", json={"options": {"simplify": 2.0}})
+    items = (await async_client.get(f"{API}/drawings")).json()["items"]
+    assert items[0]["id"] == first["id"] and items[0]["options"] == {"simplify": 2.0}
+
+
+async def test_historico_completa_desenho_antigo_sem_miniatura(async_client):
+    d = await _drawing(async_client)
+    folder = store.base_dir() / "drawings" / d["id"]
+    (folder / "info.json").unlink()
+    (folder / "thumb.jpg").unlink()
+    item = (await async_client.get(f"{API}/drawings")).json()["items"][0]
+    assert item["name"] == "cunha" and item["thumb"].startswith("data:image/jpeg") and item["options"] == {}
+    assert (folder / "info.json").is_file() and (folder / "thumb.jpg").is_file()
+
+
+async def test_excluir_do_historico(async_client):
+    d = await _drawing(async_client)
+    assert (await async_client.delete(f"{API}/drawings/{d['id']}")).status_code == 200
+    assert (await async_client.get(f"{API}/drawings")).json()["items"] == []
+    assert (await async_client.get(f"{API}/drawings/{d['id']}")).status_code == 404
+    assert (await async_client.delete(f"{API}/drawings/{d['id']}")).status_code == 404
+    assert (await async_client.delete(f"{API}/drawings/settings.json")).status_code == 404
+
+
+async def test_config_traz_tipos_de_caneta_e_ajustes_trazem_os_testes(async_client, printer_factory, manager):
+    printer = await printer_factory(model="A1")
+    cfg = (await async_client.get(f"{API}/config")).json()
+    assert cfg["default_pen_type"] == "bic" and cfg["pen_types"][0]["key"] == "bic"
+    assert {"bic", "canetinha", "pincel", "outra"} <= {t["key"] for t in cfg["pen_types"]}
+    bic = cfg["pen_types"][0]["defaults"]
+    assert bic["rigid"]["max_compression"] == 0.3 and bic["spring"]["name"] == "Caneta BIC com mola"
+    doc = (await async_client.get(f"{API}/printers/{printer.id}/settings")).json()
+    tests = doc["derived"]["padrao"]["tests"]
+    assert tests["ladder"]["depths"][0] == 0.0 and tests["wedge"]["length"] == 100.0
+    assert tests["comb"]["depths"] == [0.4, 0.77, 1.13, 1.5]
+    # trocar o tipo de caneta é só mais um campo do perfil
+    doc["pens"]["padrao"].update(E.PEN_TYPES["canetinha"].values_for("spring"), pen_type="canetinha")
+    body = {k: doc[k] for k in ("pens", "active_pen", "paper", "placement")}
+    saved = (await async_client.put(f"{API}/printers/{printer.id}/settings", json=body)).json()
+    assert saved["pens"]["padrao"]["pen_type"] == "canetinha" and saved["pens"]["padrao"]["line_width"] == 1.0
+
+
 # ---------------------------------------------------------------- modos do suporte
 async def test_ha_um_perfil_com_mola_e_um_sem_mola_cada_um_com_sua_calibracao(async_client, printer_factory, manager):
     printer = await printer_factory(model="A1")
@@ -480,7 +548,7 @@ async def test_ha_um_perfil_com_mola_e_um_sem_mola_cada_um_com_sua_calibracao(as
     assert doc["active_pen"] == "padrao" and doc["pens"]["sem-mola"]["use_mesh"] is True
     assert doc["derived"]["sem-mola"]["mount"] == "rigid" and -0.02 in doc["derived"]["sem-mola"]["jog_steps"]
     # calibrar o sem mola não mexe no com mola
-    doc["pens"]["sem-mola"].update({"z_contact": 5.5, "table": [[0.05, 0.5], [0.4, 1.5]]})
+    doc["pens"]["sem-mola"].update({"z_contact": 5.5, "table": [[0.05, 0.5], [0.3, 1.5]]})
     body = {k: doc[k] for k in ("pens", "active_pen", "paper", "placement")}
     body["active_pen"] = "sem-mola"
     saved = (await async_client.put(f"{API}/printers/{printer.id}/settings", json=body)).json()
@@ -499,7 +567,7 @@ async def test_ajustes_antigos_com_uma_caneta_ganham_o_perfil_sem_mola(async_cli
 async def test_plano_sem_mola_sai_com_malha_e_aproximacao_lenta(async_client, printer_factory, manager):
     printer = await printer_factory(model="A1")
     doc = (await async_client.get(f"{API}/printers/{printer.id}/settings")).json()
-    doc["pens"]["sem-mola"].update({"z_contact": 4.0, "table": [[0.05, 0.5], [0.4, 1.5]]})
+    doc["pens"]["sem-mola"].update({"z_contact": 4.0, "table": [[0.05, 0.5], [0.3, 1.5]]})
     body = {k: doc[k] for k in ("pens", "active_pen", "paper", "placement")}
     assert (await async_client.put(f"{API}/printers/{printer.id}/settings", json=body)).status_code == 200
     drawing = await _drawing(async_client)

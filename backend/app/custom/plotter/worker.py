@@ -17,6 +17,7 @@ import traceback
 VECTORIZE_TIMEOUT = 150.0
 PLAN_TIMEOUT = 120.0
 PREVIEW_MAX_SIDE = 1600
+THUMB_MAX_SIDE = 160  # miniatura do histórico de envios (store.THUMB_SIDE)
 SIM_MAX_POINTS = 12000
 
 # Os testes ligam isto para rodar no próprio processo (sem spawn).
@@ -41,8 +42,22 @@ def vectorize_job(data: bytes, options: dict | None) -> dict:
     h, w = rgb.shape[:2]
     scale = min(1.0, PREVIEW_MAX_SIDE / max(h, w))
     small = rgb if scale >= 1.0 else cv2.resize(rgb, (round(w * scale), round(h * scale)), interpolation=cv2.INTER_AREA)
-    ok, jpg = cv2.imencode(".jpg", cv2.cvtColor(small, cv2.COLOR_RGB2BGR), [cv2.IMWRITE_JPEG_QUALITY, 82])
-    return {"drawing": drawing.to_json(), "preview": jpg.tobytes() if ok else b""}
+    bgr = cv2.cvtColor(small, cv2.COLOR_RGB2BGR)
+    ok, jpg = cv2.imencode(".jpg", bgr, [cv2.IMWRITE_JPEG_QUALITY, 82])
+    t = min(1.0, THUMB_MAX_SIDE / max(bgr.shape[:2]))
+    tiny = (
+        bgr
+        if t >= 1.0
+        else cv2.resize(
+            bgr, (max(1, round(bgr.shape[1] * t)), max(1, round(bgr.shape[0] * t))), interpolation=cv2.INTER_AREA
+        )
+    )
+    ok_t, thumb = cv2.imencode(".jpg", tiny, [cv2.IMWRITE_JPEG_QUALITY, 72])
+    return {
+        "drawing": drawing.to_json(),
+        "preview": jpg.tobytes() if ok else b"",
+        "thumb": thumb.tobytes() if ok_t else b"",
+    }
 
 
 def plan_job(request: dict) -> dict:
@@ -76,6 +91,12 @@ def plan_job(request: dict) -> dict:
             raise E.PlanError("o papel não tem área útil dentro do alcance da caneta")
         if kind == "ladder":
             paths, extra = E.calibration.pressure_ladder(area, pen, request.get("depths"))
+        elif kind == "comb":
+            paths, extra = E.calibration.spacing_comb(area, pen, request.get("depths"), request.get("spacings"))
+        elif kind == "wedge":
+            paths, extra = E.calibration.ruler_wedge(area, pen, request.get("top_depth"))
+        elif kind == "wave":
+            paths, extra = E.calibration.wave_tapers(area, pen)
         elif kind == "cross":
             target = request.get("target")
             paths, extra = E.calibration.offset_cross(area, pen, tuple(target) if target else None)

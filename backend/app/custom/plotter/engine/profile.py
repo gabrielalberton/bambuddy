@@ -87,6 +87,99 @@ MOUNTS: dict[str, Mount] = {
 }
 
 
+@dataclass(frozen=True)
+class PenType:
+    """Tipo de caneta: valores INICIAIS (estimativas, não medidas) de aperto, largura e velocidade.
+
+    ``depth`` dá (depth_min, depth_max, max_compression) por modo do suporte, sempre dentro dos limites de
+    ``MOUNTS``. A curva real de cada caneta sai dos testes de espessura.
+    """
+
+    key: str
+    name: str
+    about: str
+    line_width: float
+    draw_speed: float
+    depth: dict  # modo -> (depth_min, depth_max, max_compression); ausente = valores do modo
+
+    def values_for(self, mount: str) -> dict:
+        out = dict(MOUNTS[mount].defaults)
+        if mount in self.depth:
+            out["depth_min"], out["depth_max"], out["max_compression"] = self.depth[mount]
+        if self.key != GENERIC_PEN_TYPE:
+            out["name"] = f"{self.name} {MOUNTS[mount].name.lower()}"
+        out.update(line_width=self.line_width, draw_speed=self.draw_speed, dwell_ms=0)
+        return out
+
+
+DEFAULT_PEN_TYPE = "bic"
+GENERIC_PEN_TYPE = "outra"
+
+# Esferográfica precisa de força para a esfera girar ("require a substantial amount of downward pressure",
+# wiki da Evil Mad Scientist); feltro marca leve e gasta com força; gel falha rápido demais ou em papel
+# com textura; pincel é o que mais varia de largura. Ver "pen plotter/references/tipos-de-caneta.md".
+PEN_TYPES: dict[str, PenType] = {
+    "bic": PenType(
+        "bic",
+        "Caneta BIC",
+        "Esferográfica (BIC Cristal). A esfera só gira com força; a largura quase não muda.",
+        0.4,
+        25.0,
+        {"spring": (0.4, 1.5, 3.0), "rigid": (0.05, 0.2, 0.3)},
+    ),
+    "canetinha": PenType(
+        "canetinha",
+        "Canetinha",
+        "Hidrográfica de ponta de feltro. Marca com pouca força; força demais achata a ponta.",
+        1.0,
+        30.0,
+        {"spring": (0.1, 0.8, 2.0), "rigid": (0.03, 0.3, 0.5)},
+    ),
+    "fineliner": PenType(
+        "fineliner",
+        "Fineliner / nanquim",
+        "Ponta fina (Pigma Micron, Stabilo point). Quase sem força e sem variar a largura.",
+        0.3,
+        20.0,
+        {"spring": (0.1, 0.5, 1.5), "rigid": (0.02, 0.12, 0.2)},
+    ),
+    "gel": PenType(
+        "gel",
+        "Caneta gel",
+        "Pouca força; pode falhar rápido demais ou em papel com textura.",
+        0.5,
+        18.0,
+        {"spring": (0.2, 0.9, 2.5), "rigid": (0.03, 0.15, 0.25)},
+    ),
+    "pincel": PenType(
+        "pincel",
+        "Caneta pincel",
+        "Pentel Pocket Brush, Tombow Fudenosuke: a largura muda muito com o aperto. Melhor sem mola.",
+        1.0,
+        15.0,
+        {"spring": (0.1, 2.0, 4.0), "rigid": (0.05, 1.0, 1.5)},
+    ),
+    "marcador": PenType(
+        "marcador",
+        "Marcador",
+        "Ponta grossa (pincel atômico, Posca). Posca precisa de pressão para a tinta sair.",
+        2.0,
+        25.0,
+        {"spring": (0.2, 1.0, 3.0), "rigid": (0.05, 0.3, 0.5)},
+    ),
+    "outra": PenType("outra", "Outra caneta", "Valores genéricos do modo do suporte.", 0.5, 25.0, {}),
+}
+
+
+def pen_type_info(pen_type: PenType) -> dict:
+    return {
+        "key": pen_type.key,
+        "name": pen_type.name,
+        "about": pen_type.about,
+        "defaults": {mount: pen_type.values_for(mount) for mount in MOUNTS},
+    }
+
+
 def mount_info(mount: Mount) -> dict:
     """O que a tela precisa saber de cada modo."""
     return {
@@ -150,6 +243,9 @@ def _num(value, name: str, lo: float, hi: float) -> float:
 class PenProfile:
     name: str = "Caneta"
     mount: str = "spring"  # "spring" (com mola) ou "rigid" (sem mola, caneta travada): ver MOUNTS
+    # chave de PEN_TYPES. Perfil novo (for_mount, ajustes padrão, tela) nasce BIC; os valores numéricos desta
+    # classe e um perfil gravado antes dos tipos existirem são os genéricos, por isso "outra" aqui
+    pen_type: str = GENERIC_PEN_TYPE
     offset_x: float = 0.0
     offset_y: float = -32.0
     z_contact: float | None = None  # None = altura de contato ainda não calibrada: não plota
@@ -171,7 +267,10 @@ class PenProfile:
         mount = data.get("mount") or "spring"
         if mount not in MOUNTS:
             raise ProfileError("mount: use 'spring' (com mola) ou 'rigid' (sem mola)")
-        p = cls.for_mount(mount)
+        pen_type = data.get("pen_type") or GENERIC_PEN_TYPE
+        if pen_type not in PEN_TYPES:
+            raise ProfileError("pen_type: tipo de caneta desconhecido")
+        p = cls.for_mount(mount, pen_type)
         spec = MOUNTS[mount]
         p.name = str(data.get("name") or p.name)[:60]
         p.offset_x = _num(data.get("offset_x", p.offset_x), "offset_x", -80, 80)
@@ -199,9 +298,9 @@ class PenProfile:
         return p
 
     @classmethod
-    def for_mount(cls, mount: str) -> PenProfile:
-        """Perfil novo com os valores iniciais do modo."""
-        return cls(mount=mount, **MOUNTS[mount].defaults)
+    def for_mount(cls, mount: str, pen_type: str = DEFAULT_PEN_TYPE) -> PenProfile:
+        """Perfil novo com os valores iniciais do modo e do tipo de caneta."""
+        return cls(mount=mount, pen_type=pen_type, **PEN_TYPES[pen_type].values_for(mount))
 
     @property
     def mount_spec(self) -> Mount:
@@ -310,15 +409,6 @@ class Paper:
         p.thickness = _num(data.get("thickness", p.thickness), "papel espessura", 0, 2)
         return p
 
-    @classmethod
-    def for_mount(cls, mount: str) -> PenProfile:
-        """Perfil novo com os valores iniciais do modo."""
-        return cls(mount=mount, **MOUNTS[mount].defaults)
-
-    @property
-    def mount_spec(self) -> Mount:
-        return MOUNTS[self.mount]
-
     def to_dict(self) -> dict:
         return asdict(self)
 
@@ -344,15 +434,6 @@ class Placement:
         p.width = _num(data.get("width", p.width), "desenho largura", 1, 1000)
         p.rotation = _num(data.get("rotation", p.rotation), "desenho rotação", -3600, 3600) % 360.0
         return p
-
-    @classmethod
-    def for_mount(cls, mount: str) -> PenProfile:
-        """Perfil novo com os valores iniciais do modo."""
-        return cls(mount=mount, **MOUNTS[mount].defaults)
-
-    @property
-    def mount_spec(self) -> Mount:
-        return MOUNTS[self.mount]
 
     def to_dict(self) -> dict:
         return asdict(self)

@@ -41,8 +41,8 @@ def test_perfil_novo_de_cada_modo_vem_com_os_valores_do_modo():
     r = E.PenProfile.from_dict({"mount": "rigid"})
     assert (r.depth_min, r.depth_max, r.max_compression, r.z_speed) == (0.05, 0.4, 0.6, 5.0)
     assert r.name == "Caneta sem mola" and r.use_mesh
-    s = E.PenProfile.for_mount("spring")
-    assert (s.depth_min, s.depth_max, s.max_compression) == (0.2, 1.2, 3.0)
+    s = E.PenProfile.for_mount("spring", "outra")
+    assert (s.depth_min, s.depth_max, s.max_compression) == (0.2, 1.2, 3.0) and s.name == "Caneta com mola"
 
 
 def test_sem_mola_limita_o_aperto_e_obriga_a_malha():

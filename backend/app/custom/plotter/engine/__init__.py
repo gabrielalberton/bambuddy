@@ -18,13 +18,16 @@ from .gcode import GcodeResult, build_gcode, z_levels
 from .plan import Issue, PenPath, PlanError, PlanOptions, PlanPaths, build_paths, placement_corners
 from .profile import (
     A1,
+    DEFAULT_PEN_TYPE,
     MACHINES,
     MOUNTS,
     PAPER_PRESETS,
+    PEN_TYPES,
     Machine,
     Mount,
     Paper,
     PenProfile,
+    PenType,
     Placement,
     ProfileError,
     drawable_area,
@@ -32,6 +35,7 @@ from .profile import (
     machine_for_model,
     mount_info,
     pen_reach,
+    pen_type_info,
 )
 from .raster import ImageError
 from .strokes import Drawing, Stroke
@@ -40,9 +44,11 @@ from .vectorize import VectorizeOptions, render_preview, vectorize, vectorize_im
 
 __all__ = [
     "A1",
+    "DEFAULT_PEN_TYPE",
     "MACHINES",
     "MOUNTS",
     "PAPER_PRESETS",
+    "PEN_TYPES",
     "Drawing",
     "GcodeResult",
     "ImageError",
@@ -52,6 +58,7 @@ __all__ = [
     "Paper",
     "PenPath",
     "PenProfile",
+    "PenType",
     "Placement",
     "PlanError",
     "PlanOptions",
@@ -71,6 +78,7 @@ __all__ = [
     "mount_info",
     "package",
     "pen_reach",
+    "pen_type_info",
     "placement_corners",
     "plot_paths",
     "render_preview",
