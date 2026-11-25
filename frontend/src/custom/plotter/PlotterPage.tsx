@@ -3,9 +3,12 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Download, ImageUp, PenTool, Play, ScanEye } from 'lucide-react';
 import { ApiError } from '../../api/client';
 import { useAuth } from '../../contexts/AuthContext';
-import { drawableArea, plotter, type Config, type Drawing, type Kind, type Paper, type Pen, type Placement, type Plan, type Rect, type Settings } from './api';
+import { drawableArea, plotter, type Config, type Drawing, type HistoryItem, type Kind, type Paper, type Pen, type Placement, type Plan, type Rect, type Settings } from './api';
 import { Numeric, PenFields } from './Controls';
+import { DrawingHistory } from './History';
 import { MountPicker } from './Mount';
+import { ThicknessTests } from './Thickness';
+import { calibrationText, type TestKind } from './thickness';
 import { FALLBACK_MOUNTS, MOUNT_ABOUT, mountOf } from './mounts';
 import { Plate, type Edit, type Layer } from './Plate';
 import { PlateCamera } from './PlateCamera';
@@ -23,8 +26,11 @@ const POSITION_FIELDS: [keyof Placement, string, number, number][] = [
   ['cx', 'Centro X (mm)', -500, 800], ['cy', 'Centro Y (mm)', -500, 800],
 ];
 const KIND_LABELS: Record<Kind, string> = {
-  drawing: 'Desenho', ladder: 'Escala de pressão', cross: 'Cruz de alinhamento', frame: 'Contorno da área útil',
+  drawing: 'Desenho', ladder: 'Teste 1 · Escada numerada', comb: 'Teste 2 · Pente de espessura',
+  wedge: 'Teste 3 · Cunha com régua', wave: 'Teste 4 · Onda e pontas',
+  cross: 'Cruz de alinhamento', frame: 'Contorno da área útil',
 };
+const HISTORY_KEY = ['custom', 'plotter', 'drawings'];
 
 function fit(drawing: Drawing, area: Rect | null): Placement {
   const [x0, y0, x1, y1] = area ?? [0, 0, 256, 256];
@@ -97,10 +103,12 @@ function Workspace({ id, config, initial }: { id: number; config: Config; initia
   const hasVision = config.printers.some(printer => printer.id === id && printer.plate_vision);
   const [aerialOn, setAerialOn] = useState(false);
   const { aerial, status: aerialStatus } = useAerialPlate(id, aerialOn);
+  const history = useQuery({ queryKey: HISTORY_KEY, queryFn: plotter.drawings, retry: false });
   const running = useRef(false);
   const positionCustomized = useRef(initial.placement !== null);
   const pen = settings.pens[settings.active_pen];
   const mounts = config.mounts?.length ? config.mounts : FALLBACK_MOUNTS;
+  const penTypes = config.pen_types ?? [];
   const mount = mountOf(pen);
   const mountInfo = mounts.find(item => item.key === mount);
   const samePens = Object.entries(settings.pens).filter(([, item]) => mountOf(item) === mount);
@@ -180,33 +188,90 @@ function Workspace({ id, config, initial }: { id: number; config: Config; initia
     setSettings(saved);
   }
 
+  function show(next: Drawing) {
+    invalidate();
+    if (!positionCustomized.current) setPlacement(fit(next, area));
+    setDrawing(next);
+    setExcluded(new Set());
+    setLayer('vector');
+    setEdit('drawing');
+    setKind('drawing');
+    void cache.invalidateQueries({ queryKey: HISTORY_KEY });
+  }
+
   function upload(file: File) {
     if (file.size > config.max_upload_mb * 1024 * 1024) {
       setError(`O limite por imagem é de ${config.max_upload_mb} MB.`);
       return;
     }
-    run('Vetorizando imagem…', async () => {
-      const next = await plotter.drawing(file, options);
-      invalidate();
-      if (!positionCustomized.current) setPlacement(fit(next, area));
-      setDrawing(next);
-      setExcluded(new Set());
-      setLayer('vector');
-      setEdit('drawing');
-      setKind('drawing');
+    run('Vetorizando imagem…', async () => show(await plotter.drawing(file, options)));
+  }
+
+  /** Reabre uma imagem do histórico com as opções de vetorização usadas nela. */
+  function reopen(item: HistoryItem) {
+    run('Abrindo imagem…', async () => {
+      const next = await plotter.openDrawing(item.id);
+      const used = item.options;
+      setThreshold(typeof used.threshold === 'number' ? used.threshold : null);
+      setBackground(used.background !== false);
+      setInk(used.ink === 'min' ? 'min' : 'luma');
+      setInvert(used.invert === 'yes' || used.invert === 'no' ? used.invert : 'auto');
+      show(next);
+      setMessage(`“${item.name}” aberta do histórico.`);
     });
   }
 
+  function forget(item: HistoryItem) {
+    if (!window.confirm(`Excluir “${item.name}” do histórico?`)) return;
+    run('Excluindo imagem…', async () => {
+      await plotter.deleteDrawing(item.id);
+      if (drawing?.id === item.id) {
+        invalidate();
+        setDrawing(null);
+        setEdit('paper');
+        setLayer('vector');
+      }
+      await cache.invalidateQueries({ queryKey: HISTORY_KEY });
+      setMessage(`“${item.name}” excluída do histórico.`);
+    });
+  }
+
+  async function makePlan(which: Kind) {
+    setReady(false);
+    const next = await plotter.plan(id, {
+      kind: which, drawing_id: drawing?.id, placement, paper, pen_id: settings.active_pen,
+      options: { pressure, width_mode: widthMode, exclude: [...excluded] },
+      title: which === 'drawing' ? drawing?.meta.name : KIND_LABELS[which],
+    });
+    setPlan(next);
+    setTime(next.sim.at(-1)?.[3] ?? 0);
+    setLayer('simulation');
+    return next;
+  }
+
   function preview() {
-    run('Gerando plano…', async () => {
-      setReady(false);
-      const next = await plotter.plan(id, {
-        kind, drawing_id: drawing?.id, placement, paper, pen_id: settings.active_pen,
-        options: { pressure, width_mode: widthMode, exclude: [...excluded] }, title: kind === 'drawing' ? drawing?.meta.name : KIND_LABELS[kind],
+    run('Gerando plano…', async () => { await makePlan(kind); });
+  }
+
+  /** Teste de espessura: grava o perfil se mudou (suporte, tipo de caneta) e gera o plano do teste. */
+  function generateTest(test: TestKind) {
+    run('Gerando teste…', async () => {
+      setKind(test);
+      if (penChanged) await saveSettings();
+      const next = await makePlan(test);
+      setMessage(next.ok ? 'Teste validado. Confira a simulação na mesa e inicie em “Operação”.' : 'Teste recusado: veja os motivos em “Operação”.');
+    });
+  }
+
+  function applyResult(next: Pen, notes: string[]) {
+    run('Gravando resultado…', async () => {
+      const saved = await plotter.save(id, {
+        ...settings, pens: { ...settings.pens, [settings.active_pen]: next },
+        placement: drawing ? placement : settings.placement,
       });
-      setPlan(next);
-      setTime(next.sim.at(-1)?.[3] ?? 0);
-      setLayer('simulation');
+      applySaved(saved);
+      invalidate();
+      setMessage(`Gravado em “${next.name}”. ${notes.join(' ')}`);
     });
   }
 
@@ -268,12 +333,15 @@ function Workspace({ id, config, initial }: { id: number; config: Config; initia
         </div>}
       </section>
       <div className="plotter-sidebar">
-        {section('Imagem', <>
+        {section('Imagem e testes', <>
           <label className="plotter-upload"><ImageUp size={22} aria-hidden="true" />
             <span><strong>Selecionar imagem</strong><small>{imported}</small></span>
             <input type="file" aria-label="Selecionar imagem" accept="image/png,image/jpeg,.png,.jpg,.jpeg" disabled={!canFiles}
               onChange={e => { const file = e.currentTarget.files?.[0]; if (file) upload(file); e.currentTarget.value = ''; }} />
           </label>
+          {history.error && <p className="plotter-muted">Histórico indisponível. {history.error.message}</p>}
+          <DrawingHistory items={history.data?.items ?? []} keep={history.data?.keep} current={drawing?.id}
+            disabled={!!busy} canDelete={canFiles} onOpen={reopen} onDelete={forget} />
           <details><summary>Opções de vetorização</summary>
             <div className="plotter-fields">
               <Numeric label="Limiar (0–1, vazio = auto)" value={threshold} min={0.03} max={0.97} nullable onChange={setThreshold} />
@@ -290,6 +358,12 @@ function Workspace({ id, config, initial }: { id: number; config: Config; initia
               invalidate(); setDrawing(next); setExcluded(new Set());
             })}>Vetorizar novamente</button>
           </details>
+          <ThicknessTests settings={settings} mounts={mounts} penTypes={penTypes} layouts={settings.derived?.[settings.active_pen]?.tests}
+            kind={kind} calibration={plan?.calibration} disabled={!!busy || !!jog} canEdit={canControl}
+            canGenerate={canFiles && canControl && !!area && pen.z_contact !== null}
+            hint={pen.z_contact === null ? 'Antes, calibre a altura de contato em “Calibração da caneta”.' : !area ? 'O papel está fora do alcance da caneta.' : undefined}
+            onSettings={next => { invalidate(); setSettings(next); }} onPen={changePen}
+            onPick={test => { setKind(test); invalidate(); }} onGenerate={generateTest} onApply={applyResult} />
         </>)}
         {section('Papel', <fieldset disabled={!!jog}>
           <div className="plotter-fields">
@@ -319,9 +393,9 @@ function Workspace({ id, config, initial }: { id: number; config: Config; initia
           </div>
         </>)}
         {section('Calibração da caneta', <>
-          <MountPicker settings={settings} mounts={mounts} disabled={!!jog || !!busy}
+          <MountPicker settings={settings} mounts={mounts} penTypes={penTypes} disabled={!!jog || !!busy}
             onChange={next => { invalidate(); setSettings(next); }} />
-          <p className="plotter-muted">{mountInfo?.name ?? mount} · {pen.name} · {pen.z_contact === null ? 'Contato pendente' : `Contato Z ${pen.z_contact} mm`} · {hasPressure ? 'Curva de pressão medida' : 'Curva de pressão pendente'}</p>
+          <p className="plotter-muted">{mountInfo?.name ?? mount} · {penTypes.find(item => item.key === pen.pen_type)?.name ?? pen.name} · {pen.z_contact === null ? 'Contato pendente' : `Contato Z ${pen.z_contact} mm`} · {hasPressure ? 'Curva de pressão medida' : 'Curva de pressão pendente'}</p>
           <details open={jog ? true : undefined}><summary>Editar perfil e ajustar contato</summary>
             <fieldset disabled={!!jog || !canControl}>
               {samePens.length > 1 && <label className="plotter-field"><span>Perfil ativo</span>
@@ -329,7 +403,7 @@ function Workspace({ id, config, initial }: { id: number; config: Config; initia
                   {samePens.map(([key, item]) => <option key={key} value={key}>{item.name}</option>)}
                 </select>
               </label>}
-              <PenFields pen={pen} mount={mountInfo} onChange={changePen} />
+              <PenFields pen={pen} mount={mountInfo} penTypes={penTypes} onChange={changePen} />
               <div className="plotter-actions">
                 <button type="button" onClick={() => run('Salvando ajustes…', async () => { await saveSettings(); invalidate(); setMessage('Ajustes salvos.'); })}>Salvar ajustes</button>
                 <button type="button" disabled={!area || !canStart || !ready} onClick={() => run('Iniciando ajuste de altura…', async () => {
@@ -390,7 +464,7 @@ function Workspace({ id, config, initial }: { id: number; config: Config; initia
           <button type="button" disabled={!canFiles || !area || penChanged || (kind === 'drawing' && (!drawing || excluded.size === drawing.strokes.length)) || !!jog} onClick={preview}>Gerar e validar plano</button>
           {plan && <div className="plotter-result" aria-live="polite">
             <strong>{plan.ok ? 'G-code validado' : 'Plano recusado'}{plan.stats.time_s !== undefined ? ` · ${showTime(plan.stats.time_s)} estimados` : ''}</strong>
-            {!!plan.calibration.rows?.length && <p>{mount === 'rigid' ? 'Apertos' : 'Compressões'}, de cima para baixo: {plan.calibration.rows.map(row => row.depth).join(' · ')} mm</p>}
+            {!!calibrationText(plan.calibration, mount === 'rigid') && <p>{calibrationText(plan.calibration, mount === 'rigid')}</p>}
             {[...plan.errors, ...plan.warnings].map((notice, index) => <p key={index}>{notice.text}</p>)}
             {plan.ok && <button type="button" onClick={() => run('Baixando G-code…', async () => {
               const url = URL.createObjectURL(await plotter.download(id, plan));

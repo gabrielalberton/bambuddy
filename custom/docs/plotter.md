@@ -19,9 +19,51 @@ ao longo do traço. A curva é uma calibração indireta de pressão, em milíme
    folha entra na compensação se o bico fez o home sobre ela.
 4. Use **Cruz de alinhamento** para conferir a posição de XY. A correção do offset é o offset atual mais
    a diferença entre o ponto medido e o ponto esperado em cada eixo.
-5. Gere **Escala de pressão** e confira os valores antes do envio. As linhas vão da menor à maior compressão
-   de cima para baixo, seguidas por uma cunha de compressão crescente. Meça as larguras e salve os pares
-   compressão/largura no perfil. Repita após trocar de caneta, suporte ou papel com espessura diferente.
+5. Em **Imagem e testes**, escolha o suporte e o **tipo de caneta** (seção abaixo) e rode um ou mais
+   **testes de espessura**. Cada teste tem o passo a passo e um formulário de resultado que grava a curva
+   ou a faixa de aperto na caneta. Repita após trocar de caneta, suporte ou papel com espessura diferente.
+
+## Tipo de caneta
+
+A **Caneta BIC** é o padrão nos dois modos. Trocar o tipo aplica os valores iniciais dele no modo atual
+(aperto mínimo e máximo, limite, largura nominal e velocidade) e zera o contato e as medidas, porque outra
+caneta tem outra altura de ponta. Os valores iniciais são estimativas, não medidas: os testes corrigem.
+
+| Tipo | Com mola (mín.–máx. / limite) | Sem mola (mín.–máx. / limite) | Traço | Velocidade |
+|---|---|---|---|---|
+| Caneta BIC | 0,4–1,5 / 3 mm | 0,05–0,2 / 0,3 mm | 0,4 mm | 25 mm/s |
+| Canetinha | 0,1–0,8 / 2 mm | 0,03–0,3 / 0,5 mm | 1 mm | 30 mm/s |
+| Fineliner / nanquim | 0,1–0,5 / 1,5 mm | 0,02–0,12 / 0,2 mm | 0,3 mm | 20 mm/s |
+| Caneta gel | 0,2–0,9 / 2,5 mm | 0,03–0,15 / 0,25 mm | 0,5 mm | 18 mm/s |
+| Caneta pincel | 0,1–2 / 4 mm | 0,05–1 / 1,5 mm | 1 mm | 15 mm/s |
+| Marcador | 0,2–1 / 3 mm | 0,05–0,3 / 0,5 mm | 2 mm | 25 mm/s |
+| Outra caneta | 0,2–1,2 / 3 mm | 0,05–0,4 / 0,6 mm | 0,5 mm | 25 mm/s |
+
+Perfis gravados antes dos tipos existirem aparecem como **Outra caneta** (valores genéricos).
+
+## Testes de espessura
+
+Ficam no cartão **Imagem e testes**, valem para o suporte e a caneta ativos e precisam da altura de contato
+calibrada. **Gerar e validar o teste** grava o perfil, se mudou, e mostra a simulação; o envio é pelo
+**Iniciar plotagem**, como um desenho. Todos saem sobre uma **grade de 10 mm** com as colunas numeradas
+embaixo, desenhada antes de tudo com aperto leve. Ela localiza cada resultado na folha e serve de escala
+numa foto. A primeira coluna traz o aperto (ou a rampa) de cada fileira.
+
+| Teste | O que sai | O que se mede | O que grava |
+|---|---|---|---|
+| 1 · Escada numerada | Uma linha de 50 mm por aperto, do zero ao topo da escala | Largura de cada linha; maior aperto com traço bom | Curva aperto → largura, faixa de aperto e largura nominal |
+| 2 · Pente de espessura | Para 4 apertos da faixa, células de 5 mm hachuradas com 8 espaçamentos (½ a 3× a largura nominal) | Última célula que virou mancha cheia em cada fileira | Curva (largura = meio entre a última fechada e a seguinte) |
+| 3 · Cunha com régua | Ida de 0 ao topo da escala em 100 mm e volta descendo; a grade é a régua | Número da grade onde a ida começou e a volta parou de marcar; onde passou do ponto | Aperto mínimo (com folga de 5%) e máximo; avisa atrito se ida e volta diferem |
+| 4 · Onda e pontas | Linha de 150 mm com o aperto oscilando entre o mínimo e o máximo, com ondas de 50 a 12 mm; pontas de 0 ao máximo e de volta a 0 com rampas de 5, 10, 20 e 40 mm | Onde a onda para de afinar (limite de resposta); a quantos mm da ponta o traço sumiu | Aperto mínimo |
+
+Ondas e rampas respeitam a variação de aperto por mm do modo (alongam se preciso). Em papel pequeno, a cunha
+e a onda encurtam em múltiplos de 10 mm.
+
+## Histórico de imagens
+
+Abaixo do botão de envio ficam as imagens já enviadas (até 30, e até 300 MB de originais), da mais recente
+para a mais antiga, com miniatura, data e número de traços. Tocar reabre a imagem com as opções de
+vetorização usadas nela; o × exclui. Imagens enviadas antes do histórico ganham miniatura na primeira listagem.
 
 ## Suporte com mola ou sem mola
 
@@ -35,8 +77,8 @@ curva de pressão separadas: travar a caneta muda a altura da ponta e a mola dei
 | Ondulação da folha/mesa | Absorvida | Muda o traço; folha plana e presa |
 | Precisão XY | Folga do tubo pode tremer o traço | Sem folga |
 | Histerese | Atrito: descendo e subindo dão pressões diferentes | Só a da ponta |
-| Aperto padrão | 0,2 a 1,2 mm, curso da mola 3 mm (até 8) | 0,05 a 0,4 mm, limite 0,6 mm (até 2) |
-| Escala de pressão | Passos de 0,1 a 0,5 mm | Passos de 0,05 mm |
+| Aperto inicial (BIC) | 0,4 a 1,5 mm, curso da mola 3 mm (até 8) | 0,05 a 0,2 mm, limite 0,3 mm (até 2) |
+| Escada (teste 1) | Passos de 0,1 a 0,5 mm | Passos de 0,05 mm |
 | Malha de nivelamento | Opcional | Obrigatória (o validador recusa sem ela) |
 | Descida | Direta na velocidade de Z | Rápida até 0,3 mm do papel e 2 mm/s até o aperto |
 | Variação de aperto no traço | Até 0,6 mm por mm | Até 0,25 mm por mm |

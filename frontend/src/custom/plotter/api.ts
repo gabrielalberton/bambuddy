@@ -9,15 +9,27 @@ export type MountInfo = {
   key: MountKey; name: string; depth_limit: number; compression_limit: number;
   jog_steps: number[]; needs_mesh: boolean; approach_speed: number | null; defaults: Partial<Pen>;
 };
+export type PenTypeInfo = { key: string; name: string; about: string; defaults: Record<MountKey, Partial<Pen>> };
 export type Pen = {
-  name: string; mount: MountKey; offset_x: number; offset_y: number; z_contact: number | null;
+  name: string; mount: MountKey; pen_type: string; offset_x: number; offset_y: number; z_contact: number | null;
   lift: number; depth_min: number; depth_max: number; max_compression: number;
   line_width: number; draw_speed: number; travel_speed: number; z_speed: number;
   dwell_ms: number; use_mesh: boolean; table: [number, number][];
 };
+export type TestLayouts = {
+  ladder: { depths: number[] };
+  comb: { depths: number[]; spacings: number[] };
+  wedge: { from: number; to: number; length: number };
+  wave: { from: number; to: number; length: number; ramps: number[] };
+};
 export type Settings = {
   machine: Machine; pens: Record<string, Pen>; active_pen: string;
   paper: Paper; placement: Placement | null;
+  derived?: Record<string, { tests?: TestLayouts }>;
+};
+export type HistoryItem = {
+  id: string; name: string; created_at: number; updated_at: number; strokes: number;
+  width: number; height: number; options: Record<string, unknown>; thumb: string | null; can_revectorize: boolean;
 };
 export type Drawing = {
   id: string; width: number; height: number; strokes: { p: number[]; c: number }[];
@@ -32,6 +44,8 @@ export type Status = {
 export type Config = {
   paper_presets: { id: string; w: number; h: number }[];
   mounts?: MountInfo[];
+  pen_types?: PenTypeInfo[];
+  default_pen_type?: string;
   max_upload_mb: number;
   limits: { jog_max_step: number };
   printers: { id: number; name: string; supported: boolean; plate_vision?: boolean }[];
@@ -41,12 +55,17 @@ export type PlateMatch = {
   outline?: [number, number][]; front_plane_mm?: number; y_mm?: number;
   topdown?: { image: string; margin: number };
 };
-export type Kind = 'drawing' | 'ladder' | 'cross' | 'frame';
+export type Kind = 'drawing' | 'ladder' | 'comb' | 'wedge' | 'wave' | 'cross' | 'frame';
+export type Calibration = {
+  test?: 'ladder' | 'comb' | 'wedge' | 'wave'; rows?: { depth: number; y: number }[]; target?: [number, number];
+  spacings?: number[]; length?: number; marks?: number; from?: number; to?: number;
+  tapers?: { ramp: number; depth: number }[];
+};
 export type SimPoint = [x: number, y: number, depth: number, time: number];
 export type Plan = {
   id: string; title: string; kind: Kind; ok: boolean;
   errors: Notice[]; warnings: Notice[]; sim: SimPoint[];
-  stats: { time_s?: number }; calibration: { rows?: { depth: number; y: number }[]; target?: [number, number] };
+  stats: { time_s?: number }; calibration: Calibration;
 };
 
 async function request(path: string, method = 'GET', body?: unknown) {
@@ -86,6 +105,9 @@ export const plotter = {
   },
   revectorize: (drawing: Drawing, options: object) =>
     json<Drawing>(`/drawings/${drawing.id}/vectorize`, 'POST', { options }),
+  drawings: () => json<{ items: HistoryItem[]; keep: number }>('/drawings'),
+  openDrawing: (drawingId: string) => json<Drawing>(`/drawings/${drawingId}`),
+  deleteDrawing: (drawingId: string) => json<unknown>(`/drawings/${drawingId}`, 'DELETE'),
   image: async (drawing: Drawing) => (await request(`/drawings/${drawing.id}/image`)).blob(),
   plan: (id: number, body: object) => json<Plan>(`${printer(id)}/plans`, 'POST', body),
   download: async (id: number, plan: Plan) => (await request(`${planPath(id, plan)}/download`)).blob(),

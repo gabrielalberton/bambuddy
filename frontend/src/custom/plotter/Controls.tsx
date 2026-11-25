@@ -1,5 +1,7 @@
 import { useState } from 'react';
-import type { MountInfo, Pen } from './api';
+import type { MountInfo, Pen, PenTypeInfo } from './api';
+import { mountOf } from './mounts';
+import { applyPenType } from './thickness';
 
 type NumberProps = {
   label: string; value: number | null; onChange: (value: number | null) => void;
@@ -24,7 +26,25 @@ export function Numeric({ label, value, onChange, min, max, nullable }: NumberPr
   </label>;
 }
 
-type NumericPenKey = Exclude<keyof Pen, 'name' | 'table' | 'use_mesh' | 'z_contact' | 'mount'>;
+type NumericPenKey = Exclude<keyof Pen, 'name' | 'table' | 'use_mesh' | 'z_contact' | 'mount' | 'pen_type'>;
+
+/** Tipo de caneta: aplica os valores iniciais do tipo no modo atual e zera contato e medidas. */
+export function PenTypeSelect({ pen, types, disabled, onChange }: {
+  pen: Pen; types: PenTypeInfo[]; disabled?: boolean; onChange: (pen: Pen) => void;
+}) {
+  if (!types.length) return null;
+  const current = types.find(type => type.key === pen.pen_type);
+  return <label className="plotter-field"><span>Tipo de caneta</span>
+    <select aria-label="Tipo de caneta" value={pen.pen_type} disabled={disabled} onChange={e => {
+      const next = types.find(type => type.key === e.target.value);
+      if (next && next.key !== pen.pen_type) onChange(applyPenType(pen, next, current, mountOf(pen)));
+    }}>
+      {!current && <option value={pen.pen_type}>{pen.pen_type}</option>}
+      {types.map(type => <option key={type.key} value={type.key}>{type.name}</option>)}
+    </select>
+    <small className="plotter-muted">Trocar o tipo aplica os valores iniciais dele e zera o contato e as medidas.</small>
+  </label>;
+}
 
 /** Campos numéricos do perfil; os limites de aperto vêm do modo do suporte (com mola aceita bem mais). */
 function penFields(pen: Pen, mount?: MountInfo): [NumericPenKey, string, number, number][] {
@@ -50,13 +70,16 @@ const PEN_FIELDS_REST: [NumericPenKey, string, number, number][] = [
   ['dwell_ms', 'Pausa para marcar pontos (ms)', 0, 2000],
 ];
 
-export function PenFields({ pen, mount, onChange }: { pen: Pen; mount?: MountInfo; onChange: (value: Pen) => void }) {
+export function PenFields({ pen, mount, penTypes = [], onChange }: {
+  pen: Pen; mount?: MountInfo; penTypes?: PenTypeInfo[]; onChange: (value: Pen) => void;
+}) {
   const meshRequired = mount?.needs_mesh ?? pen.mount === 'rigid';
   return <>
     <div className="plotter-fields">
       <label className="plotter-field"><span>Nome da caneta</span>
         <input maxLength={60} value={pen.name} onChange={e => onChange({ ...pen, name: e.target.value })} />
       </label>
+      <PenTypeSelect pen={pen} types={penTypes} onChange={onChange} />
       <Numeric label="Altura de contato Z (mm)" value={pen.z_contact} min={0.3} max={40} nullable
         onChange={z_contact => onChange({ ...pen, z_contact })} />
       {penFields(pen, mount).map(([key, label, min, max]) => <Numeric key={key} label={label} value={pen[key]} min={min} max={max}

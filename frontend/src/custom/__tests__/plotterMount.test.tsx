@@ -9,7 +9,7 @@ const [SPRING, RIGID] = FALLBACK_MOUNTS;
 
 function pen(over: Partial<Pen> = {}): Pen {
   return {
-    name: 'Caneta com mola', mount: 'spring', offset_x: 0, offset_y: -32, z_contact: 4.2, lift: 3,
+    name: 'Caneta com mola', mount: 'spring', pen_type: 'bic', offset_x: 0, offset_y: -32, z_contact: 4.2, lift: 3,
     depth_min: 0.2, depth_max: 1.2, max_compression: 3, line_width: 0.5, draw_speed: 25, travel_speed: 100,
     z_speed: 10, dwell_ms: 0, use_mesh: false, table: [[0.2, 0.4], [1.2, 1.4]], ...over,
   };

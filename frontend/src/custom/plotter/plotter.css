@@ -179,3 +179,75 @@
 .plotter-mount-compare li::before { position: absolute; inset-inline-start: 0; font-weight: 700; }
 .plotter-mount-compare li.good::before { content: "+"; color: var(--plot-accent); }
 .plotter-mount-compare li.bad::before { content: "−"; color: #c2410c; }
+
+.plotter-card h3 { font-size: 1rem; font-weight: 650; margin-block: 1rem .45rem; }
+.plotter-card h3 small { font-weight: 400; opacity: .75; margin-inline-start: .35rem; font-size: .8rem; }
+
+.plotter-history ul {
+  display: flex;
+  gap: .55rem;
+  overflow-x: auto;
+  scroll-snap-type: x proximity;
+  padding: 0 0 .45rem;
+  margin: 0;
+  list-style: none;
+}
+.plotter-history li { position: relative; flex: 0 0 7.2rem; scroll-snap-align: start; }
+.plotter .plotter-history-open {
+  display: grid;
+  justify-items: start;
+  gap: .2rem;
+  width: 100%;
+  padding: .3rem;
+  text-align: start;
+}
+.plotter-history-open img, .plotter-history-blank {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: contain;
+  background: #f5f1e7;
+  border-radius: .3rem;
+  color: #52616b;
+}
+.plotter-history-open strong, .plotter-history-open small {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: .78rem;
+}
+.plotter-history-open small { opacity: .75; font-size: .7rem; }
+.plotter-history li[aria-current=true] .plotter-history-open { border-color: var(--plot-accent); box-shadow: inset 0 0 0 1px var(--plot-accent); }
+.plotter .plotter-history-delete {
+  position: absolute;
+  top: .1rem;
+  inset-inline-end: .1rem;
+  min-height: 0;
+  width: 1.9rem;
+  height: 1.9rem;
+  padding: 0;
+  border-radius: 999px;
+  background: rgb(15 23 27 / .78);
+  color: #fff;
+}
+
+.plotter-tests .plotter-segments button { flex: 1 1 0; }
+.plotter-field small { font-size: .75rem; }
+.plotter-test-list { display: grid; gap: .5rem; margin: .6rem 0 0; padding: 0; list-style: none; }
+.plotter .plotter-test {
+  display: grid;
+  justify-items: start;
+  gap: .15rem;
+  width: 100%;
+  text-align: start;
+  padding: .55rem .7rem;
+}
+.plotter-test small { font-size: .8rem; opacity: .8; line-height: 1.35; }
+.plotter .plotter-test[aria-expanded=true] { border-color: var(--plot-accent); }
+.plotter-test-body { padding: .4rem .2rem .2rem; }
+.plotter-test-body h4 { margin-block: .9rem .2rem; }
+.plotter-steps { margin: .2rem 0 .65rem; padding-inline-start: 1.2rem; font-size: .85rem; line-height: 1.4; list-style: decimal; }
+.plotter-steps li { margin-block: .2rem; }

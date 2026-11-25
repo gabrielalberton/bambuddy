@@ -1,4 +1,4 @@
-import type { MountInfo, MountKey, Pen, Settings } from './api';
+import type { MountInfo, MountKey, Pen, PenTypeInfo, Settings } from './api';
 
 /** Fallback quando o backend ainda não manda `mounts` (mesmos valores de engine/profile.py). */
 export const FALLBACK_MOUNTS: MountInfo[] = [
@@ -53,8 +53,8 @@ export function mountOf(pen: Pen | undefined): MountKey {
   return pen?.mount === 'rigid' ? 'rigid' : 'spring';
 }
 
-/** Torna ativo o perfil do modo escolhido; cria um a partir dos valores do modo se ainda não existir. */
-export function selectMount(settings: Settings, mount: MountInfo): Settings {
+/** Torna ativo o perfil do modo escolhido; cria um (mesmo tipo de caneta, valores do modo) se ainda não existir. */
+export function selectMount(settings: Settings, mount: MountInfo, penTypes: PenTypeInfo[] = []): Settings {
   const active = settings.pens[settings.active_pen];
   if (mountOf(active) === mount.key) return settings;
   const found = Object.keys(settings.pens).find(id => mountOf(settings.pens[id]) === mount.key);
@@ -62,8 +62,9 @@ export function selectMount(settings: Settings, mount: MountInfo): Settings {
   const base = mount.key === 'rigid' ? 'sem-mola' : 'com-mola';
   let id = base;
   for (let n = 2; settings.pens[id]; n++) id = `${base}-${n}`;
+  const typed = penTypes.find(type => type.key === active.pen_type)?.defaults[mount.key];
   const pen: Pen = {
-    ...active, ...mount.defaults, mount: mount.key, z_contact: null, table: [],
+    ...active, ...mount.defaults, ...typed, mount: mount.key, z_contact: null, table: [],
     use_mesh: mount.needs_mesh || active.use_mesh,
   } as Pen;
   return { ...settings, pens: { ...settings.pens, [id]: pen }, active_pen: id };

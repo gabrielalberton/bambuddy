@@ -1,15 +1,15 @@
-import type { MountInfo, Settings } from './api';
+import type { MountInfo, PenTypeInfo, Settings } from './api';
 import { MOUNT_ABOUT, mountOf, selectMount } from './mounts';
 
-export function MountPicker({ settings, mounts, disabled, onChange }: {
-  settings: Settings; mounts: MountInfo[]; disabled?: boolean; onChange: (next: Settings) => void;
+export function MountPicker({ settings, mounts, penTypes, disabled, onChange }: {
+  settings: Settings; mounts: MountInfo[]; penTypes?: PenTypeInfo[]; disabled?: boolean; onChange: (next: Settings) => void;
 }) {
   const current = mountOf(settings.pens[settings.active_pen]);
   const about = MOUNT_ABOUT[current];
   return <div className="plotter-mount">
     <div className="plotter-segments" role="group" aria-label="Suporte da caneta">
       {mounts.map(mount => <button key={mount.key} type="button" aria-pressed={current === mount.key} disabled={disabled}
-        onClick={() => onChange(selectMount(settings, mount))}>{mount.name}</button>)}
+        onClick={() => onChange(selectMount(settings, mount, penTypes))}>{mount.name}</button>)}
     </div>
     <p className="plotter-muted">{about.summary} <strong>Para:</strong> {about.use}</p>
     <details>
