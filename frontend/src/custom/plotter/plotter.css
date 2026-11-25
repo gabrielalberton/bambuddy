@@ -75,7 +75,7 @@
 .plotter-key { margin-block: .65rem; }
 .plotter-key span { display: flex; align-items: center; gap: .3rem; }
 .plotter-swatch { width: .72rem; height: .72rem; background: #f5f1e7; border: 1px solid #a39378; border-radius: 2px; }
-.plotter-swatch.bed { background: #26333b; border-color: #657988; }
+.plotter-swatch.bed { background: #c7a36a; border-color: #a57d46; }
 .plotter-swatch.area { background: none; border: 2px dashed #158986; }
 
 .plotter button, .plotter input:not([type=checkbox], [type=range], [type=file]), .plotter select {

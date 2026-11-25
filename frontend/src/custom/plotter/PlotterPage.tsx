@@ -219,6 +219,9 @@ function Workspace({ id, config, initial }: { id: number; config: Config; initia
           <button type="button" aria-pressed={edit === 'exclude' && layer !== 'simulation'} disabled={!drawing}
             onClick={() => { setEdit('exclude'); setLayer('vector'); }}>Editar traços</button>
         </div>
+        {edit === 'drawing' && drawing && layer !== 'simulation' && <p className="plotter-muted">
+          Arraste para mover. Use a pinça ou a roda do mouse sobre o desenho para dimensionar.
+        </p>}
         {edit === 'exclude' && layer !== 'simulation' && <p className="plotter-muted">Toque em um traço para excluir ou restaurar. Os excluídos aparecem em vermelho.</p>}
         <Plate machine={settings.machine} paper={paper} area={area} pen={pen} drawing={drawing} placement={placement}
           imageUrl={imageUrl} layer={layer} edit={edit} points={plan?.sim} time={time} travel={travel}

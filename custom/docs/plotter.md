@@ -27,8 +27,9 @@ ao longo do traço. A curva é uma calibração indireta de pressão, em milíme
 
 1. Selecione PNG ou JPEG. Compare **Original**, **Vetor** e **Sobreposição**. Se houver sombra, experimente
    a compensação de iluminação e o limiar.
-2. Escolha **Mover desenho** e arraste sobre a folha. Ajuste rotação, largura e centro nos campos em milímetros,
-   ou use **Ajustar à área útil**.
+2. Escolha **Mover desenho** e arraste sobre a folha. Faça pinça na tela ou use a roda do mouse sobre o
+   desenho para mudar a largura mantendo o centro e a proporção. Também é possível ajustar rotação, largura
+   e centro nos campos em milímetros, ou usar **Ajustar à área útil**.
 3. Gere o plano e confira a simulação, a área percorrida e os avisos de recorte ou largura. O controle de tempo
    percorre a simulação resultante da leitura do G-code. A cor indica compressão e as linhas tracejadas
    indicam deslocamento sem contato. Sem curva de pressão medida, o plano avisa que usará pressão constante.
