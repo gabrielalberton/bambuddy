@@ -47,6 +47,26 @@ O go2rtc do Frigate já entrega o mesmo H.264 em MP4 fragmentado para Media Sour
 Produção: `BAMBUDDY_CUSTOM_H264_WS_URL=ws://frigate-standalone:1984/api/ws?src=thingino_135` no `23-bambuddy.yml`.
 O MJPEG (perfil leve) continua como reserva e nos primeiros segundos.
 
+**A URL RTSP da impressora precisa pedir só o vídeo**: `rtsp://frigate-standalone:8554/thingino_135?video` (campo
+`external_camera_url`, ajustado em 2026-11-24 23:44). A Thingino tem uma segunda fonte no go2rtc
+(`ffmpeg:thingino_135#audio=opus`). Um consumidor RTSP que pede todas as faixas (o ffmpeg do MJPEG sem `?video`) faz o
+go2rtc abrir essa fonte de áudio. Quando isso coincide com a abertura do H.264, o primeiro quadro-chave chega quebrado
+(`PIPELINE_ERROR_DECODE` no `<video>`). A sessão cai e o vídeo só aparece na tentativa seguinte, ~6 s depois.
+
+Medido no Chrome headless, com o 3D desligado (ms desde a navegação):
+
+| Cenário | 1ª tentativa falhou | H.264 no ar |
+|---|---|---|
+| MJPEG sem `?video` + H.264 (como estava) | 5 de 7 | ~6 s nas falhas |
+| MJPEG com `?video` + H.264 (atual) | 0 de 7 | 1,75–2,3 s |
+| H.264 sem MJPEG (bloqueado no teste) | 0 de 10 | 1,6–2,5 s |
+| Só MJPEG, para comparar | — | 1º quadro em 6,0–6,6 s |
+
+Com `?video`, abrir o MJPEG junto não atrasa o H.264, inclusive no celular. Lá a demora é a página: a câmera surge em
+~3–4,5 s e o H.264 entra 0,6–0,8 s depois. Por isso não vale um gancho no `useStreamImgRef` para nem abrir o MJPEG. O
+custo do MJPEG é um ffmpeg por ~6 s no servidor, que encerra sozinho, sem quadro enviado. Em troca, ele cobre um H.264
+lento ou indisponível.
+
 Desligar: tirar a variável (backend; tudo volta ao MJPEG) ou `localStorage['custom.h264'] = 'off'` (aparelho).
 
 Capturas, verificação da mesa, prévia e gravações não mudam: seguem seus próprios caminhos.
