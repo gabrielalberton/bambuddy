@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type PointerEvent } from 'react';
 import { platePhoto as referencePhoto } from '../plate/reference';
-import { renderPlatePhoto } from './platePhoto';
+import { renderPlatePhoto, type PlateTab } from './platePhoto';
 import type { Aerial } from './useAerialPlate';
 import type { Drawing, Machine, Paper, Pen, Placement, Rect, SimPoint } from './api';
 
@@ -132,10 +132,10 @@ type Props = {
   drawing: Drawing | null; placement: Placement; imageUrl?: string; layer: Layer; edit: Edit;
   points?: SimPoint[]; time: number; travel: boolean; locked: boolean; excluded: Set<number>;
   onPaper: (paper: Paper) => void; onPlacement: (placement: Placement) => void; onToggleStroke: (index: number) => void;
-  aerial?: Aerial | null;
+  aerial?: Aerial | null; tab?: PlateTab;
 };
 
-export function Plate({ machine, paper, area, pen, drawing, placement, imageUrl, layer, edit, points, time, travel, locked, excluded, aerial, onPaper, onPlacement, onToggleStroke }: Props) {
+export function Plate({ machine, paper, area, pen, drawing, placement, imageUrl, layer, edit, points, time, travel, locked, excluded, aerial, tab = 'none', onPaper, onPlacement, onToggleStroke }: Props) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const [platePhoto, setPlatePhoto] = useState<HTMLImageElement | null>(null);
   const [image, setImage] = useState<HTMLImageElement | null>(null);
@@ -189,7 +189,7 @@ export function Plate({ machine, paper, area, pen, drawing, placement, imageUrl,
     ctx.setTransform(scale, 0, 0, scale, ox, oy);
     const photographed = !!live && !!aerial;
     if (photographed) ctx.drawImage(live, -aerial.margin, -(h + aerial.margin), w + 2 * aerial.margin, h + 2 * aerial.margin);
-    else renderPlatePhoto(ctx, platePhoto, w, h);
+    else renderPlatePhoto(ctx, platePhoto, w, h, tab);
     ctx.lineWidth = 0.55;
     ctx.fillStyle = '#f5f1e7';
     ctx.globalAlpha = photographed ? 0.4 : 1;
@@ -214,7 +214,7 @@ export function Plate({ machine, paper, area, pen, drawing, placement, imageUrl,
     ctx.textAlign = 'right';
     ctx.fillText('Frente da A1', ox + w * scale, oy + 43);
     ctx.textAlign = 'start';
-  }, [aerial, area, drawing, edit, excluded, h, image, imageUrl, layer, live, ox, oy, paper, pen, placement, platePhoto, points, scale, time, travel, w]);
+  }, [aerial, area, drawing, edit, excluded, h, image, imageUrl, layer, live, ox, oy, paper, pen, placement, platePhoto, points, scale, tab, time, travel, w]);
 
   useEffect(() => {
     const element = canvas.current;

@@ -12,6 +12,7 @@ import { calibrationText, type TestKind } from './thickness';
 import { FALLBACK_MOUNTS, MOUNT_ABOUT, mountOf } from './mounts';
 import { Plate, type Edit, type Layer } from './Plate';
 import { PlateCamera } from './PlateCamera';
+import { PLATE_TABS, type PlateTab } from './platePhoto';
 import { useAerialPlate } from './useAerialPlate';
 import { usePlotterConfig } from './navigation';
 import './plotter.css';
@@ -102,6 +103,16 @@ function Workspace({ id, config, initial }: { id: number; config: Config; initia
   const [imageUrl, setImageUrl] = useState<string>();
   const hasVision = config.printers.some(printer => printer.id === id && printer.plate_vision);
   const [aerialOn, setAerialOn] = useState(false);
+  const [tab, setTab] = useState<PlateTab>(() => {
+    try {
+      const saved = localStorage.getItem('plotter-plate-tab');
+      return PLATE_TABS.some(([value]) => value === saved) ? saved as PlateTab : 'none';
+    } catch { return 'none'; }
+  });
+  const chooseTab = (value: PlateTab) => {
+    setTab(value);
+    try { localStorage.setItem('plotter-plate-tab', value); } catch { /* preference only */ }
+  };
   const { aerial, status: aerialStatus } = useAerialPlate(id, aerialOn);
   const history = useQuery({ queryKey: HISTORY_KEY, queryFn: plotter.drawings, retry: false });
   const running = useRef(false);
@@ -300,7 +311,7 @@ function Workspace({ id, config, initial }: { id: number; config: Config; initia
         </p>}
         {edit === 'exclude' && layer !== 'simulation' && <p className="plotter-muted">Toque em um traço para excluir ou restaurar. Os excluídos aparecem em vermelho.</p>}
         <Plate machine={settings.machine} paper={paper} area={area} pen={pen} drawing={drawing} placement={placement}
-          imageUrl={imageUrl} aerial={aerial} layer={layer} edit={edit} points={plan?.sim} time={time} travel={travel}
+          imageUrl={imageUrl} aerial={aerial} tab={tab} layer={layer} edit={edit} points={plan?.sim} time={time} travel={travel}
           locked={!!busy || !!jog || layer === 'simulation'} onPaper={changePaper} onPlacement={changePlacement}
           excluded={excluded} onToggleStroke={index => {
             const next = new Set(excluded);
@@ -311,6 +322,10 @@ function Workspace({ id, config, initial }: { id: number; config: Config; initia
           }} />
         <div className="plotter-key"><span><i className="plotter-swatch paper" /> Papel</span><span><i className="plotter-swatch bed" /> Mesa</span>
           {area ? <span><i className="plotter-swatch area" /> Área útil</span> : <span className="plotter-error">Papel fora do alcance</span>}
+        </div>
+        <div className="plotter-segments" aria-label="Aba do prato (só aparência)">
+          {PLATE_TABS.map(([value, label]) =>
+            <button key={value} type="button" aria-pressed={tab === value} onClick={() => chooseTab(value)}>{label}</button>)}
         </div>
         {hasVision && <div className="plotter-aerial">
           <button type="button" aria-pressed={aerialOn} onClick={() => setAerialOn(on => !on)}>
