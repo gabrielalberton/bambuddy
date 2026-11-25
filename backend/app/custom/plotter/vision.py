@@ -9,13 +9,24 @@ from pathlib import Path
 import cv2
 import numpy as np
 
+from .vision_pose import CameraReference
+
 
 BLUR_LENGTHS = (1, 5, 9, 17, 25)
 
 
 class PlateTracker:
     def __init__(self, path: Path):
-        self.profile = json.loads(path.read_text())
+        self._load(json.loads(path.read_text()))
+
+    @classmethod
+    def from_profile(cls, profile: dict) -> PlateTracker:
+        tracker = cls.__new__(cls)
+        tracker._load(profile)
+        return tracker
+
+    def _load(self, profile: dict):
+        self.profile = profile
         lens = self.profile["lens"]
         self.size = tuple(self.profile["frame_size"])
         self.shape = tuple(self.profile["rectified_size"])
@@ -24,6 +35,13 @@ class PlateTracker:
         self.r = np.array([lens[f"r{i}"] for i in "xyz"])
         self.t = np.array([lens[f"t{i}"] for i in "xyz"])
         self.x0, self.y0, self.z = self.profile["rectified_origin"]
+        self.rotation = None
+        self.reference = (
+            CameraReference(profile["registration"], self.k, self.d, self.size)
+            if "registration" in profile else None
+        )
+        self.views = [self.from_profile(view) for view in profile.get("views", [])]
+        self.active = self
         self.last: tuple[float, float] | None = None
         self.maps: dict[tuple[int, int], tuple[np.ndarray, np.ndarray]] = {}
         self.anchors = [
@@ -46,7 +64,11 @@ class PlateTracker:
 
     def project(self, x: np.ndarray, y: np.ndarray) -> np.ndarray:
         world = np.stack([x, y, np.full_like(x, self.z)], axis=-1).reshape(-1, 1, 3).astype(float)
-        return cv2.fisheye.projectPoints(world, self.r, self.t, self.k, self.d)[0].reshape(*x.shape, 2)
+        r, t = self.r, self.t
+        if self.rotation is not None:
+            r = cv2.Rodrigues(self.rotation @ cv2.Rodrigues(r)[0])[0].ravel()
+            t = self.rotation @ t
+        return cv2.fisheye.projectPoints(world, r, t, self.k, self.d)[0].reshape(*x.shape, 2)
 
     def rectify(self, frame: np.ndarray) -> np.ndarray:
         h, w = frame.shape[:2]
@@ -157,10 +179,54 @@ class PlateTracker:
         before, after = light[row - 13], light[row + 22]
         return (before - after > 26) & (before > after * 1.36)
 
+    def _set_rotation(self, rotation: np.ndarray | None):
+        if self.rotation is rotation:
+            return
+        if rotation is not None and self.rotation is not None and np.linalg.norm(rotation - self.rotation) < 0.003:
+            return
+        self.rotation = rotation
+        self.maps.clear()
+
     def locate(self, frame: np.ndarray, *, at: float | None = None, diagnostics: bool = False) -> dict:
-        if not self.camera_aligned(frame):
+        views = (self, *self.views)
+        if self.active is not self:
+            views = (self.active, *(view for view in views if view is not self.active))
+        for view in views:
+            if view.camera_aligned(frame):
+                view._set_rotation(None)
+                return self._locate_in_view(view, frame, at=at, diagnostics=diagnostics)
+        estimates = []
+        for view in views:
+            if view.reference is not None:
+                estimated = view.reference.estimate(frame)
+                if estimated is not None:
+                    rotation, count = estimated
+                    estimates.append((count, view, rotation))
+        if not estimates:
+            self.active.last = None
             return {"found": False, "reason": "camera_alignment"}
-        rectified = self.rectify(frame)
+        _, view, rotation = max(estimates, key=lambda item: item[0])
+        view._set_rotation(rotation)
+        return self._locate_in_view(view, frame, at=at, diagnostics=diagnostics)
+
+    def _locate_in_view(self, view, frame, *, at, diagnostics):
+        if self.active is not view:
+            view.last = None
+            self.active = view
+        rectified = view.rectify(frame)
+        if "contrast_strips" in view.profile:
+            result = view._locate_contrast(rectified, diagnostics)
+        else:
+            result = view._locate_templates(rectified, at=at, diagnostics=diagnostics)
+        if view.profile.get("view_id"):
+            result["camera_view"] = view.profile["view_id"]
+        if view.rotation is not None:
+            result["camera_reoriented"] = True
+            if diagnostics:
+                result["camera_rotation_delta"] = view.rotation.tolist()
+        return result
+
+    def _locate_templates(self, rectified: np.ndarray, *, at: float | None, diagnostics: bool) -> dict:
         gray = cv2.cvtColor(rectified, cv2.COLOR_BGR2GRAY)
         gradient = self.features(gray)
         start, end = self.profile["front_search"]
@@ -220,6 +286,50 @@ class PlateTracker:
         if at is not None:
             self.last = at, row
         front_row = self._front_row(rectified, row - self.profile["usable_front_offset"])
+        return self._project_result(result, front_row)
+
+    def _locate_contrast(self, rectified: np.ndarray, diagnostics: bool) -> dict:
+        gray = cv2.cvtColor(rectified, cv2.COLOR_BGR2GRAY)
+        gradient = self.features(gray)
+        start, end = self.profile["front_search"]
+        rows = np.arange(start, end + 1)
+        similarities = {}
+        for x, offset, _, variants in self.templates:
+            h, w = variants[0].shape
+            scan = gradient[start + offset:end + offset + h, x:x + w]
+            scores = [cv2.matchTemplate(scan, p, cv2.TM_CCOEFF_NORMED).ravel() * (1 - 0.006 * blur)
+                      for p, blur in zip(variants, BLUR_LENGTHS)]
+            similarities[x] = np.maximum(similarities.get(x, -1), np.maximum.reduce(scores))
+
+        contrast = []
+        for x0, x1, offset in self.profile["contrast_strips"]:
+            line = np.median(gray[:, x0:x1], axis=1).astype(np.float32)
+            at = rows + offset
+            bands = []
+            for sigma, gap in ((1.5, 4), (3, 7), (5, 11)):
+                smooth = cv2.GaussianBlur(line[:, None], (1, 0), sigma, sigmaY=sigma).ravel()
+                inside, outside = smooth[at - gap], smooth[at + gap]
+                evidence = np.tanh((outside - inside) / np.maximum(9, (outside + inside) * 0.17))
+                evidence[(line[at - gap] < 2) | (line[at + gap] < 3)] = 0
+                bands.append(evidence)
+            contrast.append(np.maximum.reduce(bands))
+
+        rim = np.maximum(np.sort(contrast, axis=0)[-3:], 0).mean(axis=0)
+        similarity = np.sort(list(similarities.values()), axis=0)[-3:].mean(axis=0)
+        score = similarity + 0.5 * rim
+        i = int(np.argmax(score))
+        far = np.abs(rows - rows[i]) > 16
+        margin = float(score[i] - np.max(score[far]))
+        threshold = self.profile.get("contrast_min_similarity", 0.42)
+        found = bool(similarity[i] >= threshold and rim[i] >= 0.46 and margin >= 0.08)
+        result = {"found": found, "confidence": round(float(np.clip(score[i] / 1.5, 0, 1)), 3)}
+        if diagnostics:
+            result.update(best_row=int(rows[i]), margin=margin, rim=float(rim[i]), edge=float(similarity[i]))
+        if not found:
+            return result
+        return self._project_result(result, float(rows[i]))
+
+    def _project_result(self, result: dict, front_row: float) -> dict:
         front = self.y0 - front_row
         x_left = self.profile["usable_left"]
         size = 256 * self.profile.get("plane_scale", 1.0)
