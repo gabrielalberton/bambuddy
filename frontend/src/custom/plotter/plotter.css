@@ -251,3 +251,13 @@
 .plotter-test-body h4 { margin-block: .9rem .2rem; }
 .plotter-steps { margin: .2rem 0 .65rem; padding-inline-start: 1.2rem; font-size: .85rem; line-height: 1.4; list-style: decimal; }
 .plotter-steps li { margin-block: .2rem; }
+
+/* Altura de contato: homing, descer/subir e OK sem abrir o perfil. */
+.plotter-contact { margin-block: .75rem; padding: .7rem; border: 1px solid var(--plot-line); border-radius: .5rem; }
+.plotter-contact h3 { margin: 0 0 .35rem; font-size: 1rem; }
+.plotter-contact .plotter-segments button { flex: 1 1 0; }
+.plotter-jog-z { margin: .2rem 0; font-size: 1.3rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.plotter-jog-z small { font-size: .85rem; font-weight: 400; opacity: .8; }
+.plotter-jog { display: grid; grid-template-columns: 1fr 1fr; gap: .65rem; margin-block-start: .65rem; }
+.plotter .plotter-jog button { display: flex; align-items: center; justify-content: center; gap: .4rem; min-height: 3.2rem; font-size: 1rem; }
+.plotter .plotter-contact-cancel { width: 100%; margin-block-start: .5rem; }

@@ -14,9 +14,12 @@ ao longo do traço. A curva é uma calibração indireta de pressão, em milíme
    a vista da mesa ou informe X e Y do canto inferior esquerdo. A4 pode ultrapassar a borda da mesa de 256 mm.
    O tracejado delimita a interseção entre a folha, a margem, a mesa e o alcance da ponta.
 3. Em **Calibração da caneta**, escolha **Com mola** ou **Sem mola** (seção abaixo), informe o deslocamento da
-   ponta em relação ao bico e o limite físico medido do suporte. Confirme as condições em **Operação** antes de iniciar o ajuste de altura. Acompanhe o home
-   na máquina. Com a caneta sobre o papel, desça aos poucos até o primeiro contato e salve. A espessura da
-   folha entra na compensação se o bico fez o home sobre ela.
+   ponta em relação ao bico e o limite físico medido do suporte (em **Editar perfil**). Em **Altura de contato**,
+   marque a confirmação e toque em **Fazer homing e levar a caneta ao centro**: o bico faz o home de Z na frente
+   da mesa (a caneta fica para fora) e a caneta vai, alta, para o centro do papel com o bico a 20 mm. Acompanhe na
+   máquina. Escolha o passo (1, 0,5 e 0,1 mm com mola; 1, 0,1 e 0,02 mm sem mola), use **Descer**/**Subir** até o
+   primeiro contato e toque em **OK, salvar contato e levantar**. A sessão expira após 10 minutos sem movimento.
+   A espessura da folha entra na compensação se o bico fez o home sobre ela.
 4. Use **Cruz de alinhamento** para conferir a posição de XY. A correção do offset é o offset atual mais
    a diferença entre o ponto medido e o ponto esperado em cada eixo.
 5. Em **Imagem e testes**, escolha o suporte e o **tipo de caneta** (seção abaixo) e rode um ou mais

@@ -5,6 +5,7 @@ import { ApiError } from '../../api/client';
 import { useAuth } from '../../contexts/AuthContext';
 import { drawableArea, plotter, type Config, type Drawing, type HistoryItem, type Kind, type Paper, type Pen, type Placement, type Plan, type Rect, type Settings } from './api';
 import { Numeric, PenFields } from './Controls';
+import { ContactAdjust } from './Contact';
 import { DrawingHistory } from './History';
 import { MountPicker } from './Mount';
 import { ThicknessTests } from './Thickness';
@@ -411,7 +412,25 @@ function Workspace({ id, config, initial }: { id: number; config: Config; initia
           <MountPicker settings={settings} mounts={mounts} penTypes={penTypes} disabled={!!jog || !!busy}
             onChange={next => { invalidate(); setSettings(next); }} />
           <p className="plotter-muted">{mountInfo?.name ?? mount} · {penTypes.find(item => item.key === pen.pen_type)?.name ?? pen.name} · {pen.z_contact === null ? 'Contato pendente' : `Contato Z ${pen.z_contact} mm`} · {hasPressure ? 'Curva de pressão medida' : 'Curva de pressão pendente'}</p>
-          <details open={jog ? true : undefined}><summary>Editar perfil e ajustar contato</summary>
+          <ContactAdjust jog={jog} contact={pen.z_contact} steps={(mountInfo?.jog_steps ?? [0.1, 0.5]).filter(step => Math.abs(step) <= config.limits.jog_max_step)}
+            hint={MOUNT_ABOUT[mount].contact} canControl={canControl} canStart={!!area && canStart}
+            reason={!canControl ? 'Seu usuário não tem permissão para mover a impressora.' : !area ? 'O papel não tem área útil dentro do alcance da caneta.' : jog ? undefined : blocker}
+            onStart={() => run('Fazendo homing…', async () => {
+              invalidate();
+              const saved = await saveSettings();
+              await plotter.jogStart(id, saved.active_pen);
+              await statusQuery.refetch();
+            })}
+            onMove={z => run('Ajustando altura…', async () => { await plotter.jogMove(id, z); await statusQuery.refetch(); })}
+            onFinish={save => run('Recolhendo caneta…', async () => {
+              await plotter.jogFinish(id, save);
+              await statusQuery.refetch();
+              const saved = await plotter.settings(id);
+              applySaved(saved);
+              invalidate();
+              setMessage(save ? 'Altura de contato salva.' : 'Ajuste encerrado.');
+            })} />
+          <details><summary>Editar perfil</summary>
             <fieldset disabled={!!jog || !canControl}>
               {samePens.length > 1 && <label className="plotter-field"><span>Perfil ativo</span>
                 <select aria-label="Perfil ativo" value={settings.active_pen} onChange={e => { invalidate(); setSettings({ ...settings, active_pen: e.target.value }); }}>
@@ -421,37 +440,8 @@ function Workspace({ id, config, initial }: { id: number; config: Config; initia
               <PenFields pen={pen} mount={mountInfo} penTypes={penTypes} onChange={changePen} />
               <div className="plotter-actions">
                 <button type="button" onClick={() => run('Salvando ajustes…', async () => { await saveSettings(); invalidate(); setMessage('Ajustes salvos.'); })}>Salvar ajustes</button>
-                <button type="button" disabled={!area || !canStart || !ready} onClick={() => run('Iniciando ajuste de altura…', async () => {
-                  invalidate();
-                  const saved = await saveSettings();
-                  await plotter.jogStart(id, saved.active_pen);
-                  await statusQuery.refetch();
-                })}>Iniciar ajuste de altura</button>
               </div>
-              <p className="plotter-muted">Confirme a montagem em “Operação” antes de iniciar o ajuste de altura.</p>
             </fieldset>
-            {jog && <>
-              <p role="status">Z atual {jog.z.toFixed(2)} mm {jog.settling > 0 ? '· Aguarde o movimento' : ''}</p>
-              <p className="plotter-muted">{MOUNT_ABOUT[mount].contact}</p>
-              <div className="plotter-actions">
-                {(mountInfo?.jog_steps ?? [-0.5, -0.1, 0.1, 0.5]).filter(step => Math.abs(step) <= config.limits.jog_max_step).map(step =>
-                  <button key={step} type="button" disabled={!canControl || jog.settling > 0 || jog.z + step < jog.floor - 1e-9 || jog.z + step > jog.max + 1e-9}
-                    onClick={() => run('Ajustando altura…', async () => { await plotter.jogMove(id, jog.z + step); await statusQuery.refetch(); })}>
-                    {step > 0 ? '+' : ''}{step} mm
-                  </button>)}
-              </div>
-              <div className="plotter-actions">
-                {[true, false].map(save => <button key={String(save)} type="button" disabled={!canControl || jog.settling > 0}
-                  onClick={() => run('Recolhendo caneta…', async () => {
-                    await plotter.jogFinish(id, save);
-                    await statusQuery.refetch();
-                    const saved = await plotter.settings(id);
-                    applySaved(saved);
-                    invalidate();
-                    setMessage(save ? 'Altura de contato salva.' : 'Ajuste encerrado.');
-                  })}>{save ? 'Salvar contato e levantar' : 'Levantar sem salvar'}</button>)}
-              </div>
-            </>}
           </details>
         </>)}
         {section('Operação', <>
