@@ -37,8 +37,9 @@ export type Config = {
   printers: { id: number; name: string; supported: boolean; plate_vision?: boolean }[];
 };
 export type PlateMatch = {
-  found: boolean; reason?: 'camera_alignment'; image: string; received_at: number;
+  found: boolean; reason?: 'camera_alignment'; image?: string; received_at: number;
   outline?: [number, number][]; front_plane_mm?: number; y_mm?: number;
+  topdown?: { image: string; margin: number };
 };
 export type Kind = 'drawing' | 'ladder' | 'cross' | 'frame';
 export type SimPoint = [x: number, y: number, depth: number, time: number];
@@ -74,7 +75,8 @@ export const plotter = {
   config: () => json<Config>('/config'),
   settings: (id: number) => json<Settings>(`${printer(id)}/settings`),
   save: (id: number, settings: Settings) => json<Settings>(`${printer(id)}/settings`, 'PUT', settings),
-  plateCamera: (id: number) => json<PlateMatch>(`${printer(id)}/plate-camera`),
+  plateCamera: (id: number, topdown = false) =>
+    json<PlateMatch>(`${printer(id)}/plate-camera${topdown ? '?topdown=true' : ''}`),
   status: (id: number) => json<Status>(`${printer(id)}/status`),
   drawing: (file: File, options: object) => {
     const body = new FormData();

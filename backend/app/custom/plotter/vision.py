@@ -14,6 +14,7 @@ from .vision_pose import CameraReference
 
 
 BLUR_LENGTHS = (1, 5, 9, 17, 25)
+PLATE_MM = 256.0
 
 
 class PlateTracker:
@@ -352,6 +353,36 @@ class PlateTracker:
         if not found:
             return result
         return self._project_result(result, float(rows[i]))
+
+    def top_view(
+        self, frame: np.ndarray, front_mm: float, *, margin_mm: float = 30.0, px_per_mm: float = 3.0, dim: float = 0.45,
+    ) -> np.ndarray:
+        """Aerial view of the 256 mm plate, undistorted, with a dimmed ``margin_mm`` border.
+
+        Uses the view that just located the plate (rotation included), sampling the
+        fisheye frame directly so lens distortion and perspective are removed in one step.
+        Image x grows to the right (plate X) and image y grows toward the back (plate Y up).
+        """
+        view = self.active
+        h, w = frame.shape[:2]
+        if abs(w / h - view.size[0] / view.size[1]) > 0.02:
+            raise ValueError("Enquadramento da câmera diferente do perfil.")
+        scale = view.profile.get("plane_scale", 1.0)
+        span = PLATE_MM + 2 * margin_mm
+        count = round(span * px_per_mm)
+        real = -margin_mm + (np.arange(count) + 0.5) / px_per_mm
+        x_real, y_real = np.meshgrid(real, real[::-1])
+        x = view.profile["usable_left"] + x_real * scale
+        y = front_mm + y_real * scale
+        projected = view.project(x, y) * (w / view.size[0], h / view.size[1])
+        out = cv2.remap(
+            frame, projected[:, :, 0].astype("float32"), projected[:, :, 1].astype("float32"),
+            cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT,
+        )
+        outside = (x_real < 0) | (x_real > PLATE_MM) | (y_real < 0) | (y_real > PLATE_MM)
+        shade = np.where(outside, dim, 1.0).astype("float32")
+        shade = cv2.GaussianBlur(shade, (0, 0), px_per_mm * 0.8)
+        return np.clip(out * shade[:, :, None], 0, 255).astype(np.uint8)
 
     def _project_result(self, result: dict, front_row: float) -> dict:
         front = self.y0 - front_row

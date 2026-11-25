@@ -139,9 +139,12 @@
   .plotter-board { position: sticky; top: .75rem; }
 }
 
-.plotter-camera {
+.plotter-camera,
+.plotter-aerial {
   margin-top: 0.75rem;
 }
+
+.plotter-aerial .plotter-muted { margin-block: .4rem 0; }
 
 .plotter-camera-frame {
   position: relative;

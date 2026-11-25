@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Download, ImageUp, PenTool, Play } from 'lucide-react';
+import { Download, ImageUp, PenTool, Play, ScanEye } from 'lucide-react';
 import { ApiError } from '../../api/client';
 import { useAuth } from '../../contexts/AuthContext';
 import { drawableArea, plotter, type Config, type Drawing, type Kind, type Paper, type Pen, type Placement, type Plan, type Rect, type Settings } from './api';
@@ -9,6 +9,7 @@ import { MountPicker } from './Mount';
 import { FALLBACK_MOUNTS, MOUNT_ABOUT, mountOf } from './mounts';
 import { Plate, type Edit, type Layer } from './Plate';
 import { PlateCamera } from './PlateCamera';
+import { useAerialPlate } from './useAerialPlate';
 import { usePlotterConfig } from './navigation';
 import './plotter.css';
 
@@ -93,6 +94,9 @@ function Workspace({ id, config, initial }: { id: number; config: Config; initia
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [imageUrl, setImageUrl] = useState<string>();
+  const hasVision = config.printers.some(printer => printer.id === id && printer.plate_vision);
+  const [aerialOn, setAerialOn] = useState(false);
+  const { aerial, status: aerialStatus } = useAerialPlate(id, aerialOn);
   const running = useRef(false);
   const positionCustomized = useRef(initial.placement !== null);
   const pen = settings.pens[settings.active_pen];
@@ -231,7 +235,7 @@ function Workspace({ id, config, initial }: { id: number; config: Config; initia
         </p>}
         {edit === 'exclude' && layer !== 'simulation' && <p className="plotter-muted">Toque em um traço para excluir ou restaurar. Os excluídos aparecem em vermelho.</p>}
         <Plate machine={settings.machine} paper={paper} area={area} pen={pen} drawing={drawing} placement={placement}
-          imageUrl={imageUrl} layer={layer} edit={edit} points={plan?.sim} time={time} travel={travel}
+          imageUrl={imageUrl} aerial={aerial} layer={layer} edit={edit} points={plan?.sim} time={time} travel={travel}
           locked={!!busy || !!jog || layer === 'simulation'} onPaper={changePaper} onPlacement={changePlacement}
           excluded={excluded} onToggleStroke={index => {
             const next = new Set(excluded);
@@ -243,7 +247,13 @@ function Workspace({ id, config, initial }: { id: number; config: Config; initia
         <div className="plotter-key"><span><i className="plotter-swatch paper" /> Papel</span><span><i className="plotter-swatch bed" /> Mesa</span>
           {area ? <span><i className="plotter-swatch area" /> Área útil</span> : <span className="plotter-error">Papel fora do alcance</span>}
         </div>
-        {config.printers.some(printer => printer.id === id && printer.plate_vision) && <PlateCamera id={id} />}
+        {hasVision && <div className="plotter-aerial">
+          <button type="button" aria-pressed={aerialOn} onClick={() => setAerialOn(on => !on)}>
+            <ScanEye size={16} aria-hidden="true" /> {aerialOn ? 'Voltar à foto de referência' : 'Ver o prato real (vista aérea)'}
+          </button>
+          {aerialOn && <p className="plotter-muted" role="status">{aerialStatus}</p>}
+        </div>}
+        {hasVision && <PlateCamera id={id} />}
         <div className="plotter-segments" aria-label="Camada da prévia">
           {([['vector', 'Vetor'], ['original', 'Original'], ['overlay', 'Sobreposição'], ['simulation', 'Simulação']] as const).map(([value, label]) =>
             <button key={value} type="button" aria-pressed={layer === value} disabled={value === 'simulation' ? !plan : !drawing}

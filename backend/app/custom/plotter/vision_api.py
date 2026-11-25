@@ -21,7 +21,9 @@ from .vision import PlateTracker
 
 log = logging.getLogger(__name__)
 _locks = [asyncio.Lock() for _ in range(8)]
-_recent: dict[int, tuple[float, int, dict]] = {}
+_recent: dict[tuple[int, bool], tuple[float, int, dict]] = {}
+TOP_MARGIN_MM = 30
+TOP_QUALITY = 82
 REUSE_SECONDS = 0.16
 _client: httpx.AsyncClient | None = None
 
@@ -42,16 +44,24 @@ def _tracker(path: Path, revised: int) -> PlateTracker:
     return PlateTracker(path)
 
 
-def _detect(path: Path, revised: int, image: bytes) -> dict:
+def _detect(path: Path, revised: int, image: bytes, topdown: bool = False) -> dict:
     frame = cv2.imdecode(np.frombuffer(image, np.uint8), cv2.IMREAD_COLOR)
     if frame is None:
         raise ValueError("A câmera não retornou uma imagem válida.")
     tracker = _tracker(path, revised)
     result = tracker.locate(frame, at=time.monotonic())
-    return {**result, "image": base64.b64encode(image).decode("ascii")}
+    if not topdown:
+        return {**result, "image": base64.b64encode(image).decode("ascii")}
+    if result.get("found"):
+        top = tracker.top_view(frame, result["front_plane_mm"], margin_mm=TOP_MARGIN_MM)
+        ok, encoded = cv2.imencode(".jpg", top, [cv2.IMWRITE_JPEG_QUALITY, TOP_QUALITY])
+        if not ok:
+            raise ValueError("Falha ao codificar a vista superior.")
+        result["topdown"] = {"image": base64.b64encode(encoded.tobytes()).decode("ascii"), "margin": TOP_MARGIN_MM}
+    return result
 
 
-async def match(printer_id: int) -> dict:
+async def match(printer_id: int, topdown: bool = False) -> dict:
     path = profile_path(printer_id)
     url = preview_url(printer_id)
     if not url or not path.is_file():
@@ -60,7 +70,7 @@ async def match(printer_id: int) -> dict:
     async with lock:
         try:
             revised = path.stat().st_mtime_ns
-            recent = _recent.get(printer_id)
+            recent = _recent.get((printer_id, topdown))
             if recent and recent[1] == revised and time.monotonic() - recent[0] < REUSE_SECONDS:
                 return recent[2]
             async with _http().stream("GET", url) as response:
@@ -71,12 +81,12 @@ async def match(printer_id: int) -> dict:
                         raise ValueError("Quadro grande demais.")
                     buffer.extend(chunk)
             source_at = time.time()
-            result = await asyncio.to_thread(_detect, path, revised, bytes(buffer))
+            result = await asyncio.to_thread(_detect, path, revised, bytes(buffer), topdown)
         except (ValueError, KeyError, OSError, cv2.error, httpx.HTTPError) as exc:
             log.warning("Câmera do plotter indisponível: %s", type(exc).__name__)
             raise HTTPException(502, "Câmera do plotter indisponível.") from exc
         result["received_at"] = source_at
-        if len(_recent) >= 8 and printer_id not in _recent:
+        if len(_recent) >= 8 and (printer_id, topdown) not in _recent:
             del _recent[next(iter(_recent))]
-        _recent[printer_id] = (time.monotonic(), revised, result)
+        _recent[(printer_id, topdown)] = (time.monotonic(), revised, result)
         return result

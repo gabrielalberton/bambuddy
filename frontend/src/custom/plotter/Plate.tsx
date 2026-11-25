@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type PointerEvent } from 'react';
 import { platePhoto as referencePhoto } from '../plate/reference';
 import { renderPlatePhoto } from './platePhoto';
+import type { Aerial } from './useAerialPlate';
 import type { Drawing, Machine, Paper, Pen, Placement, Rect, SimPoint } from './api';
 
 export type Layer = 'vector' | 'original' | 'overlay' | 'simulation';
@@ -131,21 +132,25 @@ type Props = {
   drawing: Drawing | null; placement: Placement; imageUrl?: string; layer: Layer; edit: Edit;
   points?: SimPoint[]; time: number; travel: boolean; locked: boolean; excluded: Set<number>;
   onPaper: (paper: Paper) => void; onPlacement: (placement: Placement) => void; onToggleStroke: (index: number) => void;
+  aerial?: Aerial | null;
 };
 
-export function Plate({ machine, paper, area, pen, drawing, placement, imageUrl, layer, edit, points, time, travel, locked, excluded, onPaper, onPlacement, onToggleStroke }: Props) {
+export function Plate({ machine, paper, area, pen, drawing, placement, imageUrl, layer, edit, points, time, travel, locked, excluded, aerial, onPaper, onPlacement, onToggleStroke }: Props) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const [platePhoto, setPlatePhoto] = useState<HTMLImageElement | null>(null);
   const [image, setImage] = useState<HTMLImageElement | null>(null);
+  const [live, setLive] = useState<HTMLImageElement | null>(null);
   const [dragging, setDragging] = useState(false);
   const drag = useRef<Drag | null>(null);
   const pinch = useRef<Pinch | null>(null);
   const w = machine.plate_w;
   const h = machine.plate_h;
+  const aerialSrc = aerial?.src;
+  const margin = live && aerial ? aerial.margin : 0;
   const view = drag.current?.view ?? [
-    Math.min(0, paper.x), Math.max(h, paper.y + paper.h),
-    Math.max(w, paper.x + paper.w) - Math.min(0, paper.x),
-    Math.max(h, paper.y + paper.h) - Math.min(0, paper.y),
+    Math.min(-margin, paper.x), Math.max(h + margin, paper.y + paper.h),
+    Math.max(w + margin, paper.x + paper.w) - Math.min(-margin, paper.x),
+    Math.max(h + margin, paper.y + paper.h) - Math.min(-margin, paper.y),
   ];
   const [left, top, spanX, spanY] = view;
   const scale = (SIZE - 2 * PADDING) / Math.max(spanX, spanY);
@@ -158,6 +163,14 @@ export function Plate({ machine, paper, area, pen, drawing, placement, imageUrl,
     photo.src = referencePhoto.url;
     return () => { photo.onload = null; };
   }, []);
+
+  useEffect(() => {
+    if (!aerialSrc) { setLive(null); return; }
+    const next = new Image();
+    next.onload = () => setLive(next);
+    next.src = aerialSrc;
+    return () => { next.onload = null; };
+  }, [aerialSrc]);
 
   useEffect(() => {
     if (!imageUrl) return;
@@ -173,11 +186,15 @@ export function Plate({ machine, paper, area, pen, drawing, placement, imageUrl,
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, SIZE, SIZE);
     ctx.setTransform(scale, 0, 0, scale, ox, oy);
-    renderPlatePhoto(ctx, platePhoto, w, h);
+    const photographed = !!live && !!aerial;
+    if (photographed) ctx.drawImage(live, -aerial.margin, -(h + aerial.margin), w + 2 * aerial.margin, h + 2 * aerial.margin);
+    else renderPlatePhoto(ctx, platePhoto, w, h);
     ctx.lineWidth = 0.55;
     ctx.fillStyle = '#f5f1e7';
+    ctx.globalAlpha = photographed ? 0.4 : 1;
     ctx.fillRect(paper.x, -paper.y - paper.h, paper.w, paper.h);
-    ctx.strokeStyle = edit === 'paper' ? '#e7a34d' : '#a39378';
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = edit === 'paper' ? '#e7a34d' : photographed ? '#f5f1e7' : '#a39378';
     ctx.strokeRect(paper.x, -paper.y - paper.h, paper.w, paper.h);
     if (area) {
       ctx.strokeStyle = '#158986';
@@ -196,7 +213,7 @@ export function Plate({ machine, paper, area, pen, drawing, placement, imageUrl,
     ctx.textAlign = 'right';
     ctx.fillText('Frente da A1', ox + w * scale, oy + 43);
     ctx.textAlign = 'start';
-  }, [area, drawing, edit, excluded, h, image, imageUrl, layer, ox, oy, paper, pen, placement, platePhoto, points, scale, time, travel, w]);
+  }, [aerial, area, drawing, edit, excluded, h, image, imageUrl, layer, live, ox, oy, paper, pen, placement, platePhoto, points, scale, time, travel, w]);
 
   useEffect(() => {
     const element = canvas.current;

@@ -24,7 +24,7 @@ export function PlateCamera({ id }: { id: number }) {
     </button>
     {tracking && <>
       {frame && <div className="plotter-camera-frame">
-        <img src={`data:image/jpeg;base64,${frame.image}`} alt="Vista da Bambu Lab A1" />
+        {frame.image && <img src={`data:image/jpeg;base64,${frame.image}`} alt="Vista da Bambu Lab A1" />}
         {!!outline && <svg viewBox="0 0 1600 900" aria-hidden="true">
           <polygon points={outline} vectorEffect="non-scaling-stroke" />
         </svg>}

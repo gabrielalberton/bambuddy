@@ -112,8 +112,11 @@ async def get_status(printer_id: int, _=RequirePrinterPermissionIfAuthEnabled(Pe
 
 
 @router.get("/printers/{printer_id}/plate-camera")
-async def get_plate_camera(printer_id: int, _=RequirePrinterPermissionIfAuthEnabled(Permission.PRINTERS_READ)):
-    return await vision_api.match(printer_id)
+async def get_plate_camera(
+    printer_id: int, topdown: bool = False, _=RequirePrinterPermissionIfAuthEnabled(Permission.PRINTERS_READ)
+):
+    """``topdown=true`` troca o quadro bruto pela vista aérea corrigida do prato (com margem escurecida)."""
+    return await vision_api.match(printer_id, topdown)
 
 
 @router.get("/printers/{printer_id}/settings")
