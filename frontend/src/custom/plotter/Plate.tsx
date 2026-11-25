@@ -76,7 +76,6 @@ function renderSimulation(ctx: CanvasRenderingContext2D, points: SimPoint[], tim
   }
 }
 
-
 function hitStroke(drawing: Drawing, placement: Placement, x: number, y: number, toleranceMm: number) {
   const angle = placement.rotation * Math.PI / 180;
   const dx = x - placement.cx;
@@ -206,7 +205,7 @@ export function Plate({ machine, paper, area, pen, drawing, placement, imageUrl,
   }
 
   return <canvas
-    className="plotter-plate" width={SIZE} height={SIZE} aria-label="Vista superior da mesa da Bambu Lab A1"
+    ref={canvas} className="plotter-plate" width={SIZE} height={SIZE} aria-label="Vista superior da mesa da Bambu Lab A1"
     style={{ touchAction: locked ? 'auto' : 'none', cursor: locked ? 'default' : edit === 'exclude' ? 'crosshair' : dragging ? 'grabbing' : 'grab' }}
     onPointerDown={begin} onPointerMove={move} onPointerUp={end} onPointerCancel={end} onLostPointerCapture={end}
   />;
