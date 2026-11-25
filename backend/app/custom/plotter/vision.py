@@ -141,7 +141,15 @@ class PlateTracker:
         x = np.array([x_left, x_left + 256, x_left + 256, x_left])
         y = np.array([front, front, front + 256, front + 256])
         corners = self.project(x, y) / self.size
-        result.update(corners=corners.round(6).tolist(), front_plane_mm=round(front, 2))
+        phase = np.arange(8) / 8
+        outline_x = (x[:, None] + (np.roll(x, -1) - x)[:, None] * phase).ravel()
+        outline_y = (y[:, None] + (np.roll(y, -1) - y)[:, None] * phase).ravel()
+        outline = self.project(outline_x, outline_y) / self.size
+        result.update(
+            corners=corners.round(6).tolist(),
+            outline=outline.round(6).tolist(),
+            front_plane_mm=round(front, 2),
+        )
         if "axis" in self.profile:
             slope, zero = self.profile["axis"]
             result["y_mm"] = round((front - zero) / slope, 2)

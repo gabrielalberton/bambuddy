@@ -16,7 +16,7 @@ export function PlateCamera({ id }: { id: number }) {
   });
   const frame = camera.data;
   const matches = tracking && !camera.error && frame?.found;
-  const outline = matches && frame.corners?.map(([x, y]) => `${x * 1600},${y * 900}`).join(' ');
+  const outline = matches && frame.outline?.map(([x, y]) => `${x * 1600},${y * 900}`).join(' ');
 
   return <section className="plotter-camera" aria-label="Câmera do prato">
     <button type="button" aria-expanded={tracking} onClick={() => setTracking(active => !active)}>

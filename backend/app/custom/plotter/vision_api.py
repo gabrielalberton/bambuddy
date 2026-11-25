@@ -21,6 +21,8 @@ from .vision import PlateTracker
 
 log = logging.getLogger(__name__)
 _locks = [asyncio.Lock() for _ in range(8)]
+_recent: dict[int, tuple[float, int, dict]] = {}
+REUSE_SECONDS = 0.18
 
 
 def profile_path(printer_id: int) -> Path:
@@ -47,10 +49,12 @@ async def match(printer_id: int) -> dict:
     if not url or not path.is_file():
         raise HTTPException(404, "Rastreamento não configurado para esta câmera.")
     lock = _locks[printer_id % len(_locks)]
-    if lock.locked():
-        raise HTTPException(429, "A câmera já está processando um quadro.")
     async with lock:
         try:
+            revised = path.stat().st_mtime_ns
+            recent = _recent.get(printer_id)
+            if recent and recent[1] == revised and time.monotonic() - recent[0] < REUSE_SECONDS:
+                return recent[2]
             async with httpx.AsyncClient(timeout=3, follow_redirects=False) as client:
                 async with client.stream("GET", url) as response:
                     response.raise_for_status()
@@ -60,8 +64,12 @@ async def match(printer_id: int) -> dict:
                             raise ValueError("Quadro grande demais.")
                         buffer.extend(chunk)
             source_at = time.time()
-            result = await asyncio.to_thread(_detect, path, path.stat().st_mtime_ns, bytes(buffer))
+            result = await asyncio.to_thread(_detect, path, revised, bytes(buffer))
         except (ValueError, KeyError, OSError, cv2.error, httpx.HTTPError) as exc:
             log.warning("Câmera do plotter indisponível: %s", type(exc).__name__)
             raise HTTPException(502, "Câmera do plotter indisponível.") from exc
-    return {**result, "received_at": source_at}
+        result["received_at"] = source_at
+        if len(_recent) >= 8 and printer_id not in _recent:
+            del _recent[next(iter(_recent))]
+        _recent[printer_id] = (time.monotonic(), revised, result)
+        return result

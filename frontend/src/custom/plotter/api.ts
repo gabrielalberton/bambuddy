@@ -32,7 +32,7 @@ export type Config = {
 };
 export type PlateMatch = {
   found: boolean; reason?: 'camera_alignment'; image: string; received_at: number;
-  corners?: [number, number][]; front_plane_mm?: number; y_mm?: number;
+  outline?: [number, number][]; front_plane_mm?: number; y_mm?: number;
 };
 export type Kind = 'drawing' | 'ladder' | 'cross' | 'frame';
 export type SimPoint = [x: number, y: number, depth: number, time: number];
