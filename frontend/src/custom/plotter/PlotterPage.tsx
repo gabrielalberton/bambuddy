@@ -86,7 +86,7 @@ function Workspace({ id, config, initial }: { id: number; config: Config; initia
   const [excluded, setExcluded] = useState(new Set<number>());
   const [placement, setPlacement] = useState<Placement>(initial.placement ?? { cx: 128, cy: 110, width: 150, rotation: 0 });
   const [layer, setLayer] = useState<Layer>('vector');
-  const [edit, setEdit] = useState<Edit>('paper');
+  const [edit, setEdit] = useState<Edit>('lock');
   const [kind, setKind] = useState<Kind>('drawing');
   const [pressure, setPressure] = useState('variable');
   const [widthMode, setWidthMode] = useState('fit');
@@ -219,7 +219,7 @@ function Workspace({ id, config, initial }: { id: number; config: Config; initia
     setDrawing(next);
     setExcluded(new Set());
     setLayer('vector');
-    setEdit('drawing');
+    setEdit('lock');
     setKind('drawing');
     void cache.invalidateQueries({ queryKey: HISTORY_KEY });
   }
@@ -253,7 +253,7 @@ function Workspace({ id, config, initial }: { id: number; config: Config; initia
       if (drawing?.id === item.id) {
         invalidate();
         setDrawing(null);
-        setEdit('paper');
+        setEdit('lock');
         setLayer('vector');
       }
       await cache.invalidateQueries({ queryKey: HISTORY_KEY });
@@ -315,8 +315,9 @@ function Workspace({ id, config, initial }: { id: number; config: Config; initia
       <section className="plotter-card plotter-board">
         <div className="plotter-board-heading"><h2>Mesa da A1</h2><span>{settings.machine.plate_w} × {settings.machine.plate_h} mm</span></div>
         <div className="plotter-segments" aria-label="Mover na mesa">
-          <button type="button" aria-pressed={edit === 'paper' && layer !== 'simulation'} onClick={() => { setEdit('paper'); if (layer === 'simulation') setLayer('vector'); }}>Mover papel</button>
-          <button type="button" aria-pressed={edit === 'drawing' && layer !== 'simulation'} disabled={!drawing} onClick={() => { setEdit('drawing'); if (layer === 'simulation') setLayer('vector'); }}>Mover desenho</button>
+          <button type="button" aria-pressed={edit === 'paper'} onClick={() => { setEdit('paper'); if (layer === 'simulation') setLayer('vector'); }}>Mover papel</button>
+          <button type="button" aria-pressed={edit === 'drawing'} disabled={!drawing} onClick={() => { setEdit('drawing'); if (layer === 'simulation') setLayer('vector'); }}>Mover desenho</button>
+          <button type="button" aria-pressed={edit === 'lock'} onClick={() => setEdit('lock')}>Travado</button>
           <button type="button" aria-pressed={edit === 'exclude' && layer !== 'simulation'} disabled={!drawing}
             onClick={() => { setEdit('exclude'); setLayer('vector'); }}>Editar traços</button>
         </div>
@@ -326,7 +327,7 @@ function Workspace({ id, config, initial }: { id: number; config: Config; initia
         {edit === 'exclude' && layer !== 'simulation' && <p className="plotter-muted">Toque em um traço para excluir ou restaurar. Os excluídos aparecem em vermelho.</p>}
         <Plate machine={settings.machine} paper={paper} area={area} pen={pen} drawing={drawing} placement={placement}
           imageUrl={imageUrl} aerial={aerial} tab={tab} layer={layer} edit={edit} points={plan?.sim} time={time} travel={travel}
-          locked={!!busy || !!jog} onPaper={changePaper} onPlacement={changePlacement}
+          locked={!!busy || !!jog || edit === 'lock'} onPaper={changePaper} onPlacement={changePlacement}
           excluded={excluded} onToggleStroke={index => {
             const next = new Set(excluded);
             if (next.has(index)) next.delete(index);

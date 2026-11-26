@@ -5,7 +5,7 @@ import type { Aerial } from './useAerialPlate';
 import type { Drawing, Machine, Paper, Pen, Placement, Rect, SimPoint } from './api';
 
 export type Layer = 'vector' | 'original' | 'overlay' | 'simulation';
-export type Edit = 'paper' | 'drawing' | 'exclude';
+export type Edit = 'lock' | 'paper' | 'drawing' | 'exclude';
 const SIZE = 760;
 const PADDING = 48;
 const round = (value: number) => Math.round(value * 10) / 10;
