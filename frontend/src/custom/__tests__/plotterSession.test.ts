@@ -4,7 +4,7 @@ import { loadSession, saveSession, SESSION_MAX_AGE_MS, type Session } from '../p
 
 const session = (over: Partial<Session> = {}): Session => ({
   at: 1_000_000, paper: { x: 23, y: 0, w: 210, h: 297, margin: 5, thickness: 0.1 },
-  placement: { cx: 128, cy: 110, width: 150, rotation: 0 }, customized: true, activePen: 'padrao', kind: 'zsweep',
+  placement: { cx: 128, cy: 110, width: 150, rotation: 0 }, customized: true, activePen: 'padrao', kind: 'zsweep', variant: 'reference',
   pressure: 'variable', widthMode: 'fit', threshold: null, background: true, ink: 'luma', invert: 'auto',
   excluded: [2, 5], drawingId: 'abc', plan: { id: 'p1', ok: true } as unknown as Plan, ...over,
 });

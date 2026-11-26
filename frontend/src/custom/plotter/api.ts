@@ -51,6 +51,7 @@ export type PlateMatch = {
 export type Kind = 'drawing' | 'zsweep' | 'cross' | 'frame';
 export type Calibration = {
   test?: 'zsweep'; target?: [number, number]; length?: number; z_from?: number; z_to?: number; touch?: number;
+  speeds?: number[]; order?: number[];
 };
 export type SimPoint = [x: number, y: number, depth: number, time: number];
 export type Plan = {

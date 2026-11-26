@@ -56,6 +56,7 @@ class PlanOptions:
 @dataclass
 class PenPath:
     pts: np.ndarray  # (n, 3) float64: X, Y da ponta da caneta (mm da mesa) e aperto (mm)
+    speed: float | None = None  # mm/s deste traço (None = a velocidade de desenho do perfil; nunca acima dela)
 
     @property
     def is_dot(self) -> bool:

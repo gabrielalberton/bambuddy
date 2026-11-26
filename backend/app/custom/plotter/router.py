@@ -66,6 +66,9 @@ class PlanBody(BaseModel):
     options: dict = Field(default_factory=dict)
     z_from: float | None = Field(default=None, ge=0, le=60)
     z_to: float | None = Field(default=None, ge=0, le=60)
+    lines: int | None = Field(default=None, ge=2, le=8)
+    speeds: list[float] | None = Field(default=None, max_length=8)
+    reverse: bool = False
     target: list[float] | None = Field(default=None, min_length=2, max_length=2)
     title: str | None = Field(default=None, max_length=80)
 
@@ -266,7 +269,9 @@ async def create_plan(
         request.update(drawing=drawing, placement=body.placement, options=body.options)
         request["title"] = body.title or (drawing.get("meta") or {}).get("name") or "desenho"
     else:
-        request.update(z_from=body.z_from, z_to=body.z_to, target=body.target)
+        request.update(
+            z_from=body.z_from, z_to=body.z_to, lines=body.lines, speeds=body.speeds, reverse=body.reverse, target=body.target
+        )
     try:
         result = await worker.run("plan", request, timeout=worker.PLAN_TIMEOUT)
     except (ValueError, worker.JobError) as exc:

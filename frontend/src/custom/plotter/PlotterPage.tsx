@@ -9,7 +9,7 @@ import { ContactAdjust } from './Contact';
 import { DrawingHistory } from './History';
 import { MountPicker } from './Mount';
 import { ZSweepTest } from './Thickness';
-import { calibrationText } from './thickness';
+import { calibrationText, sweepOptions, type SweepVariant } from './thickness';
 import { FALLBACK_MOUNTS, MOUNT_ABOUT, mountOf } from './mounts';
 import { Plate, type Edit, type Layer } from './Plate';
 import { PlateCamera } from './PlateCamera';
@@ -30,7 +30,7 @@ const POSITION_FIELDS: [keyof Placement, string, number, number][] = [
   ['cx', 'Centro X (mm)', -500, 800], ['cy', 'Centro Y (mm)', -500, 800],
 ];
 const KIND_LABELS: Record<Kind, string> = {
-  drawing: 'Desenho', zsweep: 'Teste de altura (Z 5 a 8)',
+  drawing: 'Desenho', zsweep: 'Teste de altura (contato ±2 mm)',
   cross: 'Cruz de alinhamento', frame: 'Contorno da área útil',
 };
 const HISTORY_KEY = ['custom', 'plotter', 'drawings'];
@@ -93,6 +93,7 @@ function Workspace({ id, config, initial }: { id: number; config: Config; initia
   const [layer, setLayer] = useState<Layer>('vector');
   const [edit, setEdit] = useState<Edit>('lock');
   const [kind, setKind] = useState<Kind>(restored?.kind ?? 'drawing');
+  const [variant, setVariant] = useState<SweepVariant>(restored?.variant ?? 'reference');
   const [pressure, setPressure] = useState(restored?.pressure ?? 'variable');
   const [widthMode, setWidthMode] = useState(restored?.widthMode ?? 'fit');
   const [threshold, setThreshold] = useState<number | null>(restored?.threshold ?? null);
@@ -137,7 +138,6 @@ function Workspace({ id, config, initial }: { id: number; config: Config; initia
   const jog = status?.jog;
   const end = plan?.sim.at(-1)?.[3] ?? 0;
   const options = { threshold, background, ink, invert };
-  const hasPressure = pen.table.length > 1 && Math.max(...pen.table.map(row => row[1])) > Math.min(...pen.table.map(row => row[1]));
   const calibrated = pen.z_contact !== null;
   const blocker = status?.blockers[0]?.text;
   const canStart = !!status && !blocker && !jog;
@@ -155,9 +155,9 @@ function Workspace({ id, config, initial }: { id: number; config: Config; initia
   useEffect(() => {
     saveSession(id, {
       at: Date.now(), paper: settings.paper, placement, customized: positionCustomized.current, activePen: settings.active_pen,
-      kind, pressure, widthMode, threshold, background, ink, invert, excluded: [...excluded], drawingId: drawing?.id ?? restored?.drawingId ?? null, plan,
+      kind, variant, pressure, widthMode, threshold, background, ink, invert, excluded: [...excluded], drawingId: drawing?.id ?? restored?.drawingId ?? null, plan,
     });
-  }, [id, settings.paper, settings.active_pen, placement, kind, pressure, widthMode, threshold, background, ink, invert, excluded, drawing, plan, restored]);
+  }, [id, settings.paper, settings.active_pen, placement, kind, variant, pressure, widthMode, threshold, background, ink, invert, excluded, drawing, plan, restored]);
 
   useEffect(() => {
     if (!drawing || (layer !== 'original' && layer !== 'overlay')) return;
@@ -287,6 +287,7 @@ function Workspace({ id, config, initial }: { id: number; config: Config; initia
     const next = await plotter.plan(id, {
       kind: which, drawing_id: drawing?.id, placement, paper, pen_id: settings.active_pen,
       options: { pressure, width_mode: widthMode, exclude: [...excluded] },
+      ...(which === 'zsweep' ? sweepOptions(variant) : {}),
       title: which === 'drawing' ? drawing?.meta.name : KIND_LABELS[which],
     });
     setPlan(next);
@@ -296,16 +297,9 @@ function Workspace({ id, config, initial }: { id: number; config: Config; initia
   }
 
   function preview() {
-    run('Gerando plano…', async () => { await makePlan(kind); });
-  }
-
-  /** Teste de espessura: grava o perfil se mudou (suporte, tipo de caneta) e gera o plano do teste. */
-  function generateTest() {
-    run('Gerando teste…', async () => {
-      setKind('zsweep');
-      if (penChanged) await saveSettings();
-      const next = await makePlan('zsweep');
-      setMessage(next.ok ? 'Teste validado. Confira a simulação na mesa e inicie em “Operação”.' : 'Teste recusado: veja os motivos em “Operação”.');
+    run('Gerando plano…', async () => {
+      const next = await makePlan(kind);
+      if (kind === 'zsweep') setMessage(next.ok ? 'Teste validado. Confira a simulação na mesa e inicie em “4 · Enviar”.' : 'Teste recusado: veja os motivos em “4 · Enviar”.');
     });
   }
 
@@ -315,6 +309,18 @@ function Workspace({ id, config, initial }: { id: number; config: Config; initia
     return <section className="plotter-card"><h2>{title}</h2>{body}</section>;
   }
 
+  const paperSummary = `${config.paper_presets.find(preset => preset.w === paper.w && preset.h === paper.h)?.id ?? 'Personalizado'} · ${paper.w} × ${paper.h} mm · X ${paper.x} Y ${paper.y}`;
+  const layers = [
+    ...(drawing ? [['vector', 'Vetor'], ['original', 'Original'], ['overlay', 'Sobreposição']] as const : []),
+    ...(plan ? [['simulation', 'Simulação']] as const : []),
+  ];
+  const canGenerate = canFiles && !!area && calibrated && !penChanged && !jog
+    && (kind !== 'drawing' || (!!drawing && excluded.size < drawing.strokes.length));
+  const generateHint = !calibrated ? 'Antes, calibre a altura de contato em “3 · Caneta”.'
+    : penChanged ? 'Salve o perfil da caneta para aplicar as mudanças ao plano.'
+    : !area ? 'O papel está fora do alcance da caneta.'
+    : kind === 'drawing' && !drawing ? 'Selecione uma imagem.' : undefined;
+
   return <>
     <div className="plotter-messages" aria-live="polite">
       {error && <p role="alert" className="plotter-error">{error}</p>}
@@ -323,17 +329,16 @@ function Workspace({ id, config, initial }: { id: number; config: Config; initia
     <fieldset disabled={!!busy} className="plotter-workspace">
       <section className="plotter-card plotter-board">
         <div className="plotter-board-heading"><h2>Mesa da A1</h2><span>{settings.machine.plate_w} × {settings.machine.plate_h} mm</span></div>
-        <div className="plotter-segments" aria-label="Mover na mesa">
-          <button type="button" aria-pressed={edit === 'paper'} onClick={() => { setEdit('paper'); if (layer === 'simulation') setLayer('vector'); }}>Mover papel</button>
-          <button type="button" aria-pressed={edit === 'drawing'} disabled={!drawing} onClick={() => { setEdit('drawing'); if (layer === 'simulation') setLayer('vector'); }}>Mover desenho</button>
+        <div className="plotter-segments" role="group" aria-label="Mover na mesa">
           <button type="button" aria-pressed={edit === 'lock'} onClick={() => setEdit('lock')}>Travado</button>
-          <button type="button" aria-pressed={edit === 'exclude' && layer !== 'simulation'} disabled={!drawing}
-            onClick={() => { setEdit('exclude'); setLayer('vector'); }}>Editar traços</button>
+          <button type="button" aria-pressed={edit === 'paper'} onClick={() => { setEdit('paper'); if (layer === 'simulation') setLayer('vector'); }}>Mover papel</button>
+          {drawing && <button type="button" aria-pressed={edit === 'drawing'} onClick={() => { setEdit('drawing'); if (layer === 'simulation') setLayer('vector'); }}>Mover desenho</button>}
+          {drawing && <button type="button" aria-pressed={edit === 'exclude'} onClick={() => { setEdit('exclude'); setLayer('vector'); }}>Editar traços</button>}
         </div>
-        {edit === 'drawing' && drawing && layer !== 'simulation' && <p className="plotter-muted">
+        {edit === 'drawing' && drawing && <p className="plotter-muted">
           Arraste para mover. Use a pinça ou a roda do mouse sobre o desenho para dimensionar.
         </p>}
-        {edit === 'exclude' && layer !== 'simulation' && <p className="plotter-muted">Toque em um traço para excluir ou restaurar. Os excluídos aparecem em vermelho.</p>}
+        {edit === 'exclude' && <p className="plotter-muted">Toque em um traço para excluir ou restaurar. Os excluídos aparecem em vermelho.</p>}
         <Plate machine={settings.machine} paper={paper} area={area} pen={pen} drawing={drawing} placement={placement}
           imageUrl={imageUrl} aerial={aerial} tab={tab} layer={layer} edit={edit} points={plan?.sim} time={time} travel={travel}
           locked={!!busy || !!jog || edit === 'lock'} onPaper={changePaper} onPlacement={changePlacement}
@@ -347,22 +352,11 @@ function Workspace({ id, config, initial }: { id: number; config: Config; initia
         <div className="plotter-key"><span><i className="plotter-swatch paper" /> Papel</span><span><i className="plotter-swatch bed" /> Mesa</span>
           {area ? <span><i className="plotter-swatch area" /> Área útil</span> : <span className="plotter-error">Papel fora do alcance</span>}
         </div>
-        <div className="plotter-segments" aria-label="Aba do prato (só aparência)">
-          {PLATE_TABS.map(([value, label]) =>
-            <button key={value} type="button" aria-pressed={tab === value} onClick={() => chooseTab(value)}>{label}</button>)}
-        </div>
-        {hasVision && <div className="plotter-aerial">
-          <button type="button" aria-pressed={aerialOn} onClick={() => setAerialOn(on => !on)}>
-            <ScanEye size={16} aria-hidden="true" /> {aerialOn ? 'Voltar à foto de referência' : 'Ver o prato real (vista aérea)'}
-          </button>
-          {aerialOn && <p className="plotter-muted" role="status">{aerialStatus}</p>}
-        </div>}
-        {hasVision && <PlateCamera id={id} />}
-        <div className="plotter-segments" aria-label="Camada da prévia">
-          {([['vector', 'Vetor'], ['original', 'Original'], ['overlay', 'Sobreposição'], ['simulation', 'Simulação']] as const).map(([value, label]) =>
-            <button key={value} type="button" aria-pressed={layer === value} disabled={value === 'simulation' ? !plan : !drawing}
+        {layers.length > 1 && <div className="plotter-segments" role="group" aria-label="Camada da prévia">
+          {layers.map(([value, label]) =>
+            <button key={value} type="button" aria-pressed={layer === value}
               onClick={() => { if (value === 'original' && edit === 'exclude') setEdit('drawing'); setLayer(value); }}>{label}</button>)}
-        </div>
+        </div>}
         {layer === 'simulation' && <div className="plotter-simulation">
           <label><span>Posição no tempo · {showTime(time)} / {showTime(end)}</span>
             <input type="range" min={0} max={end} step={0.01} value={time} onChange={e => setTime(Number(e.target.value))} />
@@ -370,130 +364,144 @@ function Workspace({ id, config, initial }: { id: number; config: Config; initia
           <label className="plotter-check"><input type="checkbox" checked={travel} onChange={e => setTravel(e.target.checked)} /> Mostrar deslocamentos no ar</label>
           <span className="plotter-gradient" /> <span>Menor a maior compressão</span>
         </div>}
+        <details className="plotter-view">
+          <summary>Visualização do prato</summary>
+          <div className="plotter-segments" role="group" aria-label="Aba do prato (só aparência)">
+            {PLATE_TABS.map(([value, label]) =>
+              <button key={value} type="button" aria-pressed={tab === value} onClick={() => chooseTab(value)}>{label}</button>)}
+          </div>
+          {hasVision && <div className="plotter-aerial">
+            <button type="button" aria-pressed={aerialOn} onClick={() => setAerialOn(on => !on)}>
+              <ScanEye size={16} aria-hidden="true" /> {aerialOn ? 'Voltar à foto de referência' : 'Ver o prato real (vista aérea)'}
+            </button>
+            {aerialOn && <p className="plotter-muted" role="status">{aerialStatus}</p>}
+          </div>}
+          {hasVision && <PlateCamera id={id} />}
+        </details>
       </section>
       <div className="plotter-sidebar">
-        {section('Imagem e testes', <>
-          <label className="plotter-upload"><ImageUp size={22} aria-hidden="true" />
-            <span><strong>Selecionar imagem</strong><small>{imported}</small></span>
-            <input type="file" aria-label="Selecionar imagem" accept="image/png,image/jpeg,.png,.jpg,.jpeg" disabled={!canFiles}
-              onChange={e => { const file = e.currentTarget.files?.[0]; if (file) upload(file); e.currentTarget.value = ''; }} />
+        {section('1 · O que plotar', <>
+          <label className="plotter-field"><span>Trabalho</span>
+            <select aria-label="Trabalho" value={kind} onChange={e => { setKind(e.target.value as Kind); invalidate(); }}>
+              {Object.entries(KIND_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+            </select>
           </label>
-          {history.error && <p className="plotter-muted">Histórico indisponível. {history.error.message}</p>}
-          <DrawingHistory items={history.data?.items ?? []} keep={history.data?.keep} current={drawing?.id}
-            disabled={!!busy} canDelete={canFiles} onOpen={reopen} onDelete={forget} />
-          <details><summary>Opções de vetorização</summary>
-            <div className="plotter-fields">
-              <Numeric label="Limiar (0–1, vazio = auto)" value={threshold} min={0.03} max={0.97} nullable onChange={setThreshold} />
-              <label className="plotter-field"><span>Tipo de tinta</span>
-                <select aria-label="Tipo de tinta" value={ink} onChange={e => setInk(e.target.value)}><option value="luma">Escura</option><option value="min">Colorida</option></select>
-              </label>
-              <label className="plotter-field"><span>Polaridade</span>
-                <select aria-label="Polaridade" value={invert} onChange={e => setInvert(e.target.value)}><option value="auto">Automática</option><option value="no">Traço escuro</option><option value="yes">Traço claro</option></select>
-              </label>
-            </div>
-            <label className="plotter-check"><input type="checkbox" checked={background} onChange={e => setBackground(e.target.checked)} /> Compensar iluminação do papel</label>
-            <button type="button" disabled={!drawing || !canFiles} onClick={() => drawing && run('Vetorizando novamente…', async () => {
-              const next = await plotter.revectorize(drawing, options);
-              invalidate(); setDrawing(next); setExcluded(new Set());
-            })}>Vetorizar novamente</button>
-          </details>
-          <ZSweepTest settings={settings} mounts={mounts} penTypes={penTypes}
-            disabled={!!busy || !!jog} canEdit={canControl}
-            canGenerate={canFiles && canControl && !!area && pen.z_contact !== null}
-            hint={pen.z_contact === null ? 'Antes, calibre a altura de contato em “Calibração da caneta”.' : !area ? 'O papel está fora do alcance da caneta.' : undefined}
-            onSettings={next => { invalidate(); setSettings(next); }} onPen={changePen} onGenerate={generateTest} />
-        </>)}
-        {section('Papel', <fieldset disabled={!!jog}>
-          <div className="plotter-fields">
-            <label className="plotter-field"><span>Formato</span>
-              <select aria-label="Formato" value={config.paper_presets.find(preset => preset.w === paper.w && preset.h === paper.h)?.id ?? ''}
-                onChange={e => {
-                  const preset = config.paper_presets.find(item => item.id === e.target.value);
-                  if (preset) changePaper({ ...paper, w: preset.w, h: preset.h });
-                }}>
-                <option value="">Personalizado</option>
-                {config.paper_presets.map(preset => <option key={preset.id}>{preset.id}</option>)}
-              </select>
+          {kind === 'drawing' && <>
+            <label className="plotter-upload"><ImageUp size={22} aria-hidden="true" />
+              <span><strong>Selecionar imagem</strong><small>{imported}</small></span>
+              <input type="file" aria-label="Selecionar imagem" accept="image/png,image/jpeg,.png,.jpg,.jpeg" disabled={!canFiles}
+                onChange={e => { const file = e.currentTarget.files?.[0]; if (file) upload(file); e.currentTarget.value = ''; }} />
             </label>
-            <button className="plotter-swap" type="button" onClick={() => changePaper({ ...paper, w: paper.h, h: paper.w })}>Girar formato 90°</button>
-            {PAPER_FIELDS.map(([key, label, min, max]) => <Numeric key={key} label={label} value={paper[key]} min={min} max={max}
-              onChange={value => { if (value !== null && value !== paper[key]) changePaper({ ...paper, [key]: value }); }} />)}
-          </div>
-        </fieldset>)}
-        {drawing && section('Posição do desenho', <>
-          <div className="plotter-fields">{POSITION_FIELDS.map(([key, label, min, max]) => <Numeric key={key} label={label} value={placement[key]} min={min} max={max}
-            onChange={value => { if (value !== null && value !== placement[key]) changePlacement({ ...placement, [key]: value }); }} />)}</div>
-          <div className="plotter-actions">
-            <button type="button" disabled={!area} onClick={() => changePlacement(fit(drawing, area))}>Ajustar à área útil</button>
-            {excluded.size > 0 && <button type="button" onClick={() => { setExcluded(new Set()); invalidate(); }}>
-              Restaurar {excluded.size} {excluded.size === 1 ? 'traço' : 'traços'}
-            </button>}
-          </div>
-        </>)}
-        <section className="plotter-card plotter-calibration">
-          <details open={!!jog || (calibOpen ?? !calibrated)} onToggle={e => setCalibOpen(e.currentTarget.open)}>
-            <summary><h2>Calibração da caneta</h2>
-              <span className="plotter-muted">{calibrated ? `Contato Z ${pen.z_contact} mm` : 'Contato pendente'}{hasPressure ? ' · pressão medida' : ' · pressão pendente'}</span></summary>
-          <MountPicker settings={settings} mounts={mounts} penTypes={penTypes} disabled={!!jog || !!busy}
-            onChange={next => { invalidate(); setSettings(next); }} />
-          <p className="plotter-muted">{mountInfo?.name ?? mount} · {penTypes.find(item => item.key === pen.pen_type)?.name ?? pen.name} · {pen.z_contact === null ? 'Contato pendente' : `Contato Z ${pen.z_contact} mm`} · {hasPressure ? 'Curva de pressão medida' : 'Curva de pressão pendente'}</p>
-          <ContactAdjust jog={jog} contact={pen.z_contact} steps={(mountInfo?.jog_steps ?? [0.1, 0.5]).filter(step => Math.abs(step) <= config.limits.jog_max_step)}
-            hint={MOUNT_ABOUT[mount].contact} canControl={canControl} canStart={!!area && canStart}
-            reason={!canControl ? 'Seu usuário não tem permissão para mover a impressora.' : !area ? 'O papel não tem área útil dentro do alcance da caneta.' : jog ? undefined : blocker}
-            onStart={() => run('Fazendo homing…', async () => {
-              invalidate();
-              const saved = await saveSettings();
-              await plotter.jogStart(id, saved.active_pen);
-              await statusQuery.refetch();
-            })}
-            onMove={moveHeight}
-            onFinish={save => run('Recolhendo caneta…', async () => {
-              await moves.current;
-              await plotter.jogFinish(id, save);
-              await statusQuery.refetch();
-              const saved = await plotter.settings(id);
-              applySaved(saved);
-              invalidate();
-              setMessage(save ? 'Altura de contato salva.' : 'Ajuste encerrado.');
-            })} />
-          <details><summary>Editar perfil</summary>
-            <fieldset disabled={!!jog || !canControl}>
-              {samePens.length > 1 && <label className="plotter-field"><span>Perfil ativo</span>
-                <select aria-label="Perfil ativo" value={settings.active_pen} onChange={e => { invalidate(); setSettings({ ...settings, active_pen: e.target.value }); }}>
-                  {samePens.map(([key, item]) => <option key={key} value={key}>{item.name}</option>)}
-                </select>
-              </label>}
-              <PenFields pen={pen} mount={mountInfo} penTypes={penTypes} onChange={changePen} />
+            {history.error && <p className="plotter-muted">Histórico indisponível. {history.error.message}</p>}
+            <DrawingHistory items={history.data?.items ?? []} keep={history.data?.keep} current={drawing?.id}
+              disabled={!!busy} canDelete={canFiles} onOpen={reopen} onDelete={forget} />
+            {drawing && <details><summary>Posição e tamanho do desenho</summary>
+              <div className="plotter-fields">{POSITION_FIELDS.map(([key, label, min, max]) => <Numeric key={key} label={label} value={placement[key]} min={min} max={max}
+                onChange={value => { if (value !== null && value !== placement[key]) changePlacement({ ...placement, [key]: value }); }} />)}</div>
               <div className="plotter-actions">
-                <button type="button" onClick={() => run('Salvando ajustes…', async () => { await saveSettings(); invalidate(); setMessage('Ajustes salvos.'); })}>Salvar ajustes</button>
+                <button type="button" disabled={!area} onClick={() => changePlacement(fit(drawing, area))}>Ajustar à área útil</button>
+                {excluded.size > 0 && <button type="button" onClick={() => { setExcluded(new Set()); invalidate(); }}>
+                  Restaurar {excluded.size} {excluded.size === 1 ? 'traço' : 'traços'}
+                </button>}
+              </div>
+            </details>}
+            <details><summary>Opções de vetorização e de pressão</summary>
+              <div className="plotter-fields">
+                <Numeric label="Limiar (0–1, vazio = auto)" value={threshold} min={0.03} max={0.97} nullable onChange={setThreshold} />
+                <label className="plotter-field"><span>Tipo de tinta</span>
+                  <select aria-label="Tipo de tinta" value={ink} onChange={e => setInk(e.target.value)}><option value="luma">Escura</option><option value="min">Colorida</option></select>
+                </label>
+                <label className="plotter-field"><span>Polaridade</span>
+                  <select aria-label="Polaridade" value={invert} onChange={e => setInvert(e.target.value)}><option value="auto">Automática</option><option value="no">Traço escuro</option><option value="yes">Traço claro</option></select>
+                </label>
+                <label className="plotter-field"><span>Pressão</span>
+                  <select aria-label="Pressão" value={pressure} onChange={e => { setPressure(e.target.value); invalidate(); }}>
+                    <option value="variable">Variável</option><option value="constant">Constante</option>
+                  </select>
+                </label>
+                {pressure === 'variable' && <label className="plotter-field"><span>Largura do traço</span>
+                  <select aria-label="Largura do traço" value={widthMode} onChange={e => { setWidthMode(e.target.value); invalidate(); }}>
+                    <option value="fit">Adaptar à faixa da caneta</option><option value="physical">Escala física da imagem</option>
+                  </select>
+                </label>}
+              </div>
+              <label className="plotter-check"><input type="checkbox" checked={background} onChange={e => setBackground(e.target.checked)} /> Compensar iluminação do papel</label>
+              <button type="button" disabled={!drawing || !canFiles} onClick={() => drawing && run('Vetorizando novamente…', async () => {
+                const next = await plotter.revectorize(drawing, options);
+                invalidate(); setDrawing(next); setExcluded(new Set());
+              })}>Vetorizar novamente</button>
+            </details>
+          </>}
+          {kind === 'zsweep' && <ZSweepTest contact={pen.z_contact} variant={variant} onVariant={next => { setVariant(next); invalidate(); }} />}
+          {kind === 'cross' && <p className="plotter-muted">Cruz leve no meio da área útil para conferir o alinhamento da caneta.</p>}
+          {kind === 'frame' && <p className="plotter-muted">Contorno da área útil para conferir onde o papel está.</p>}
+        </>)}
+        <section className="plotter-card plotter-fold">
+          <details open={!area}>
+            <summary><h2>2 · Papel</h2><span className="plotter-muted">{paperSummary}</span></summary>
+            <fieldset disabled={!!jog}>
+              <div className="plotter-fields">
+                <label className="plotter-field"><span>Formato</span>
+                  <select aria-label="Formato" value={config.paper_presets.find(preset => preset.w === paper.w && preset.h === paper.h)?.id ?? ''}
+                    onChange={e => {
+                      const preset = config.paper_presets.find(item => item.id === e.target.value);
+                      if (preset) changePaper({ ...paper, w: preset.w, h: preset.h });
+                    }}>
+                    <option value="">Personalizado</option>
+                    {config.paper_presets.map(preset => <option key={preset.id}>{preset.id}</option>)}
+                  </select>
+                </label>
+                <button className="plotter-swap" type="button" onClick={() => changePaper({ ...paper, w: paper.h, h: paper.w })}>Girar formato 90°</button>
+                {PAPER_FIELDS.map(([key, label, min, max]) => <Numeric key={key} label={label} value={paper[key]} min={min} max={max}
+                  onChange={value => { if (value !== null && value !== paper[key]) changePaper({ ...paper, [key]: value }); }} />)}
               </div>
             </fieldset>
           </details>
+        </section>
+        <section className="plotter-card plotter-fold">
+          <details open={!!jog || (calibOpen ?? !calibrated)} onToggle={e => setCalibOpen(e.currentTarget.open)}>
+            <summary><h2>3 · Caneta</h2>
+              <span className="plotter-muted">{penTypes.find(item => item.key === pen.pen_type)?.name ?? pen.name} · {mountInfo?.name ?? mount} · {calibrated ? `contato Z ${pen.z_contact} mm` : 'contato pendente'}</span></summary>
+            <MountPicker settings={settings} mounts={mounts} penTypes={penTypes} disabled={!!jog || !!busy}
+              onChange={next => { invalidate(); setSettings(next); }} />
+            <ContactAdjust jog={jog} contact={pen.z_contact} steps={(mountInfo?.jog_steps ?? [0.1, 0.5]).filter(step => Math.abs(step) <= config.limits.jog_max_step)}
+              hint={MOUNT_ABOUT[mount].contact} canControl={canControl} canStart={!!area && canStart}
+              reason={!canControl ? 'Seu usuário não tem permissão para mover a impressora.' : !area ? 'O papel não tem área útil dentro do alcance da caneta.' : jog ? undefined : blocker}
+              onStart={() => run('Fazendo homing…', async () => {
+                invalidate();
+                const saved = await saveSettings();
+                await plotter.jogStart(id, saved.active_pen);
+                await statusQuery.refetch();
+              })}
+              onMove={moveHeight}
+              onFinish={save => run('Recolhendo caneta…', async () => {
+                await moves.current;
+                await plotter.jogFinish(id, save);
+                await statusQuery.refetch();
+                const saved = await plotter.settings(id);
+                applySaved(saved);
+                invalidate();
+                setMessage(save ? 'Altura de contato salva.' : 'Ajuste encerrado.');
+              })} />
+            <details><summary>Perfil da caneta</summary>
+              <fieldset disabled={!!jog || !canControl}>
+                {samePens.length > 1 && <label className="plotter-field"><span>Perfil ativo</span>
+                  <select aria-label="Perfil ativo" value={settings.active_pen} onChange={e => { invalidate(); setSettings({ ...settings, active_pen: e.target.value }); }}>
+                    {samePens.map(([key, item]) => <option key={key} value={key}>{item.name}</option>)}
+                  </select>
+                </label>}
+                <PenFields pen={pen} mount={mountInfo} penTypes={penTypes} onChange={changePen} />
+                <div className="plotter-actions">
+                  <button type="button" onClick={() => run('Salvando ajustes…', async () => { await saveSettings(); invalidate(); setMessage('Ajustes salvos.'); })}>Salvar ajustes</button>
+                </div>
+              </fieldset>
+            </details>
           </details>
         </section>
-        {section('Operação', <>
+        {section('4 · Enviar', <>
           <p className="plotter-muted" role="status">{plotMessage}</p>
-          <div className="plotter-fields">
-            <label className="plotter-field"><span>Trabalho</span>
-              <select aria-label="Trabalho" value={kind} onChange={e => { setKind(e.target.value as Kind); invalidate(); }}>
-                {Object.entries(KIND_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-              </select>
-            </label>
-            {kind === 'drawing' && <>
-              <label className="plotter-field"><span>Pressão</span>
-                <select aria-label="Pressão" value={pressure} onChange={e => { setPressure(e.target.value); invalidate(); }}>
-                  <option value="variable">Variável</option><option value="constant">Constante</option>
-                </select>
-              </label>
-              {pressure === 'variable' && <label className="plotter-field"><span>Largura do traço</span>
-                <select aria-label="Largura do traço" value={widthMode} onChange={e => { setWidthMode(e.target.value); invalidate(); }}>
-                  <option value="fit">Adaptar à faixa da caneta</option><option value="physical">Escala física da imagem</option>
-                </select>
-              </label>}
-            </>}
-          </div>
-          {penChanged && <p className="plotter-muted">Salve o perfil da caneta para aplicar as mudanças ao plano.</p>}
-          <button type="button" disabled={!canFiles || !area || penChanged || (kind === 'drawing' && (!drawing || excluded.size === drawing.strokes.length)) || !!jog} onClick={preview}>Gerar e validar plano</button>
+          <button type="button" disabled={!canGenerate} onClick={preview}>Gerar e validar plano</button>
+          {generateHint && <p className="plotter-muted">{generateHint}</p>}
           {plan && <div className="plotter-result" aria-live="polite">
             <strong>{plan.ok ? 'G-code validado' : 'Plano recusado'}{plan.stats.time_s !== undefined ? ` · ${showTime(plan.stats.time_s)} estimados` : ''}</strong>
             {!!calibrationText(plan.calibration) && <p>{calibrationText(plan.calibration)}</p>}

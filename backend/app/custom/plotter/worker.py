@@ -91,7 +91,10 @@ def plan_job(request: dict) -> dict:
             raise E.PlanError("o papel não tem área útil dentro do alcance da caneta")
         if kind == "zsweep":
             touch = E.z_levels(pen, paper, machine)["touch"]
-            paths, extra = E.calibration.z_sweep(area, pen, touch, paper.w, request.get("z_from"), request.get("z_to"))
+            paths, extra = E.calibration.z_sweep(
+                area, pen, touch, paper.w, request.get("z_from"), request.get("z_to"),
+                request.get("lines") or E.calibration.Z_LINES, request.get("speeds"), bool(request.get("reverse")),
+            )
         elif kind == "cross":
             target = request.get("target")
             paths, extra = E.calibration.offset_cross(area, pen, tuple(target) if target else None)

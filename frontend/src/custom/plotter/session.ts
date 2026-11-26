@@ -1,4 +1,5 @@
 import type { Kind, Paper, Placement, Plan } from './api';
+import type { SweepVariant } from './thickness';
 
 /**
  * Rascunho do que está montado na tela do Plotter (papel, desenho, opções e plano validado), guardado no
@@ -6,7 +7,7 @@ import type { Kind, Paper, Placement, Plan } from './api';
  * as calibrações da caneta continuam no servidor e nunca entram aqui.
  */
 export type Session = {
-  at: number; paper: Paper; placement: Placement; customized: boolean; activePen: string; kind: Kind;
+  at: number; paper: Paper; placement: Placement; customized: boolean; activePen: string; kind: Kind; variant?: SweepVariant;
   pressure: string; widthMode: string; threshold: number | null; background: boolean; ink: string; invert: string;
   excluded: number[]; drawingId: string | null; plan: Plan | null;
 };
@@ -31,6 +32,7 @@ export function loadSession(id: number, now = Date.now()): Session | null {
     return {
       ...(data as Session),
       kind: known ? (data.kind as Kind) : 'drawing',
+      variant: data.variant === 'speeds' || data.variant === 'reverse' ? data.variant : 'reference',
       excluded: Array.isArray(data.excluded) ? data.excluded.filter(finite) : [],
       drawingId: typeof data.drawingId === 'string' ? data.drawingId : null,
       plan: known && data.plan && typeof data.plan === 'object' ? data.plan : null,

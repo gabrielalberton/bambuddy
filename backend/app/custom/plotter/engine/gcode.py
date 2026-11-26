@@ -152,7 +152,7 @@ def build_gcode(
     z = z_levels(pen, paper, machine)
     touch, z_travel, floor = z["touch"], z["travel"], z["floor"]
     ox, oy = pen.offset_x, pen.offset_y
-    f_draw, f_travel, f_z = pen.draw_speed * 60.0, pen.travel_speed * 60.0, pen.z_speed * 60.0
+    f_travel, f_z = pen.travel_speed * 60.0, pen.z_speed * 60.0
 
     deepest = max(float(p.pts[:, 2].max()) for p in paths)
     if touch - deepest < floor - 1e-9:
@@ -180,13 +180,15 @@ def build_gcode(
     nozzle = (hx, hy)
     for path in paths:
         pts = path.pts
+        speed = min(pen.draw_speed, path.speed) if path.speed else pen.draw_speed
+        f_draw = speed * 60.0
         x0, y0, d0 = float(pts[0, 0]), float(pts[0, 1]), float(pts[0, 2])
         nx, ny = x0 - ox, y0 - oy
         check(nx, ny)
         joined = pen_down and cur is not None and math.hypot(x0 - cur[0], y0 - cur[1]) <= JOIN_TOLERANCE
         if joined:
             dist = math.hypot(nx - nozzle[0], ny - nozzle[1])
-            ops.append((f"G1 X{fmt(nx)} Y{fmt(ny)} Z{fmt(touch - d0)} F{fmt(f_draw, 0)}", dist / pen.draw_speed))
+            ops.append((f"G1 X{fmt(nx)} Y{fmt(ny)} Z{fmt(touch - d0)} F{fmt(f_draw, 0)}", dist / speed))
             draw_mm += dist
         else:
             if pen_down:
@@ -210,11 +212,11 @@ def build_gcode(
             cur_z = touch - float(q[2])
             word_f = "" if last_f == f_draw else f" F{fmt(f_draw, 0)}"
             last_f = f_draw
-            ops.append((f"G1 X{fmt(qx)} Y{fmt(qy)} Z{fmt(cur_z)}{word_f}", dist / pen.draw_speed))
+            ops.append((f"G1 X{fmt(qx)} Y{fmt(qy)} Z{fmt(cur_z)}{word_f}", dist / speed))
             stroke_len += dist
             nozzle = (qx, qy)
         if stroke_len > 0:
-            ops.append(("", pen.draw_speed / ACCEL_XY))  # acelera e freia uma vez por traço
+            ops.append(("", speed / ACCEL_XY))  # acelera e freia uma vez por traço
         draw_mm += stroke_len
         pen_down = True
         cur = (float(pts[-1, 0]), float(pts[-1, 1]))

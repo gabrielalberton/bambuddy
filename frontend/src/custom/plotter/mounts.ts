@@ -30,7 +30,7 @@ export const MOUNT_ABOUT: Record<MountKey, About> = {
       'Atrito: a mesma altura dá pressões diferentes descendo e subindo.',
       'A força mínima da mola limita o traço mais leve.',
     ],
-    contact: 'Desça até a ponta encostar no papel e a mola começar a ceder.',
+    contact: 'Desça até a ponta encostar no papel e pare no toque, antes de a mola ceder. O teste de altura mostra a partir de onde a linha marca.',
   },
   rigid: {
     summary: 'Caneta travada no tubo, sem a mola: só a própria ponta cede.',

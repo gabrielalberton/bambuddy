@@ -115,7 +115,7 @@ def ftp(monkeypatch):
 
 async def _calibrated(client, printer_id, **pen):
     doc = (await client.get(f"{API}/printers/{printer_id}/settings")).json()
-    doc["pens"]["padrao"].update({"z_contact": 4.0, "table": TABLE, **pen})
+    doc["pens"]["padrao"].update({"z_contact": 4.0, "table": TABLE, "depth_min": 0.2, "depth_max": 1.5, **pen})
     body = {k: doc[k] for k in ("pens", "active_pen", "paper", "placement")}
     r = await client.put(f"{API}/printers/{printer_id}/settings", json=body)
     assert r.status_code == 200, r.text
@@ -253,7 +253,7 @@ async def test_padroes_de_calibracao_viram_planos(async_client, printer_factory,
     assert sweep.status_code == 200, sweep.text
     body = sweep.json()
     assert body["ok"] and body["calibration"]["test"] == "zsweep"
-    assert (body["calibration"]["z_from"], body["calibration"]["z_to"]) == (5.0, 8.0)
+    assert body["calibration"]["z_to"] - body["calibration"]["z_from"] == 4.0  # 2 mm abaixo e acima do contato
     assert body["calibration"]["length"] == 168.0
     old = await async_client.post(f"{API}/printers/{printer.id}/plans", json={"kind": "ladder"})
     assert old.status_code == 422

@@ -1,36 +1,27 @@
-import type { MountInfo, Pen, PenTypeInfo, Settings } from './api';
-import { PenTypeSelect } from './Controls';
-import { mountOf, selectMount } from './mounts';
-import { mm } from './thickness';
+import { mm, SWEEP_VARIANTS, type SweepVariant } from './thickness';
 
-const ZSWEEP_STEPS = [
-  'Plote o teste. Cada linha horizontal começa apertada (Z 5) e termina com o bico no ar (Z 8); só elas são o teste.',
-  'As verticais, a régua e os números são só marcação: cada número é o Z do bico naquele ponto.',
-  'Veja em que número o traço começa a afinar e em que número ele some, e me informe os dois.',
-];
+const EXPLAIN: Record<SweepVariant, string> = {
+  reference: 'Cinco linhas iguais: serve de referência para comparar com as próximas calibrações.',
+  speeds: 'Seis linhas, alternando velocidade cheia e 40%: mostra se a velocidade muda onde o traço some.',
+  reverse: 'As mesmas cinco linhas desenhadas de baixo para cima: separa o efeito da posição na folha do efeito da ordem em que a tinta é usada.',
+};
 
-/** Teste de altura: suporte e tipo de caneta, o que o teste faz e o botão que gera e valida o plano. */
-export function ZSweepTest({
-  settings, mounts, penTypes, disabled, canEdit, canGenerate, hint, onSettings, onPen, onGenerate,
-}: {
-  settings: Settings; mounts: MountInfo[]; penTypes: PenTypeInfo[]; disabled?: boolean; canEdit: boolean;
-  canGenerate: boolean; hint?: string; onSettings: (next: Settings) => void; onPen: (pen: Pen) => void;
-  onGenerate: () => void;
+/** Teste de altura: o que ele faz e a variação desejada. O botão que gera o plano fica em "Enviar". */
+export function ZSweepTest({ contact, variant, onVariant }: {
+  contact: number | null; variant: SweepVariant; onVariant: (next: SweepVariant) => void;
 }) {
-  const pen = settings.pens[settings.active_pen];
-  const mount = mountOf(pen);
-  const type = penTypes.find(item => item.key === pen.pen_type);
+  const range = contact === null ? '2 mm abaixo a 2 mm acima do contato' : `Z ${mm(contact - 2)} a ${mm(contact + 2)} mm`;
   return <div className="plotter-tests">
-    <h3>Teste de altura (Z)</h3>
-    <div className="plotter-segments" role="group" aria-label="Suporte no teste">
-      {mounts.map(item => <button key={item.key} type="button" aria-pressed={mount === item.key} disabled={disabled}
-        onClick={() => onSettings(selectMount(settings, item, penTypes))}>{item.name}</button>)}
-    </div>
-    <div className="plotter-fields"><PenTypeSelect pen={pen} types={penTypes} disabled={disabled || !canEdit} onChange={onPen} /></div>
-    {type && <p className="plotter-muted">{type.about} Valores iniciais: aperto de {mm(pen.depth_min)} a {mm(pen.depth_max)} mm,
-      traço de ~{mm(pen.line_width)} mm.</p>}
-    <ol className="plotter-steps">{ZSWEEP_STEPS.map(step => <li key={step}>{step}</li>)}</ol>
-    <button type="button" disabled={disabled || !canGenerate} onClick={onGenerate}>Gerar e validar o teste</button>
-    {hint && <p className="plotter-muted">{hint}</p>}
+    <p className="plotter-muted">
+      Cada linha horizontal sobe de {range}, da esquerda para a direita: começa apertada e termina com o bico no ar.
+      Só elas são o teste; as verticais, a régua e os números são marcação (cada número é o Z do bico naquele ponto).
+      Veja em que número o traço começa a afinar e em que número ele some.
+    </p>
+    <label className="plotter-field"><span>Variação</span>
+      <select aria-label="Variação do teste" value={variant} onChange={e => onVariant(e.target.value as SweepVariant)}>
+        {SWEEP_VARIANTS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+      </select>
+    </label>
+    <p className="plotter-muted">{EXPLAIN[variant]}</p>
   </div>;
 }

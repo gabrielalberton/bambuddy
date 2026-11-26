@@ -4,7 +4,7 @@ import type { HistoryItem, Pen, PenTypeInfo, Settings } from '../plotter/api';
 import { DrawingHistory } from '../plotter/History';
 import { FALLBACK_MOUNTS, selectMount } from '../plotter/mounts';
 import { ZSweepTest } from '../plotter/Thickness';
-import { applyPenType, calibrationText } from '../plotter/thickness';
+import { applyPenType, calibrationText, sweepOptions } from '../plotter/thickness';
 
 const [, RIGID] = FALLBACK_MOUNTS;
 
@@ -81,37 +81,26 @@ describe('tipo de caneta', () => {
 });
 
 describe('cartão do teste de altura', () => {
-  function renderTest(over: { canGenerate?: boolean; hint?: string } = {}) {
-    const handlers = { onSettings: vi.fn(), onPen: vi.fn(), onGenerate: vi.fn() };
-    render(<ZSweepTest
-      settings={settings({ padrao: pen(), 'sem-mola': pen({ mount: 'rigid', name: 'Caneta BIC sem mola' }) })}
-      mounts={FALLBACK_MOUNTS} penTypes={TYPES} canEdit canGenerate={over.canGenerate ?? true}
-      hint={over.hint} {...handlers} />);
-    return handlers;
-  }
-
-  it('é um teste só: explica Z 5 a 8, gera o plano e troca de suporte e de caneta', () => {
-    const props = renderTest();
-    expect(screen.getByRole('heading', { name: 'Teste de altura (Z)' })).toBeTruthy();
+  it('explica a faixa de contato ±2 mm e troca a variação do teste', () => {
+    const onVariant = vi.fn();
+    render(<ZSweepTest contact={7} variant="reference" onVariant={onVariant} />);
     expect(screen.queryByText(/Escada|Pente|Cunha|Onda/)).toBeNull();
-    expect(screen.getByText(/começa apertada \(Z 5\) e termina com o bico no ar \(Z 8\)/)).toBeTruthy();
-    expect((screen.getByLabelText('Tipo de caneta') as HTMLSelectElement).value).toBe('bic');
-    fireEvent.change(screen.getByLabelText('Tipo de caneta'), { target: { value: 'canetinha' } });
-    expect(props.onPen.mock.calls[0][0]).toMatchObject({ pen_type: 'canetinha', z_contact: null });
-    fireEvent.click(screen.getByRole('button', { name: 'Sem mola' }));
-    expect(props.onSettings.mock.calls[0][0].active_pen).toBe('sem-mola');
-    fireEvent.click(screen.getByRole('button', { name: 'Gerar e validar o teste' }));
-    expect(props.onGenerate).toHaveBeenCalledTimes(1);
+    expect(screen.getByText(/sobe de Z 5 a 9 mm/)).toBeTruthy();
+    expect(screen.getByText(/Cinco linhas iguais/)).toBeTruthy();
+    fireEvent.change(screen.getByLabelText('Variação do teste'), { target: { value: 'speeds' } });
+    expect(onVariant).toHaveBeenCalledWith('speeds');
   });
 
-  it('sem contato calibrado o botão de gerar fica desligado e explica o motivo', () => {
-    renderTest({ canGenerate: false, hint: 'Antes, calibre a altura de contato.' });
-    expect((screen.getByRole('button', { name: 'Gerar e validar o teste' }) as HTMLButtonElement).disabled).toBe(true);
-    expect(screen.getByText('Antes, calibre a altura de contato.')).toBeTruthy();
+  it('as variações viram opções do pedido do plano', () => {
+    expect(sweepOptions('reference')).toEqual({});
+    expect(sweepOptions('speeds')).toEqual({ lines: 6, speeds: [1, 0.4] });
+    expect(sweepOptions('reverse')).toEqual({ reverse: true });
   });
 
-  it('descreve o teste gerado com o Z inicial e final', () => {
-    expect(calibrationText({ test: 'zsweep', z_from: 5, z_to: 8, length: 168 })).toMatch(/Z 5 a 8 mm em 168 mm/);
+  it('descreve o teste gerado com o Z inicial e final, as velocidades e a ordem', () => {
+    expect(calibrationText({ test: 'zsweep', z_from: 5, z_to: 9, length: 168 })).toMatch(/Z 5 a 9 mm em 168 mm/);
+    expect(calibrationText({ test: 'zsweep', z_from: 5, z_to: 9, length: 168, speeds: [60, 24], order: [4, 3, 2, 1, 0] }))
+      .toMatch(/60 · 24 mm\/s.*de baixo para cima/);
     expect(calibrationText({})).toBe('');
   });
 });

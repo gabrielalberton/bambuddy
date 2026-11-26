@@ -125,7 +125,7 @@ PEN_TYPES: dict[str, PenType] = {
         "Esferográfica (BIC Cristal). A esfera só gira com força; a largura quase não muda.",
         0.4,
         60.0,
-        {"spring": (0.4, 1.5, 3.0), "rigid": (0.05, 0.2, 0.3)},
+        {"spring": (1.4, 2.5, 3.0), "rigid": (0.05, 0.2, 0.3)},
     ),
     "canetinha": PenType(
         "canetinha",
