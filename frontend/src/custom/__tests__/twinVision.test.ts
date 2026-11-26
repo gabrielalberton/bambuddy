@@ -31,6 +31,6 @@ describe('observações de câmera no Twin', () => {
     expect(camera.current(10)).toEqual({ x: 120 });
     camera.observe({ ts: 1004.6, vision: { at: 1002, x: 121 } }, 12.6, null);
     expect(camera.current(12.6)).toBeNull();
-    expect(camera.pose).toEqual({ x: 120 });
+    expect(camera.current(10)).toEqual({ x: 120 });
   });
 });

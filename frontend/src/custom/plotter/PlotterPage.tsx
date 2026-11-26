@@ -99,6 +99,7 @@ function Workspace({ id, config, initial }: { id: number; config: Config; initia
   const [travel, setTravel] = useState(true);
   const [ready, setReady] = useState(false);
   const [busy, setBusy] = useState('');
+  const moves = useRef<Promise<void>>(Promise.resolve());
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [imageUrl, setImageUrl] = useState<string>();
@@ -157,16 +158,26 @@ function Workspace({ id, config, initial }: { id: number; config: Config; initia
     setLayer(current => current === 'simulation' ? 'vector' : current);
   }
 
+  function showError(err: unknown) {
+    const reasons = err instanceof ApiError ? err.detail?.reasons as { text: string }[] | undefined : undefined;
+    setError(reasons?.length ? reasons.map(reason => reason.text).join(' ') : String((err as Error).message || err));
+  }
+
+  // Os ajustes de altura saem em fila (um depois do outro), sem travar a tela entre um toque e outro.
+  function moveHeight(z: number) {
+    const sent = moves.current.then(() => plotter.jogMove(id, z)).then(() => undefined);
+    moves.current = sent.catch(() => undefined);
+    setError('');
+    return sent.catch(err => { showError(err); throw err; });
+  }
+
   function run(label: string, task: () => Promise<void>) {
     if (running.current) return;
     running.current = true;
     setBusy(label);
     setError('');
     setMessage('');
-    void task().catch(err => {
-      const reasons = err instanceof ApiError ? err.detail?.reasons as { text: string }[] | undefined : undefined;
-      setError(reasons?.length ? reasons.map(reason => reason.text).join(' ') : String(err.message || err));
-    }).finally(() => {
+    void task().catch(showError).finally(() => {
       running.current = false;
       setBusy('');
     });
@@ -421,8 +432,9 @@ function Workspace({ id, config, initial }: { id: number; config: Config; initia
               await plotter.jogStart(id, saved.active_pen);
               await statusQuery.refetch();
             })}
-            onMove={z => run('Ajustando altura…', async () => { await plotter.jogMove(id, z); await statusQuery.refetch(); })}
+            onMove={moveHeight}
             onFinish={save => run('Recolhendo caneta…', async () => {
+              await moves.current;
               await plotter.jogFinish(id, save);
               await statusQuery.refetch();
               const saved = await plotter.settings(id);

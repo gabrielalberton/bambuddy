@@ -41,9 +41,9 @@ describe('altura de contato', () => {
     expect(props.onMove).toHaveBeenLastCalledWith(19);
     fireEvent.click(screen.getByRole('button', { name: '0,1 mm' }));
     fireEvent.click(screen.getByRole('button', { name: /Subir 0,1/ }));
-    expect(props.onMove).toHaveBeenLastCalledWith(20.1);
+    expect(props.onMove).toHaveBeenLastCalledWith(19.1);
     fireEvent.click(screen.getByRole('button', { name: /Descer 0,1/ }));
-    expect(props.onMove).toHaveBeenLastCalledWith(19.9);
+    expect(props.onMove).toHaveBeenLastCalledWith(19);
   });
 
   it('sem mola oferece o passo de 0,02 mm e não passa do piso', () => {
@@ -55,7 +55,7 @@ describe('altura de contato', () => {
     expect(props.onMove).toHaveBeenLastCalledWith(0.63);
   });
 
-  it('OK grava o contato; cancelar levanta sem gravar; tudo trava enquanto a A1 se move', () => {
+  it('OK grava o contato; cancelar levanta sem gravar; nada trava enquanto a A1 se move', () => {
     const props = setup({ jog: jog() });
     fireEvent.click(screen.getByRole('button', { name: 'OK, salvar contato e levantar' }));
     expect(props.onFinish).toHaveBeenLastCalledWith(true);
@@ -63,9 +63,27 @@ describe('altura de contato', () => {
     expect(props.onFinish).toHaveBeenLastCalledWith(false);
     props.rerender(<ContactAdjust jog={jog({ settling: 2 })} contact={null} steps={SPRING} hint="" canControl canStart
       onStart={props.onStart} onMove={props.onMove} onFinish={props.onFinish} />);
-    expect(screen.getByText(/aguarde o movimento/)).toBeTruthy();
+    expect(screen.queryByText(/aguarde/)).toBeNull();
     for (const name of [/Descer/, /Subir/, /OK, salvar/, /Cancelar/]) {
-      expect((screen.getByRole('button', { name }) as HTMLButtonElement).disabled).toBe(true);
+      expect((screen.getByRole('button', { name }) as HTMLButtonElement).disabled).toBe(false);
     }
+  });
+
+  it('toques seguidos somam os passos sem esperar a A1 responder', () => {
+    const props = setup({ jog: jog({ settling: 3 }) });
+    for (let i = 0; i < 3; i += 1) fireEvent.click(screen.getByRole('button', { name: /Descer 1/ }));
+    expect(props.onMove.mock.calls.map(call => call[0])).toEqual([19, 18, 17]);
+    expect(screen.getByRole('status').textContent).toMatch(/Z 17,00 mm/);
+    props.rerender(<ContactAdjust jog={jog({ z: 17 })} contact={null} steps={SPRING} hint="" canControl canStart
+      onStart={props.onStart} onMove={props.onMove} onFinish={props.onFinish} />);
+    fireEvent.click(screen.getByRole('button', { name: /Subir 1/ }));
+    expect(props.onMove).toHaveBeenLastCalledWith(18);
+  });
+
+  it('se o movimento falha, volta a valer a altura informada pela A1', async () => {
+    const props = setup({ jog: jog() });
+    props.onMove.mockRejectedValueOnce(new Error('falhou'));
+    fireEvent.click(screen.getByRole('button', { name: /Descer 1/ }));
+    await vi.waitFor(() => expect(screen.getByRole('status').textContent).toMatch(/Z 20,00 mm/));
   });
 });
