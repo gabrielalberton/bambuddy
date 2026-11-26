@@ -15,6 +15,7 @@ import { Plate, type Edit, type Layer } from './Plate';
 import { PlateCamera } from './PlateCamera';
 import { PlateClear } from './PlateClear';
 import { PLATE_TABS, type PlateTab } from './platePhoto';
+import { loadSession, saveSession } from './session';
 import { useAerialPlate } from './useAerialPlate';
 import { usePlotterConfig } from './navigation';
 import './plotter.css';
@@ -83,20 +84,23 @@ function Workspace({ id, config, initial }: { id: number; config: Config; initia
     queryKey: ['custom', 'plotter', id, 'status'], queryFn: () => plotter.status(id),
     refetchInterval: query => query.state.data?.jog ? 700 : 3000, retry: false,
   });
-  const [settings, setSettings] = useState(initial);
+  const [restored] = useState(() => loadSession(id));
+  const [settings, setSettings] = useState<Settings>(() => restored ? {
+    ...initial, paper: restored.paper, active_pen: restored.activePen in initial.pens ? restored.activePen : initial.active_pen,
+  } : initial);
   const [drawing, setDrawing] = useState<Drawing | null>(null);
-  const [excluded, setExcluded] = useState(new Set<number>());
-  const [placement, setPlacement] = useState<Placement>(initial.placement ?? { cx: 128, cy: 110, width: 150, rotation: 0 });
+  const [excluded, setExcluded] = useState(new Set<number>(restored?.excluded));
+  const [placement, setPlacement] = useState<Placement>(restored?.placement ?? initial.placement ?? { cx: 128, cy: 110, width: 150, rotation: 0 });
   const [layer, setLayer] = useState<Layer>('vector');
   const [edit, setEdit] = useState<Edit>('lock');
-  const [kind, setKind] = useState<Kind>('drawing');
-  const [pressure, setPressure] = useState('variable');
-  const [widthMode, setWidthMode] = useState('fit');
-  const [threshold, setThreshold] = useState<number | null>(null);
-  const [background, setBackground] = useState(true);
-  const [ink, setInk] = useState('luma');
-  const [invert, setInvert] = useState('auto');
-  const [plan, setPlan] = useState<Plan | null>(null);
+  const [kind, setKind] = useState<Kind>(restored?.kind ?? 'drawing');
+  const [pressure, setPressure] = useState(restored?.pressure ?? 'variable');
+  const [widthMode, setWidthMode] = useState(restored?.widthMode ?? 'fit');
+  const [threshold, setThreshold] = useState<number | null>(restored?.threshold ?? null);
+  const [background, setBackground] = useState(restored?.background ?? true);
+  const [ink, setInk] = useState(restored?.ink ?? 'luma');
+  const [invert, setInvert] = useState(restored?.invert ?? 'auto');
+  const [plan, setPlan] = useState<Plan | null>(restored?.plan ?? null);
   const [time, setTime] = useState(0);
   const [travel, setTravel] = useState(true);
   const [ready, setReady] = useState(false);
@@ -121,7 +125,7 @@ function Workspace({ id, config, initial }: { id: number; config: Config; initia
   const { aerial, status: aerialStatus } = useAerialPlate(id, aerialOn);
   const history = useQuery({ queryKey: HISTORY_KEY, queryFn: plotter.drawings, retry: false });
   const running = useRef(false);
-  const positionCustomized = useRef(initial.placement !== null);
+  const positionCustomized = useRef(initial.placement !== null || !!restored?.customized);
   const pen = settings.pens[settings.active_pen];
   const mounts = config.mounts?.length ? config.mounts : FALLBACK_MOUNTS;
   const penTypes = config.pen_types ?? [];
@@ -139,6 +143,22 @@ function Workspace({ id, config, initial }: { id: number; config: Config; initia
   const blocker = status?.blockers[0]?.text;
   const canStart = !!status && !blocker && !jog;
   const penChanged = JSON.stringify(pen) !== JSON.stringify(savedSettings.current.pens[settings.active_pen]);
+
+  // Reabre o desenho do rascunho (a imagem fica no histórico do servidor).
+  useEffect(() => {
+    const wanted = restored?.drawingId;
+    if (!wanted) return;
+    let active = true;
+    plotter.openDrawing(wanted).then(next => { if (active) setDrawing(current => current ?? next); }).catch(() => undefined);
+    return () => { active = false; };
+  }, [restored]);
+
+  useEffect(() => {
+    saveSession(id, {
+      at: Date.now(), paper: settings.paper, placement, customized: positionCustomized.current, activePen: settings.active_pen,
+      kind, pressure, widthMode, threshold, background, ink, invert, excluded: [...excluded], drawingId: drawing?.id ?? restored?.drawingId ?? null, plan,
+    });
+  }, [id, settings.paper, settings.active_pen, placement, kind, pressure, widthMode, threshold, background, ink, invert, excluded, drawing, plan, restored]);
 
   useEffect(() => {
     if (!drawing || (layer !== 'original' && layer !== 'overlay')) return;
