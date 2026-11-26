@@ -326,7 +326,7 @@ function Workspace({ id, config, initial }: { id: number; config: Config; initia
         {edit === 'exclude' && layer !== 'simulation' && <p className="plotter-muted">Toque em um traço para excluir ou restaurar. Os excluídos aparecem em vermelho.</p>}
         <Plate machine={settings.machine} paper={paper} area={area} pen={pen} drawing={drawing} placement={placement}
           imageUrl={imageUrl} aerial={aerial} tab={tab} layer={layer} edit={edit} points={plan?.sim} time={time} travel={travel}
-          locked={!!busy || !!jog || layer === 'simulation'} onPaper={changePaper} onPlacement={changePlacement}
+          locked={!!busy || !!jog} onPaper={changePaper} onPlacement={changePlacement}
           excluded={excluded} onToggleStroke={index => {
             const next = new Set(excluded);
             if (next.has(index)) next.delete(index);
