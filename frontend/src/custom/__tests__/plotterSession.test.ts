@@ -4,7 +4,7 @@ import { loadSession, saveSession, SESSION_MAX_AGE_MS, type Session } from '../p
 
 const session = (over: Partial<Session> = {}): Session => ({
   at: 1_000_000, paper: { x: 23, y: 0, w: 210, h: 297, margin: 5, thickness: 0.1 },
-  placement: { cx: 128, cy: 110, width: 150, rotation: 0 }, customized: true, activePen: 'padrao', kind: 'wave',
+  placement: { cx: 128, cy: 110, width: 150, rotation: 0 }, customized: true, activePen: 'padrao', kind: 'zsweep',
   pressure: 'variable', widthMode: 'fit', threshold: null, background: true, ink: 'luma', invert: 'auto',
   excluded: [2, 5], drawingId: 'abc', plan: { id: 'p1', ok: true } as unknown as Plan, ...over,
 });
@@ -34,10 +34,15 @@ describe('rascunho do Plotter no navegador', () => {
     expect(loadSession(1, 1_000_500)).toBeNull();
   });
 
+  it('rascunho com um dos testes antigos volta ao desenho e descarta o plano', () => {
+    store.set('plotter-session-1', JSON.stringify(session({ kind: 'wave' as never })));
+    expect(loadSession(1, 1_000_500)).toMatchObject({ kind: 'drawing', plan: null, drawingId: 'abc' });
+  });
+
   it('sem espaço para o plano, guarda o resto do rascunho', () => {
     (localStorage.setItem as Mock).mockImplementationOnce(() => { throw new DOMException('cheio', 'QuotaExceededError'); });
     saveSession(1, session());
     expect(vi.mocked(localStorage.setItem)).toHaveBeenCalledTimes(2);
-    expect(loadSession(1, 1_000_500)).toMatchObject({ kind: 'wave', drawingId: 'abc', plan: null });
+    expect(loadSession(1, 1_000_500)).toMatchObject({ kind: 'zsweep', drawingId: 'abc', plan: null });
   });
 });

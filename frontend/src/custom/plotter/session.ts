@@ -11,6 +11,7 @@ export type Session = {
   excluded: number[]; drawingId: string | null; plan: Plan | null;
 };
 
+const KINDS: string[] = ['drawing', 'zsweep', 'cross', 'frame'];
 export const SESSION_MAX_AGE_MS = 12 * 60 * 60 * 1000;
 const key = (id: number) => `plotter-session-${id}`;
 
@@ -26,11 +27,13 @@ export function loadSession(id: number, now = Date.now()): Session | null {
     if (!finite(data.at) || now - (data.at as number) > SESSION_MAX_AGE_MS) return null;
     if (!isPaper(data.paper as Record<string, unknown>) || !isPlacement(data.placement as Record<string, unknown>)) return null;
     if (typeof data.activePen !== 'string' || typeof data.kind !== 'string') return null;
+    const known = KINDS.includes(data.kind as string);  // rascunho de antes da troca dos testes: volta ao desenho
     return {
       ...(data as Session),
+      kind: known ? (data.kind as Kind) : 'drawing',
       excluded: Array.isArray(data.excluded) ? data.excluded.filter(finite) : [],
       drawingId: typeof data.drawingId === 'string' ? data.drawingId : null,
-      plan: data.plan && typeof data.plan === 'object' ? data.plan : null,
+      plan: known && data.plan && typeof data.plan === 'object' ? data.plan : null,
     };
   } catch { return null; }
 }

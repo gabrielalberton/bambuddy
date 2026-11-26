@@ -61,124 +61,71 @@ def test_numeros_saem_com_virgula_e_alinhados_a_direita():
 
 
 # ---------------------------------------------------------------- teste 2: pente
+
+
+# ---------------------------------------------------------------- teste de altura (Z 5 -> 8 mm)
+def sweep(pen=None, paper=None, **kw):
+    pen = pen or calibrated(z_contact=6.0)
+    paper = paper or E.Paper()
+    area = E.drawable_area(E.A1, pen, paper)
+    touch = E.z_levels(pen, paper, E.A1)["touch"]
+    return E.calibration.z_sweep(area, pen, touch, paper.w, **kw), pen, paper
+
+
+def test_linhas_do_teste_descem_de_z5_a_z8_da_esquerda_para_a_direita():
+    (paths, info), pen, paper = sweep()
+    touch = info["touch"]
+    tests = [q for q in paths if len(q.pts) == 2 and q.pts[0, 2] != q.pts[1, 2]]
+    assert len(tests) == 5 and info["rows"] == [round(float(q.pts[0, 1]), 2) for q in tests]
+    for q in tests:
+        assert touch - q.pts[0, 2] == pytest.approx(5.0) and touch - q.pts[1, 2] == pytest.approx(8.0)
+        assert q.pts[1, 0] - q.pts[0, 0] == pytest.approx(info["length"])
+    assert info["length"] == pytest.approx(0.8 * paper.w)
+    ids = {id(q) for q in tests}
+    order = [id(q) in ids for q in paths]
+    assert order == sorted(order)  # régua, verticais e números antes das linhas do teste
+
+
+def test_verticais_numeradas_marcam_o_z_de_cada_posicao():
+    (paths, info), _, _ = sweep()
+    marks = {m["z"]: m["x"] for m in info["marks"]}
+    assert list(marks) == [5.0, 5.5, 6.0, 6.5, 7.0, 7.5, 8.0]
+    assert marks[5.0] == pytest.approx(info["left"]) and marks[8.0] == pytest.approx(info["left"] + info["length"])
+    assert marks[6.5] == pytest.approx(info["left"] + info["length"] / 2.0)
+    depths = {round(float(d), 3) for q in paths if not (len(q.pts) == 2 and q.pts[0, 2] != q.pts[1, 2]) for d in q.pts[:, 2]}
+    assert len(depths) == 1  # verticais, régua e números saem leves e iguais: só as linhas do teste variam
+    assert max(info["rows"]) < info["top"] and info["bottom"] < min(info["rows"])
+
+
+def test_teste_tem_uns_50_mm_de_altura_e_80_por_cento_da_largura_do_papel():
+    (paths, info), _, paper = sweep()
+    x0, y0, x1, y1 = info["box"]
+    assert x1 - x0 == pytest.approx(0.8 * paper.w)
+    assert 45.0 <= y1 - y0 <= 55.0
+
+
 @pytest.mark.parametrize("mount", ["spring", "rigid"])
-def test_pente_tem_uma_celula_por_espacamento_em_cada_aperto(mount):
-    pen = calibrated(mount)
-    paths, info = E.calibration.spacing_comb(a4_area(pen), pen)
-    depths = [r["depth"] for r in info["rows"]]
-    assert depths == E.calibration.comb_depths(pen) and depths[0] == pen.depth_min and depths[-1] == pen.depth_max
-    spacings = info["spacings"]
-    assert len(spacings) == 8 and spacings == sorted(spacings)
-    assert spacings[0] <= pen.line_width <= spacings[-1]  # a largura nominal fica dentro do pente
-    cells = [q for q in paths if len(q.pts) > 4 and np.ptp(q.pts[:, 2]) == 0 and q.pts[0, 2] in depths]
-    cells = [q for q in cells if np.ptp(q.pts[:, 0]) == pytest.approx(E.calibration.COMB_CELL)]
-    assert len(cells) == len(depths) * len(spacings)
-    first = cells[0]  # linhas da primeira célula ficam a exatamente um espaçamento umas das outras
-    ys = sorted(set(np.round(first.pts[:, 1], 4)), reverse=True)
-    assert np.allclose(-np.diff(ys), spacings[0])
-    plot = E.plot_paths(paths, pen, E.Paper(), title="pente")
+def test_teste_de_altura_passa_na_validacao_com_o_bico_acima_do_contato(mount):
+    pen = calibrated(mount=mount, z_contact=6.0)
+    kw = {} if mount == "spring" else {"z_from": 5.8, "z_to": 6.5}
+    (paths, info), pen, paper = sweep(pen, **kw)
+    plot = E.plot_paths(paths, pen, paper, title="altura")
     assert plot.ok, plot.report.errors
+    assert plot.report.stats["z_max"] >= info["touch"]  # a linha sobe até ficar acima do papel
 
 
-def test_pente_de_marcador_nao_passa_da_celula():
-    pen = calibrated(pen_type="marcador")
-    spacings = E.calibration.comb_spacings(pen)
-    assert spacings[-1] <= 0.6 * E.calibration.COMB_CELL and spacings[0] < pen.line_width
+def test_teste_recusa_aperto_alem_do_suporte_e_papel_pequeno():
+    pen = calibrated(z_contact=6.0)
+    area = E.drawable_area(E.A1, pen, E.Paper())
+    with pytest.raises(E.PlanError, match="limite do suporte"):
+        E.calibration.z_sweep(area, pen, 6.0, 210.0, z_from=1.0, z_to=8.0)
     with pytest.raises(E.PlanError):
-        E.calibration.spacing_comb(a4_area(pen), pen, spacings=[0.3, 6.0])
-
-
-# ---------------------------------------------------------------- teste 3: cunha com régua
-@pytest.mark.parametrize("mount", ["spring", "rigid"])
-def test_cunha_vai_subindo_e_volta_descendo_sobre_a_regua(mount):
-    pen = calibrated(mount)
-    paths, info = E.calibration.ruler_wedge(a4_area(pen), pen)
-    top = E.calibration.default_ladder_depths(pen)[-1]
-    assert (info["from"], info["to"], info["length"], info["marks"]) == (0.0, top, 100.0, 10)
-    forward, back = paths[-2].pts, paths[-1].pts
-    assert forward[0, 2] == 0.0 and forward[-1, 2] == top and forward[-1, 0] - forward[0, 0] == 100.0
-    # a volta corre da direita para a esquerda com o mesmo aperto da ida em cada ponto da régua
-    assert back[0, 0] == forward[-1, 0] and back[0, 2] == top and back[-1, 2] == 0.0
-    assert info["return_y"] < info["forward_y"]
-    grid = info["grid"]  # a grade numerada é a régua: coluna 0 no começo da ida, 10 no fim
-    assert grid["zero_x"] == forward[0, 0] and grid["zero_x"] + grid["pitch"] * info["marks"] == forward[-1, 0]
-    plot = E.plot_paths(paths, pen, E.Paper(), title="cunha")
-    assert plot.ok, plot.report.errors
-
-
-def test_cunha_encurta_em_papel_pequeno_e_recusa_o_que_nao_cabe():
-    pen = calibrated()
-    _, info = E.calibration.ruler_wedge(E.drawable_area(E.A1, pen, E.Paper(w=105, h=148)), pen)
-    assert info["length"] == 70.0 and info["marks"] == 7
+        E.calibration.z_sweep(area, pen, 6.0, 210.0, z_from=8.0, z_to=5.0)
     with pytest.raises(E.PlanError):
-        E.calibration.ruler_wedge((0, 0, 40, 40), pen)
-    with pytest.raises(E.PlanError):
-        E.calibration.ruler_wedge(a4_area(pen), pen, top_depth=9.0)
+        E.calibration.z_sweep((0, 0, 40, 30), pen, 6.0, 210.0)
 
 
-def test_layouts_dos_testes_seguem_o_perfil():
-    rigid = calibrated("rigid")
-    out = E.calibration.thickness_layouts(rigid, a4_area(rigid))
-    assert out["ladder"]["depths"] == [0.0, 0.05, 0.1, 0.15, 0.2, 0.3]
-    assert out["comb"]["depths"] == [0.05, 0.1, 0.15, 0.2]
-    assert out["wedge"] == {"from": 0.0, "to": 0.3, "length": 100.0}
-    assert out["wave"] == {"length": 150.0, "from": 0.05, "to": 0.2, "ramps": [5.0, 10.0, 20.0, 40.0]}
+def test_bic_vai_mais_rapido_que_antes():
+    pen = E.PenProfile.for_mount("spring", "bic")
+    assert (pen.draw_speed, pen.travel_speed, pen.z_speed) == (60.0, 200.0, 20.0)
 
-
-# ---------------------------------------------------------------- teste 4: onda e pontas
-@pytest.mark.parametrize("mount", ["spring", "rigid"])
-def test_onda_varia_do_minimo_ao_maximo_e_as_pontas_somem(mount):
-    pen = calibrated(mount)
-    paths, info = E.calibration.wave_tapers(a4_area(pen), pen)
-    ramps = [t["ramp"] for t in info["tapers"]]
-    assert ramps == [5.0, 10.0, 20.0, 40.0] and info["length"] == 150.0
-    wave = paths[-1 - len(ramps)].pts
-    assert wave[0, 2] == pytest.approx(pen.depth_min) and np.ptp(wave[:, 0]) == pytest.approx(150.0)
-    assert wave[:, 2].min() >= pen.depth_min - 1e-9 and wave[:, 2].max() == pytest.approx(pen.depth_max, abs=0.01)
-    peaks = np.flatnonzero((wave[1:-1, 2] > wave[:-2, 2]) & (wave[1:-1, 2] >= wave[2:, 2]))
-    assert len(peaks) >= 5 and np.diff(wave[peaks + 1, 0])[-1] < np.diff(wave[peaks + 1, 0])[0]  # ondas encurtam
-    for taper, ramp in zip(paths[-len(ramps) :], ramps, strict=True):
-        pts = taper.pts
-        assert pts[0, 2] == 0.0 and pts[-1, 2] == 0.0 and pts[:, 2].max() == pen.depth_max  # some nas duas pontas
-        assert pts[1, 0] - pts[0, 0] == ramp and pts[-1, 0] - pts[-2, 0] == ramp
-    plot = E.plot_paths(paths, pen, E.Paper(), title="onda")
-    assert plot.ok, plot.report.errors
-
-
-def test_pontas_alongam_para_respeitar_a_variacao_de_aperto_do_modo():
-    pen = calibrated(depth_max=3.0, max_compression=3.0)  # 3 mm em 5 mm passaria de 0,6 mm por mm
-    ramps = E.calibration.taper_ramps(pen)
-    assert ramps[0] >= 3.0 / (0.9 * E.MOUNTS["spring"].max_slope) and ramps[0] % 5 == 0
-
-
-@pytest.mark.parametrize("make", ["pressure_ladder", "spacing_comb", "ruler_wedge", "wave_tapers"])
-@pytest.mark.parametrize("mount", ["spring", "rigid"])
-def test_todo_teste_sai_numa_grade_de_10_mm_e_respeita_o_modo(make, mount):
-    pen = calibrated(mount, "pincel")
-    paths, info = getattr(E.calibration, make)(a4_area(pen), pen)
-    grid = info["grid"]
-    vertical = paths[0].pts
-    xs = sorted(set(np.round(vertical[:, 0], 6)))
-    assert len(xs) == grid["cols"] + 1 and np.allclose(np.diff(xs), 10.0)
-    assert np.ptp(vertical[:, 1]) == pytest.approx(10.0 * grid["rows"])
-    # variação de aperto por mm dentro do limite do modo em todos os traços
-    slope = pen.mount_spec.max_slope
-    for q in paths:
-        seg = np.hypot(*np.diff(q.pts[:, :2], axis=0).T)
-        dd = np.abs(np.diff(q.pts[:, 2]))
-        assert np.all(dd <= slope * seg + 1e-9)
-    box = info["box"]
-    for q in paths:  # tudo dentro da caixa informada (grade + números embaixo)
-        assert q.pts[:, 0].min() >= box[0] - 1e-6 and q.pts[:, 0].max() <= box[2] + 1e-6
-        assert q.pts[:, 1].min() >= box[1] - 0.6 and q.pts[:, 1].max() <= box[3] + 1e-6
-
-
-def test_celulas_do_pente_nao_encostam_na_grade():
-    pen = calibrated()
-    paths, info = E.calibration.spacing_comb(a4_area(pen), pen)
-    zero, top = info["grid"]["zero_x"], info["grid"]["top"]
-    cells = [q for q in paths if np.ptp(q.pts[:, 0]) == pytest.approx(5.0) and len(q.pts) > 4]
-    for q in cells:
-        cx = (q.pts[:, 0].min() - zero) % 10.0
-        cy = (top - q.pts[:, 1].max()) % 10.0
-        assert cx == pytest.approx(2.5) and cy == pytest.approx(2.5)

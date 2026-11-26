@@ -58,15 +58,14 @@ class VectorizeBody(BaseModel):
 
 
 class PlanBody(BaseModel):
-    kind: Literal["drawing", "ladder", "comb", "wedge", "wave", "cross", "frame"] = "drawing"
+    kind: Literal["drawing", "zsweep", "cross", "frame"] = "drawing"
     drawing_id: str | None = None
     placement: dict | None = None
     paper: dict | None = None
     pen_id: str | None = None
     options: dict = Field(default_factory=dict)
-    depths: list[float] | None = Field(default=None, max_length=24)
-    spacings: list[float] | None = Field(default=None, max_length=12)
-    top_depth: float | None = None
+    z_from: float | None = Field(default=None, ge=0, le=60)
+    z_to: float | None = Field(default=None, ge=0, le=60)
     target: list[float] | None = Field(default=None, min_length=2, max_length=2)
     title: str | None = Field(default=None, max_length=80)
 
@@ -156,8 +155,6 @@ def _settings_view(printer_id: int, doc: dict) -> dict:
             "jog_steps": list(pen.mount_spec.jog_steps),
             "contact_calibrated": pen.contact_calibrated,
             "pressure_calibrated": pen.pressure_calibrated,
-            "ladder_depths": E.calibration.default_ladder_depths(pen),
-            "tests": E.calibration.thickness_layouts(pen, area),
         }
     hx, hy, on_paper = E.home_point(machine, paper)
     return {**doc, "derived": derived, "home": [hx, hy, on_paper], "machine": P.machine_info(machine)}
@@ -269,7 +266,7 @@ async def create_plan(
         request.update(drawing=drawing, placement=body.placement, options=body.options)
         request["title"] = body.title or (drawing.get("meta") or {}).get("name") or "desenho"
     else:
-        request.update(depths=body.depths, spacings=body.spacings, top_depth=body.top_depth, target=body.target)
+        request.update(z_from=body.z_from, z_to=body.z_to, target=body.target)
     try:
         result = await worker.run("plan", request, timeout=worker.PLAN_TIMEOUT)
     except (ValueError, worker.JobError) as exc:

@@ -21,7 +21,7 @@ from dataclasses import dataclass
 from .plan import PenPath, PlanError
 from .profile import APPROACH_GAP, Machine, Paper, PenProfile, home_point
 
-ACCEL_XY = 3000.0  # mm/s²: abaixo do padrão da A1 (6000) para a caneta não balançar no suporte
+ACCEL_XY = 5000.0  # mm/s²: um pouco abaixo do padrão da A1 (6000) para a caneta não balançar no suporte
 ACCEL_Z = 500.0
 JOIN_TOLERANCE = 0.2  # mm: traço seguinte começando aqui perto não levanta a caneta
 HOMING_SECONDS = 40.0

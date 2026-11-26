@@ -249,15 +249,14 @@ async def test_plano_so_para_a1_e_com_desenho_existente(async_client, printer_fa
 async def test_padroes_de_calibracao_viram_planos(async_client, printer_factory, manager):
     printer = await printer_factory(model="A1")
     await _calibrated(async_client, printer.id, table=[])  # só a altura de contato: já dá para a folha de teste
-    ladder = await async_client.post(
-        f"{API}/printers/{printer.id}/plans", json={"kind": "ladder", "depths": [0.0, 0.4, 0.8, 1.2]}
-    )
-    assert ladder.status_code == 200, ladder.text
-    assert ladder.json()["ok"] and [r["depth"] for r in ladder.json()["calibration"]["rows"]] == [0.0, 0.4, 0.8, 1.2]
-    comb = (await async_client.post(f"{API}/printers/{printer.id}/plans", json={"kind": "comb"})).json()
-    assert comb["ok"] and comb["calibration"]["test"] == "comb" and len(comb["calibration"]["spacings"]) == 8
-    wedge = await async_client.post(f"{API}/printers/{printer.id}/plans", json={"kind": "wedge", "top_depth": 1.0})
-    assert wedge.json()["ok"] and wedge.json()["calibration"]["to"] == 1.0, wedge.text
+    sweep = await async_client.post(f"{API}/printers/{printer.id}/plans", json={"kind": "zsweep"})
+    assert sweep.status_code == 200, sweep.text
+    body = sweep.json()
+    assert body["ok"] and body["calibration"]["test"] == "zsweep"
+    assert (body["calibration"]["z_from"], body["calibration"]["z_to"]) == (5.0, 8.0)
+    assert body["calibration"]["length"] == 168.0
+    old = await async_client.post(f"{API}/printers/{printer.id}/plans", json={"kind": "ladder"})
+    assert old.status_code == 422
     cross = await async_client.post(f"{API}/printers/{printer.id}/plans", json={"kind": "cross", "target": [100, 100]})
     assert cross.json()["ok"] and cross.json()["calibration"]["target"] == [100.0, 100.0]
     assert (await async_client.post(f"{API}/printers/{printer.id}/plans", json={"kind": "frame"})).json()["ok"]
@@ -526,9 +525,7 @@ async def test_config_traz_tipos_de_caneta_e_ajustes_trazem_os_testes(async_clie
     bic = cfg["pen_types"][0]["defaults"]
     assert bic["rigid"]["max_compression"] == 0.3 and bic["spring"]["name"] == "Caneta BIC com mola"
     doc = (await async_client.get(f"{API}/printers/{printer.id}/settings")).json()
-    tests = doc["derived"]["padrao"]["tests"]
-    assert tests["ladder"]["depths"][0] == 0.0 and tests["wedge"]["length"] == 100.0
-    assert tests["comb"]["depths"] == [0.4, 0.77, 1.13, 1.5]
+    assert "tests" not in doc["derived"]["padrao"] and "ladder_depths" not in doc["derived"]["padrao"]
     # trocar o tipo de caneta é só mais um campo do perfil
     doc["pens"]["padrao"].update(E.PEN_TYPES["canetinha"].values_for("spring"), pen_type="canetinha")
     body = {k: doc[k] for k in ("pens", "active_pen", "paper", "placement")}

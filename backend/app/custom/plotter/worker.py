@@ -89,14 +89,9 @@ def plan_job(request: dict) -> dict:
         area = E.drawable_area(machine, pen, paper)
         if area is None:
             raise E.PlanError("o papel não tem área útil dentro do alcance da caneta")
-        if kind == "ladder":
-            paths, extra = E.calibration.pressure_ladder(area, pen, request.get("depths"))
-        elif kind == "comb":
-            paths, extra = E.calibration.spacing_comb(area, pen, request.get("depths"), request.get("spacings"))
-        elif kind == "wedge":
-            paths, extra = E.calibration.ruler_wedge(area, pen, request.get("top_depth"))
-        elif kind == "wave":
-            paths, extra = E.calibration.wave_tapers(area, pen)
+        if kind == "zsweep":
+            touch = E.z_levels(pen, paper, machine)["touch"]
+            paths, extra = E.calibration.z_sweep(area, pen, touch, paper.w, request.get("z_from"), request.get("z_to"))
         elif kind == "cross":
             target = request.get("target")
             paths, extra = E.calibration.offset_cross(area, pen, tuple(target) if target else None)

@@ -195,7 +195,7 @@ def test_tempo_do_gerador_bate_com_o_do_validador():
     assert plot.report.stats["time_s"] == pytest.approx(plot.stats["gcode"]["time_s"], rel=0.02)
     assert plot.report.stats["draw_mm"] == pytest.approx(plot.stats["gcode"]["draw_mm"], rel=0.01)
     assert plot.report.stats["pen_downs"] == plot.stats["gcode"]["pen_downs"] == 1
-    assert plot.report.sim and plot.report.sim[-1][3] <= plot.report.stats["time_s"]
+    assert plot.report.sim and plot.report.sim[-1][3] <= plot.report.stats["time_s"] + 0.1  # time_s é arredondado
 
 
 @pytest.mark.parametrize(
@@ -286,30 +286,6 @@ def test_plot_recusado_nao_empacota():
 
 
 # ---------------------------------------------------------------- calibração
-def test_escada_tem_uma_linha_por_aperto_com_o_aperto_escrito_ao_lado():
-    p = E.PenProfile.from_dict({"z_contact": 4.0})
-    area = E.drawable_area(E.A1, p, E.Paper())
-    paths, info = E.calibration.pressure_ladder(area, p, [0.0, 0.3, 0.6, 1.0])
-    assert [r["depth"] for r in info["rows"]] == [0.0, 0.3, 0.6, 1.0]
-    lines = [q for q in paths if len(q.pts) == 2 and abs(q.pts[1, 0] - q.pts[0, 0]) == E.calibration.LADDER_LINE]
-    assert [float(q.pts[0, 2]) for q in lines] == [0.0, 0.3, 0.6, 1.0]
-    assert [round(float(q.pts[0, 1]), 2) for q in lines] == [r["y"] for r in info["rows"]]
-    line_ids = {id(q) for q in lines}
-    order = [id(q) in line_ids for q in paths]
-    assert order == sorted(order)  # grade e números antes das linhas
-    zero = info["grid"]["zero_x"]
-    assert all(q.pts[0, 0] in (zero, zero + 50.0) for q in lines)
-    labels = [q for q in paths if id(q) not in line_ids and q.pts[:, 1].min() > info["grid"]["top"] - 80]
-    labels = [q for q in labels if np.ptp(q.pts[:, 0]) < 3 and q.pts[:, 0].max() < zero]
-    assert labels  # aperto escrito na coluna da esquerda
-    plot = E.plot_paths(paths, p, E.Paper(), title="folha")
-    assert plot.ok, plot.report.errors
-    with pytest.raises(E.PlanError):
-        E.calibration.pressure_ladder(area, p, [0.0, 9.0])
-    with pytest.raises(E.PlanError):
-        E.calibration.pressure_ladder((0, 0, 30, 30), p)
-
-
 def test_cruz_corrige_o_offset_da_caneta():
     p = pen()
     area = E.drawable_area(E.A1, p, E.Paper())

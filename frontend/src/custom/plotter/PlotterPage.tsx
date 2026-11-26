@@ -8,8 +8,8 @@ import { Numeric, PenFields } from './Controls';
 import { ContactAdjust } from './Contact';
 import { DrawingHistory } from './History';
 import { MountPicker } from './Mount';
-import { ThicknessTests } from './Thickness';
-import { calibrationText, type TestKind } from './thickness';
+import { ZSweepTest } from './Thickness';
+import { calibrationText } from './thickness';
 import { FALLBACK_MOUNTS, MOUNT_ABOUT, mountOf } from './mounts';
 import { Plate, type Edit, type Layer } from './Plate';
 import { PlateCamera } from './PlateCamera';
@@ -30,8 +30,7 @@ const POSITION_FIELDS: [keyof Placement, string, number, number][] = [
   ['cx', 'Centro X (mm)', -500, 800], ['cy', 'Centro Y (mm)', -500, 800],
 ];
 const KIND_LABELS: Record<Kind, string> = {
-  drawing: 'Desenho', ladder: 'Teste 1 · Escada numerada', comb: 'Teste 2 · Pente de espessura',
-  wedge: 'Teste 3 · Cunha com régua', wave: 'Teste 4 · Onda e pontas',
+  drawing: 'Desenho', zsweep: 'Teste de altura (Z 5 a 8)',
   cross: 'Cruz de alinhamento', frame: 'Contorno da área útil',
 };
 const HISTORY_KEY = ['custom', 'plotter', 'drawings'];
@@ -301,24 +300,12 @@ function Workspace({ id, config, initial }: { id: number; config: Config; initia
   }
 
   /** Teste de espessura: grava o perfil se mudou (suporte, tipo de caneta) e gera o plano do teste. */
-  function generateTest(test: TestKind) {
+  function generateTest() {
     run('Gerando teste…', async () => {
-      setKind(test);
+      setKind('zsweep');
       if (penChanged) await saveSettings();
-      const next = await makePlan(test);
+      const next = await makePlan('zsweep');
       setMessage(next.ok ? 'Teste validado. Confira a simulação na mesa e inicie em “Operação”.' : 'Teste recusado: veja os motivos em “Operação”.');
-    });
-  }
-
-  function applyResult(next: Pen, notes: string[]) {
-    run('Gravando resultado…', async () => {
-      const saved = await plotter.save(id, {
-        ...settings, pens: { ...settings.pens, [settings.active_pen]: next },
-        placement: drawing ? placement : settings.placement,
-      });
-      applySaved(saved);
-      invalidate();
-      setMessage(`Gravado em “${next.name}”. ${notes.join(' ')}`);
     });
   }
 
@@ -410,12 +397,11 @@ function Workspace({ id, config, initial }: { id: number; config: Config; initia
               invalidate(); setDrawing(next); setExcluded(new Set());
             })}>Vetorizar novamente</button>
           </details>
-          <ThicknessTests settings={settings} mounts={mounts} penTypes={penTypes} layouts={settings.derived?.[settings.active_pen]?.tests}
-            kind={kind} calibration={plan?.calibration} disabled={!!busy || !!jog} canEdit={canControl}
+          <ZSweepTest settings={settings} mounts={mounts} penTypes={penTypes}
+            disabled={!!busy || !!jog} canEdit={canControl}
             canGenerate={canFiles && canControl && !!area && pen.z_contact !== null}
             hint={pen.z_contact === null ? 'Antes, calibre a altura de contato em “Calibração da caneta”.' : !area ? 'O papel está fora do alcance da caneta.' : undefined}
-            onSettings={next => { invalidate(); setSettings(next); }} onPen={changePen}
-            onPick={test => { setKind(test); invalidate(); }} onGenerate={generateTest} onApply={applyResult} />
+            onSettings={next => { invalidate(); setSettings(next); }} onPen={changePen} onGenerate={generateTest} />
         </>)}
         {section('Papel', <fieldset disabled={!!jog}>
           <div className="plotter-fields">
@@ -510,7 +496,7 @@ function Workspace({ id, config, initial }: { id: number; config: Config; initia
           <button type="button" disabled={!canFiles || !area || penChanged || (kind === 'drawing' && (!drawing || excluded.size === drawing.strokes.length)) || !!jog} onClick={preview}>Gerar e validar plano</button>
           {plan && <div className="plotter-result" aria-live="polite">
             <strong>{plan.ok ? 'G-code validado' : 'Plano recusado'}{plan.stats.time_s !== undefined ? ` · ${showTime(plan.stats.time_s)} estimados` : ''}</strong>
-            {!!calibrationText(plan.calibration, mount === 'rigid') && <p>{calibrationText(plan.calibration, mount === 'rigid')}</p>}
+            {!!calibrationText(plan.calibration) && <p>{calibrationText(plan.calibration)}</p>}
             {[...plan.errors, ...plan.warnings].map((notice, index) => <p key={index}>{notice.text}</p>)}
             {plan.ok && <button type="button" onClick={() => run('Baixando G-code…', async () => {
               const url = URL.createObjectURL(await plotter.download(id, plan));

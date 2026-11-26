@@ -56,12 +56,6 @@ def test_sem_mola_limita_o_aperto_e_obriga_a_malha():
         E.PenProfile.from_dict({"mount": "elastico"})
 
 
-def test_escala_de_pressao_sem_mola_tem_passos_finos():
-    assert E.calibration.default_ladder_depths(rigid()) == [0.0, 0.05, 0.1, 0.15, 0.2, 0.3, 0.4, 0.5]
-    spring_steps = E.calibration.default_ladder_depths(spring())
-    assert spring_steps[0] == 0.0 and spring_steps[-1] == 1.5 and min(np.diff(spring_steps)) >= 0.1 - 1e-9
-
-
 def test_sem_mola_suaviza_mais_a_mudanca_de_aperto():
     paper, place = E.Paper(), E.Placement(cx=128, cy=110, width=100)
     opts = E.PlanOptions(pressure="variable", width_mode="fit")
@@ -93,7 +87,7 @@ def test_com_mola_desce_direto():
     paths, _ = E.calibration.frame(E.drawable_area(E.A1, pen, E.Paper()), pen)
     lines = code_lines(E.build_gcode(paths, pen, E.Paper(), E.A1).text)
     downs = [ln for ln in lines if ln.startswith("G1 Z3.") and "X" not in ln]
-    assert downs and all(ln.endswith("F600") for ln in downs)
+    assert downs and all(ln.endswith("F1200") for ln in downs)
 
 
 @pytest.mark.parametrize(
@@ -119,8 +113,10 @@ def test_plano_sem_mola_avisa_da_folha_plana():
     assert "rigid_flatness" not in {i.code for i in plot.issues}
 
 
-def test_escala_de_pressao_sem_mola_tambem_avisa_da_folha_plana():
+def test_teste_de_altura_sem_mola_tambem_avisa_da_folha_plana():
     pen = rigid()
-    paths, _ = E.calibration.pressure_ladder(E.drawable_area(E.A1, pen, E.Paper()), pen)
-    plot = E.plot_paths(paths, pen, E.Paper())
+    paper = E.Paper()
+    touch = E.z_levels(pen, paper, E.A1)["touch"]
+    paths, _ = E.calibration.z_sweep(E.drawable_area(E.A1, pen, paper), pen, touch, paper.w, touch - 0.2, touch + 0.5)
+    plot = E.plot_paths(paths, pen, paper)
     assert plot.ok and [i.code for i in plot.issues] == ["rigid_flatness"]

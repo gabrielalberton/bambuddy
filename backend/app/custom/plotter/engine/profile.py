@@ -62,7 +62,7 @@ MOUNTS: dict[str, Mount] = {
             "depth_min": 0.2,
             "depth_max": 1.2,
             "max_compression": 3.0,
-            "z_speed": 10.0,
+            "z_speed": 20.0,
         },
     ),
     "rigid": Mount(
@@ -124,7 +124,7 @@ PEN_TYPES: dict[str, PenType] = {
         "Caneta BIC",
         "Esferográfica (BIC Cristal). A esfera só gira com força; a largura quase não muda.",
         0.4,
-        25.0,
+        60.0,
         {"spring": (0.4, 1.5, 3.0), "rigid": (0.05, 0.2, 0.3)},
     ),
     "canetinha": PenType(
@@ -256,7 +256,7 @@ class PenProfile:
     line_width: float = 0.5  # largura nominal da ponta (pressão constante e pré-visualização)
     table: list[list[float]] = field(default_factory=list)  # [[aperto, largura], ...] medidos na folha de teste
     draw_speed: float = 25.0  # mm/s
-    travel_speed: float = 100.0
+    travel_speed: float = 200.0
     z_speed: float = 10.0
     dwell_ms: int = 0  # espera depois de baixar a caneta (tinta começar a sair)
     use_mesh: bool = True  # usa a malha de nivelamento salva (pressão mais uniforme na folha)

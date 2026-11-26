@@ -16,16 +16,9 @@ export type Pen = {
   line_width: number; draw_speed: number; travel_speed: number; z_speed: number;
   dwell_ms: number; use_mesh: boolean; table: [number, number][];
 };
-export type TestLayouts = {
-  ladder: { depths: number[] };
-  comb: { depths: number[]; spacings: number[] };
-  wedge: { from: number; to: number; length: number };
-  wave: { from: number; to: number; length: number; ramps: number[] };
-};
 export type Settings = {
   machine: Machine; pens: Record<string, Pen>; active_pen: string;
   paper: Paper; placement: Placement | null;
-  derived?: Record<string, { tests?: TestLayouts }>;
 };
 export type HistoryItem = {
   id: string; name: string; created_at: number; updated_at: number; strokes: number;
@@ -55,11 +48,9 @@ export type PlateMatch = {
   outline?: [number, number][]; front_plane_mm?: number; y_mm?: number;
   topdown?: { image: string; margin: number };
 };
-export type Kind = 'drawing' | 'ladder' | 'comb' | 'wedge' | 'wave' | 'cross' | 'frame';
+export type Kind = 'drawing' | 'zsweep' | 'cross' | 'frame';
 export type Calibration = {
-  test?: 'ladder' | 'comb' | 'wedge' | 'wave'; rows?: { depth: number; y: number }[]; target?: [number, number];
-  spacings?: number[]; length?: number; marks?: number; from?: number; to?: number;
-  tapers?: { ramp: number; depth: number }[];
+  test?: 'zsweep'; target?: [number, number]; length?: number; z_from?: number; z_to?: number; touch?: number;
 };
 export type SimPoint = [x: number, y: number, depth: number, time: number];
 export type Plan = {
