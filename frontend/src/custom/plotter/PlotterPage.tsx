@@ -100,6 +100,7 @@ function Workspace({ id, config, initial }: { id: number; config: Config; initia
   const [ready, setReady] = useState(false);
   const [busy, setBusy] = useState('');
   const moves = useRef<Promise<void>>(Promise.resolve());
+  const [calibOpen, setCalibOpen] = useState<boolean | null>(null);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [imageUrl, setImageUrl] = useState<string>();
@@ -132,6 +133,7 @@ function Workspace({ id, config, initial }: { id: number; config: Config; initia
   const end = plan?.sim.at(-1)?.[3] ?? 0;
   const options = { threshold, background, ink, invert };
   const hasPressure = pen.table.length > 1 && Math.max(...pen.table.map(row => row[1])) > Math.min(...pen.table.map(row => row[1]));
+  const calibrated = pen.z_contact !== null;
   const blocker = status?.blockers[0]?.text;
   const canStart = !!status && !blocker && !jog;
   const penChanged = JSON.stringify(pen) !== JSON.stringify(savedSettings.current.pens[settings.active_pen]);
@@ -419,7 +421,10 @@ function Workspace({ id, config, initial }: { id: number; config: Config; initia
             </button>}
           </div>
         </>)}
-        {section('Calibração da caneta', <>
+        <section className="plotter-card plotter-calibration">
+          <details open={!!jog || (calibOpen ?? !calibrated)} onToggle={e => setCalibOpen(e.currentTarget.open)}>
+            <summary><h2>Calibração da caneta</h2>
+              <span className="plotter-muted">{calibrated ? `Contato Z ${pen.z_contact} mm` : 'Contato pendente'}{hasPressure ? ' · pressão medida' : ' · pressão pendente'}</span></summary>
           <MountPicker settings={settings} mounts={mounts} penTypes={penTypes} disabled={!!jog || !!busy}
             onChange={next => { invalidate(); setSettings(next); }} />
           <p className="plotter-muted">{mountInfo?.name ?? mount} · {penTypes.find(item => item.key === pen.pen_type)?.name ?? pen.name} · {pen.z_contact === null ? 'Contato pendente' : `Contato Z ${pen.z_contact} mm`} · {hasPressure ? 'Curva de pressão medida' : 'Curva de pressão pendente'}</p>
@@ -455,7 +460,8 @@ function Workspace({ id, config, initial }: { id: number; config: Config; initia
               </div>
             </fieldset>
           </details>
-        </>)}
+          </details>
+        </section>
         {section('Operação', <>
           <p className="plotter-muted" role="status">{plotMessage}</p>
           <div className="plotter-fields">

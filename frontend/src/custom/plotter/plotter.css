@@ -261,3 +261,7 @@
 .plotter-jog { display: grid; grid-template-columns: 1fr 1fr; gap: .65rem; margin-block-start: .65rem; }
 .plotter .plotter-jog button { display: flex; align-items: center; justify-content: center; gap: .4rem; min-height: 3.2rem; font-size: 1rem; }
 .plotter .plotter-contact-cancel { width: 100%; margin-block-start: .5rem; }
+
+.plotter-calibration > details > summary { display: flex; flex-wrap: wrap; align-items: baseline; gap: .25rem .75rem; list-style-position: inside; }
+.plotter-calibration > details > summary h2 { display: inline; margin: 0; }
+.plotter-calibration > details[open] > summary { margin-bottom: .6rem; }
