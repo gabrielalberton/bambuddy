@@ -524,6 +524,7 @@ Detalhes e medições: [camera-h264](docs/camera-h264.md).
 
 - `backend/app/api/routes/library.py` e `schemas/library.py` projetam no resultado da listagem o ID da origem salvo em `file_metadata.sliced_from_library_file_id`, quando a origem também está visível na resposta.
 - `frontend/src/custom/libraryFamilies/` reaproveita o vínculo para organizar grade, lista e colunas com os fatiamentos sob a origem na mesma pasta. Busca ou filtros que ocultam a origem mantêm os resultados fatiados acessíveis. Os arquivos conservam suas ações, pastas e IDs.
+- Na grade, a família é um painel sobre as próprias colunas da grade (CSS `subgrid`). A origem e os fatiamentos são cartões comuns, e a família ocupa tantas colunas quanto tem arquivos, até o limite da grade. `GridFamily.tsx` mede as colunas e o espaçamento da grade. Antes (até 2026-11-26) os fatiamentos ficavam numa coluna interna `auto`. Um nome longo alargava o cartão para além da tela e esticava os vizinhos.
 - Ganchos em `FileManagerPage` nos mapas de renderização e nas listas ordenadas usadas pelo teclado. Desativar com `localStorage.setItem('custom.libraryFamilies', 'off')` e recarregar.
 - `ArchivesPage` usa a própria chave de título traduzível; o português do fork apresenta essa área como **Impressos**, inclusive no menu.
 
