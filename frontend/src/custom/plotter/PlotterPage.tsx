@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Download, ImageUp, PenTool, Play, ScanEye } from 'lucide-react';
-import { ApiError } from '../../api/client';
+import { api, ApiError } from '../../api/client';
 import { useAuth } from '../../contexts/AuthContext';
 import { drawableArea, plotter, type Config, type Drawing, type HistoryItem, type Kind, type Paper, type Pen, type Placement, type Plan, type Rect, type Settings } from './api';
 import { Numeric, PenFields } from './Controls';
@@ -13,6 +13,7 @@ import { calibrationText, type TestKind } from './thickness';
 import { FALLBACK_MOUNTS, MOUNT_ABOUT, mountOf } from './mounts';
 import { Plate, type Edit, type Layer } from './Plate';
 import { PlateCamera } from './PlateCamera';
+import { PlateClear } from './PlateClear';
 import { PLATE_TABS, type PlateTab } from './platePhoto';
 import { useAerialPlate } from './useAerialPlate';
 import { usePlotterConfig } from './navigation';
@@ -77,6 +78,7 @@ function Workspace({ id, config, initial }: { id: number; config: Config; initia
   const savedSettings = useRef(initial);
   const canFiles = !authEnabled || hasPermission('printers:files');
   const canControl = !authEnabled || hasPermission('printers:control');
+  const canClearPlate = !authEnabled || hasPermission('printers:clear_plate');
   const statusQuery = useQuery({
     queryKey: ['custom', 'plotter', id, 'status'], queryFn: () => plotter.status(id),
     refetchInterval: query => query.state.data?.jog ? 700 : 3000, retry: false,
@@ -499,6 +501,12 @@ function Workspace({ id, config, initial }: { id: number; config: Config; initia
               window.setTimeout(() => URL.revokeObjectURL(url), 10_000);
             })}><Download size={17} aria-hidden="true" /> Baixar .gcode.3mf</button>}
           </div>}
+          <PlateClear needed={!!status?.blockers.some(item => item.code === 'plate_not_cleared')} allowed={canClearPlate}
+            onConfirm={() => run('Confirmando mesa liberada…', async () => {
+              await api.clearPlate(id);
+              await statusQuery.refetch();
+              setMessage('Mesa liberada.');
+            })} />
           {canControl && <label className="plotter-check">
             <input type="checkbox" checked={ready} disabled={!!jog} onChange={e => setReady(e.target.checked)} />
             Estou junto à A1. O suporte está montado {mount === 'rigid' ? 'sem mola (caneta travada)' : 'com mola'} e a caneta,
