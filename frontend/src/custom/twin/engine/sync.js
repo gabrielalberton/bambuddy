@@ -12,6 +12,7 @@
 const LAT = 1.0;           // s: atraso típico entre a A1 executar e nós recebermos. A A1 publica deltas em ticks fixos de ~2,06 s
                            // (atraso médio ~1,0 s, até 2+ s); backend+SSE somam < 1 ms. (Medido na impressão real de 2026-11-12.)
 const RUNNING = new Set(['RUNNING', 'PREPARE']);
+const STAGE_ANCHORED = new Set([2, 13, 24, 4, 8, 3, 14, 1, 0]);
 
 export class Tracker {
   constructor(prog, opts = {}) {
@@ -33,7 +34,7 @@ export class Tracker {
     this.calib = this.o.calib0; this.speed = 1; this.scale = 0; this.corr = 0; this.tLast = null;
     this.m73i = -1; this.lastP = null; this.lastR = null; this.lastLayer = 0; this.lastLine = 0;
     this.lineT = null; this.lineTAt = 0; this.lineOk = 0; this.lineBad = 0; this.lineHist = []; this.lineTrusted = false; this.hasLine = false;
-    this.lastA = null; this.unloadAt = null; this.prevAms = null; this.holdSt = new Map(); this.waiting = false; this.s = {}; this.nAnch = 0; this.finished = false;
+    this.lastA = null; this.unloadAt = null; this.prevAms = null; this.holdSt = new Map(); this.prevStg = null; this.waiting = false; this.s = {}; this.nAnch = 0; this.finished = false;
     this.diag = { anchors: 0, snaps: 0 };
   }
 
@@ -65,7 +66,7 @@ export class Tracker {
       return;
     }
     for (const a of anchors) this.applyAnchor(a, now, age);
-    this.trackStage(s, now);
+    this.trackStage(s, now, age);
   }
 
   extractAnchors(s, now, age) {
@@ -174,6 +175,10 @@ export class Tracker {
       if (ok) T = Tl; else { this.lineBad = 99; this.lineTrusted = false; this.diag.lineDistrust = true; }
     }
     if (T === null) T = Tm;
+    if (T === null && s.stg_cur != null && !s.layer_num) {                 // entrou no meio da rotina de início: usa o estágio
+      const c = this.p.claims.find((x) => x.n === Number(s.stg_cur));
+      if (c) T = c.t + 1;
+    }
     if (T === null && s.layer_num) {
       const ev = this.layerEv.find((l) => l.n === s.layer_num);
       if (ev) T = ev.t + 2;
@@ -197,7 +202,7 @@ export class Tracker {
     const Tobs = a.T + (this.o.lat + age) * v;
     const cur = this.T + this.corr;
     // aprendizado do fator de velocidade entre âncoras fortes
-    if (a.kind !== 'layer') {
+    if (a.kind !== 'layer' && a.kind !== 'stage') {
       if (this.lastA && now - this.lastA.now >= 10) {
         if (!this.holdBetween(this.lastA.T, a.T) && this.mode === 'running' && !this.lastA.paused) {
           const meas = (Tobs - this.lastA.T) / (now - this.lastA.now);
@@ -213,7 +218,26 @@ export class Tracker {
     this.corr += err * a.w;
   }
 
-  trackStage(s, now) {
+  // Cada mudança de `stg_cur` (2, 13, 24, 4, 8, 3, 14, 1, 0) é um marco exato da rotina de início da A1. Medido na A1 real (micro 2026-11-26,
+  // vídeo em tela cheia): a ordem do simulador bate, as durações internas não (esperas de calibração, nivelamento, limpeza). Reancora o relógio
+  // do programa no evento `claim` do estágio (o mais próximo do relógio atual) em vez de deixar o erro acumular até o próximo M73.
+  stageAnchor(s, now, age) {
+    const stg = s.stg_cur == null ? null : Number(s.stg_cur);
+    if (stg === null || !Number.isFinite(stg)) return;
+    const first = this.prevStg === undefined || this.prevStg === null;
+    if (stg === this.prevStg) return;
+    this.prevStg = stg;
+    if (first || this.mode !== 'running' || !STAGE_ANCHORED.has(stg)) return;
+    const cur = this.T + this.corr;
+    let best = null;
+    for (const c of this.p.claims) if (c.n === stg && Math.abs(c.t - cur) < 150 && (!best || Math.abs(c.t - cur) < Math.abs(best.t - cur))) best = c;
+    if (!best) return;
+    this.applyAnchor({ T: best.t, w: 1, kind: 'stage' }, now, age);
+    this.diag.stage = (this.diag.stage || 0) + 1;
+  }
+
+  trackStage(s, now, age = 0) {
+    this.stageAnchor(s, now, age);
     const h = this.p.holdAt(this.T);
     if (h) {
       let st = this.holdSt.get(h);

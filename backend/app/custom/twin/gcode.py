@@ -37,10 +37,12 @@ DEFAULTS = dict(
     bed_heat=0.55,
     bed_cool=0.12,
     cal_wait={  # esperas de rotinas sem modelo físico no G-code (s)
-        "M983": 16.0,
-        "M984": 14.0,
-        "M970.3": 5.0,
-        "M970.2": 3.0,
+        # Medido na A1 real (micro 2026-11-26, vídeo em tela cheia): calibração de extrusão (stg 8) 87 s no total (simulado 47 s),
+        # varredura/mech check (stg 3) 37 s (simulado 27 s).
+        "M983": 36.0,
+        "M984": 34.0,
+        "M970.3": 8.5,
+        "M970.2": 4.5,
         "M974": 2.0,
         "M975": 0.0,
         "G39.4": 6.0,
@@ -646,18 +648,25 @@ class Interpreter:
             self._wait(1.0)
 
     def _g29(self, w: dict[str, float]) -> None:
-        """Nivelamento da mesa (A1: toque com o bico em grade). Sintetiza uma varredura em serpentina."""
+        """Nivelamento da mesa (A1: toque com o bico em grade). Sintetiza uma varredura em serpentina.
+
+        Medido na A1 real (2026-11-26, `G29 A1 X4 Y4 I248 J248`): pontos a 16 mm de cada borda da área, passo ~36 mm, ou seja 7 colunas
+        (X=20…236) x 7 linhas, serpentina, ~1,3 s por ponto (~62 s a grade) depois de ~12 s de preparação.
+        """
         self._barrier()
         x0, y0 = w.get("X", 0.0), w.get("Y", 0.0)
         sx, sy = w.get("I", 256.0), w.get("J", 256.0)
         if sx < 20 or sy < 20:
             sx, sy = 256.0 - x0, 256.0 - y0
-        n = 6
+        inset, pitch = 16.0, 36.0
+        nx = max(2, round((sx - 2 * inset) / pitch) + 1)
+        ny = max(2, round((sy - 2 * inset) / pitch) + 1)
         z_hover = 5.0
-        for iy in range(n):
-            yy = y0 + sy * iy / (n - 1)
-            for ix in range(n):
-                xx = x0 + sx * (ix if iy % 2 == 0 else n - 1 - ix) / (n - 1)
+        self._wait(12.0)
+        for iy in range(ny):
+            yy = y0 + inset + (sy - 2 * inset) * iy / (ny - 1)
+            for ix in range(nx):
+                xx = x0 + inset + (sx - 2 * inset) * (ix if iy % 2 == 0 else nx - 1 - ix) / (nx - 1)
                 self._add_block(xx, yy, z_hover, 0.0, 300)
                 self._barrier()
                 self._add_block(xx, yy, 0.0, 0.0, 12)
