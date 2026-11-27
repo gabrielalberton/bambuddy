@@ -8,26 +8,28 @@
   border-inline-start: 2px solid color-mix(in srgb, currentColor 20%, transparent);
 }
 
-/* Grid: the original and its slices are ordinary cells on the library grid's
-   own columns (subgrid), so a long name can't widen a column past the screen
-   and the cards beside the family keep their height. The panel stays inside
-   the grid area (an overhang would scroll the desktop list sideways): every
-   card in it is inset by the same amount, using padding at the panel edges
-   and a wider gap between its columns. --library-grid-gap is the library
-   grid's own gap, measured in render.tsx. */
+/* Grid: the family takes a whole row, so no card beside it is stretched to
+   its height. The original sits on the first column (subgrid); its slices
+   hang below it, indented behind the line, with small thumbnails. Every
+   track can shrink, so a long name can't widen a card past the screen. */
 .library-file-family--grid {
-  --library-family-inset: 0.375rem;
-  --library-family-gap: calc(var(--library-grid-gap, 1rem) + 2 * var(--library-family-inset));
+  grid-column: 1 / -1;
   display: grid;
   grid-template-columns: subgrid;
-  column-gap: var(--library-family-gap);
-  row-gap: var(--library-family-gap);
-  padding: var(--library-family-inset);
-  border-radius: 0.75rem;
-  background: color-mix(in srgb, currentColor 5%, transparent);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, currentColor 12%, transparent);
+  row-gap: 0.5rem;
 }
 
 .library-file-family--grid .library-file-family__slices {
-  display: contents;
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 9rem), 1fr));
+  gap: 0.5rem;
+}
+
+.library-file-family--grid .library-file-family__slices .aspect-square {
+  aspect-ratio: 2 / 1;
+}
+
+.library-file-family--grid .library-file-family__slices .aspect-square img {
+  object-fit: contain;
 }
